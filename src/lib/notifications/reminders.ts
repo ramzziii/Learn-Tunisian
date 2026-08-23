@@ -52,11 +52,12 @@ export async function scheduleDailyReminder(profileId: string, time: string): Pr
       body: REMINDER_BODY,
       data: { profileId },
     },
+    // DAILY (not CALENDAR + repeats) is the trigger type that reliably
+    // repeats every day at hour:minute on both iOS and Android.
     trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
+      type: Notifications.SchedulableTriggerInputTypes.DAILY,
       hour,
       minute,
-      repeats: true,
     },
   });
 }

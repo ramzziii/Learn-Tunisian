@@ -44,7 +44,7 @@ export function SessionCompleteCard({ minutesLearned, onClose, onAddMore }: Sess
 
 const styles = StyleSheet.create({
   overlay: {
-    ...StyleSheet.absoluteFill,
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(36, 32, 33, 0.4)',
     alignItems: 'center',
     justifyContent: 'center',
