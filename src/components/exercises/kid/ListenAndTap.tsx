@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AnswerFeedback } from '@/components/exercises/shared/AnswerFeedback';
+import { VariantCallout } from '@/components/exercises/shared/VariantCallout';
 import { WordPicture } from '@/components/exercises/shared/WordPicture';
 import { colors, kidTrackSizing, radii, spacing } from '@/constants/theme';
 import { useWordAudioPlayer } from '@/hooks/useWordAudioPlayer';
@@ -17,16 +18,16 @@ interface ListenAndTapProps {
 
 /** Kid track: listen to a word, tap the matching picture. No reading required to answer. */
 export function ListenAndTap({ exercise, onComplete }: ListenAndTapProps) {
-  const { play, hasAudio } = useWordAudioPlayer(exercise.targetWord, { autoPlay: true });
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const { play, hasAudio } = useWordAudioPlayer(exercise.promptVariant, { autoPlay: true });
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!selectedId) return;
-    const timer = setTimeout(() => onComplete(selectedId === exercise.targetWord.id), FEEDBACK_DELAY_MS);
+    if (!selectedGroupId) return;
+    const timer = setTimeout(() => onComplete(selectedGroupId === exercise.targetGroup.id), FEEDBACK_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [selectedId, exercise.targetWord.id, onComplete]);
+  }, [selectedGroupId, exercise.targetGroup.id, onComplete]);
 
-  const isCorrectSelection = selectedId === exercise.targetWord.id;
+  const isCorrectSelection = selectedGroupId === exercise.targetGroup.id;
 
   return (
     <View style={styles.container}>
@@ -39,31 +40,32 @@ export function ListenAndTap({ exercise, onComplete }: ListenAndTapProps) {
         <Text style={styles.playIcon}>🔊</Text>
       </Pressable>
       <Text style={styles.instructions}>Tap the matching picture</Text>
+      <VariantCallout group={exercise.targetGroup} />
 
       <View style={styles.grid}>
         {exercise.options.map((option) => {
-          const isSelected = selectedId === option.id;
-          const revealCorrect = selectedId !== null && option.id === exercise.targetWord.id;
+          const isSelected = selectedGroupId === option.group.id;
+          const revealCorrect = selectedGroupId !== null && option.group.id === exercise.targetGroup.id;
           return (
             <Pressable
-              key={option.id}
-              onPress={() => !selectedId && setSelectedId(option.id)}
-              disabled={!!selectedId}
+              key={option.group.id}
+              onPress={() => !selectedGroupId && setSelectedGroupId(option.group.id)}
+              disabled={!!selectedGroupId}
               style={[
                 styles.card,
                 isSelected && (isCorrectSelection ? styles.cardCorrect : styles.cardIncorrect),
                 revealCorrect && !isSelected && styles.cardCorrect,
               ]}
             >
-              <WordPicture word={option} size={PICTURE_SIZE} />
-              <Text style={styles.arabicScript}>{option.arabicScript}</Text>
+              <WordPicture group={option.group} size={PICTURE_SIZE} />
+              <Text style={styles.arabicScript}>{option.variant.wordArabic}</Text>
             </Pressable>
           );
         })}
       </View>
 
-      {selectedId ? (
-        <AnswerFeedback isCorrect={isCorrectSelection} correctAnswerLabel={exercise.targetWord.englishMeaning} />
+      {selectedGroupId ? (
+        <AnswerFeedback isCorrect={isCorrectSelection} correctAnswerLabel={exercise.targetGroup.englishMeaning} />
       ) : null}
     </View>
   );

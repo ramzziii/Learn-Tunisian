@@ -3,21 +3,21 @@ import { Image, StyleSheet, Text, View } from 'react-native';
 import { placeholderEmojiFor } from '@/constants/placeholderVisuals';
 import { colors, radii } from '@/constants/theme';
 import { getImageUrl } from '@/lib/supabase/client';
-import type { Word } from '@/types/models';
+import type { WordGroup } from '@/types/models';
 
 interface WordPictureProps {
-  word: Word;
+  group: WordGroup;
   size: number;
 }
 
-export function WordPicture({ word, size }: WordPictureProps) {
-  const imageUrl = getImageUrl(word.imagePath);
+export function WordPicture({ group, size }: WordPictureProps) {
+  const imageUrl = getImageUrl(group.imagePath);
   return (
     <View style={[styles.container, { width: size, height: size, borderRadius: radii.md }]}>
       {imageUrl ? (
         <Image source={{ uri: imageUrl }} style={{ width: size, height: size, borderRadius: radii.md }} />
       ) : (
-        <Text style={{ fontSize: size * 0.5 }}>{placeholderEmojiFor(word.englishMeaning)}</Text>
+        <Text style={{ fontSize: size * 0.5 }}>{placeholderEmojiFor(group.id)}</Text>
       )}
     </View>
   );

@@ -1,7 +1,7 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
 
 import { recordConsent } from '@/data/consent';
-import { createDailyGoalSettings, createProfile, trackForAge } from '@/data/profiles';
+import { createDailyGoalSettings, createProfile } from '@/data/profiles';
 import { requestNotificationPermission, scheduleDailyReminder } from '@/lib/notifications/reminders';
 import type { DailyGoalMinutes, LearningGoal, Profile, StartingProficiency } from '@/types/models';
 
@@ -9,8 +9,10 @@ export interface OnboardingState {
   forWhom: 'myself' | 'child' | null;
   consentGiven: boolean;
   name: string;
-  age: string; // kept as string while editing; parsed to a number on submit
+  /** ISO date string ("YYYY-MM-DD"), null until the user picks one. */
+  dateOfBirth: string | null;
   nativeLanguage: string;
+  country: string;
   startingProficiency: StartingProficiency | null;
   learningGoal: LearningGoal | null;
   dailyGoalMinutes: DailyGoalMinutes | null;
@@ -22,8 +24,9 @@ const initialState: OnboardingState = {
   forWhom: null,
   consentGiven: false,
   name: '',
-  age: '',
+  dateOfBirth: null,
   nativeLanguage: '',
+  country: '',
   startingProficiency: null,
   learningGoal: null,
   dailyGoalMinutes: null,
@@ -52,8 +55,9 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       submit: async (accountId: string) => {
         const {
           name,
-          age,
+          dateOfBirth,
           nativeLanguage,
+          country,
           startingProficiency,
           learningGoal,
           dailyGoalMinutes,
@@ -62,8 +66,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
           forWhom,
         } = state;
 
-        const parsedAge = Number(age);
-        if (!name || !Number.isFinite(parsedAge) || !nativeLanguage || !startingProficiency) {
+        if (!name || !dateOfBirth || !nativeLanguage || !country || !startingProficiency) {
           throw new Error('Missing required profile fields');
         }
         if (!dailyGoalMinutes || reminderHour === null || reminderMinute === null) {
@@ -73,8 +76,9 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
         const profile = await createProfile({
           accountId,
           name,
-          age: parsedAge,
+          dateOfBirth,
           nativeLanguage,
+          country,
           startingProficiency,
           learningGoal,
         });
@@ -84,7 +88,6 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
         const reminderTime = `${String(reminderHour).padStart(2, '0')}:${String(reminderMinute).padStart(2, '0')}:00`;
         await createDailyGoalSettings(profile.id, dailyGoalMinutes, reminderTime);
 
-        const track = trackForAge(parsedAge);
         // Notifications are requested here, at the point the reminder time is
         // set — not bundled into earlier onboarding steps — for both tracks;
         // a parent grants it on a kid profile's behalf just like any other
@@ -93,7 +96,6 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
         if (granted) {
           await scheduleDailyReminder(profile.id, `${reminderHour}:${reminderMinute}`);
         }
-        void track; // track is stored on the profile row itself; kept here for clarity at the call site
 
         return profile;
       },

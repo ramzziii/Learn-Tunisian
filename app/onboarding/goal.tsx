@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Text } from 'react-native';
 
 import { OnboardingStepLayout } from '@/components/onboarding/OnboardingStepLayout';
-import { TimePicker } from '@/components/onboarding/TimePicker';
+import { TimeWheelPicker } from '@/components/onboarding/TimeWheelPicker';
 import { Button } from '@/components/ui/Button';
 import { SelectableCard } from '@/components/ui/SelectableCard';
 import { colors, spacing } from '@/constants/theme';
@@ -69,7 +69,7 @@ export default function DailyGoalSetup() {
       <Text style={{ fontSize: 14, fontWeight: '600', marginTop: spacing.xl, marginBottom: spacing.md }}>
         Daily reminder time
       </Text>
-      <TimePicker
+      <TimeWheelPicker
         hour24={reminderHour}
         minute={reminderMinute}
         onChange={(hour24, minute) => update({ reminderHour: hour24, reminderMinute: minute })}

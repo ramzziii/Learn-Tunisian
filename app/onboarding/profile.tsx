@@ -1,10 +1,14 @@
 import { router } from 'expo-router';
 import { Text } from 'react-native';
 
+import { DateOfBirthField } from '@/components/onboarding/DateOfBirthField';
 import { OnboardingStepLayout } from '@/components/onboarding/OnboardingStepLayout';
+import { Autocomplete } from '@/components/ui/Autocomplete';
 import { Button } from '@/components/ui/Button';
 import { SelectableCard } from '@/components/ui/SelectableCard';
 import { TextField } from '@/components/ui/TextField';
+import { COUNTRIES } from '@/constants/countries';
+import { LANGUAGES } from '@/constants/languages';
 import { spacing } from '@/constants/theme';
 import { useOnboarding } from '@/lib/onboarding/OnboardingContext';
 import type { LearningGoal, StartingProficiency } from '@/types/models';
@@ -28,9 +32,9 @@ export default function ProfileSetup() {
 
   const canContinue =
     state.name.trim().length > 0 &&
-    Number(state.age) > 0 &&
-    Number(state.age) < 120 &&
+    state.dateOfBirth !== null &&
     state.nativeLanguage.trim().length > 0 &&
+    state.country.trim().length > 0 &&
     state.startingProficiency !== null;
 
   return (
@@ -46,18 +50,24 @@ export default function ProfileSetup() {
         onChangeText={(name) => update({ name })}
         placeholder={isForChild ? "Child's name" : 'Your name'}
       />
-      <TextField
-        label="Age"
-        value={state.age}
-        onChangeText={(age) => update({ age: age.replace(/[^0-9]/g, '') })}
-        keyboardType="number-pad"
-        placeholder="Age"
+      <DateOfBirthField
+        label="Date of birth"
+        value={state.dateOfBirth}
+        onChange={(dateOfBirth) => update({ dateOfBirth })}
       />
-      <TextField
+      <Autocomplete
         label="Mother tongue / native language"
         value={state.nativeLanguage}
         onChangeText={(nativeLanguage) => update({ nativeLanguage })}
-        placeholder="e.g. English"
+        options={LANGUAGES}
+        placeholder="Select or type a language"
+      />
+      <Autocomplete
+        label="Country"
+        value={state.country}
+        onChangeText={(country) => update({ country })}
+        options={COUNTRIES}
+        placeholder="Select or type a country"
       />
 
       <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: spacing.sm }}>
