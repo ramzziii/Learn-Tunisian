@@ -40,3 +40,7 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# generated placeholder audio (scripts/generate-placeholder-audio.sh) —
+# upload to Supabase Storage, don't commit
+/generated-audio

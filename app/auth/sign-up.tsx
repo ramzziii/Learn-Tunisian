@@ -1,7 +1,8 @@
 import { Link, router } from 'expo-router';
 import { useState } from 'react';
-import { Text } from 'react-native';
+import { Text, View } from 'react-native';
 
+import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { TextField } from '@/components/ui/TextField';
@@ -16,6 +17,7 @@ export default function SignUp() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [confirmationSentTo, setConfirmationSentTo] = useState<string | null>(null);
 
   const handleSignUp = async () => {
     setError(null);
@@ -24,19 +26,58 @@ export default function SignUp() {
       return;
     }
     setIsSubmitting(true);
-    const { error: signUpError } = await signUpWithEmail(email.trim(), password);
+    const trimmedEmail = email.trim();
+    const { error: signUpError, needsEmailConfirmation } = await signUpWithEmail(trimmedEmail, password);
     setIsSubmitting(false);
     if (signUpError) {
       setError(signUpError);
       return;
     }
-    // New account -> straight into onboarding to create the first profile.
+    if (needsEmailConfirmation) {
+      setConfirmationSentTo(trimmedEmail);
+      return;
+    }
+    // Project has email confirmation disabled -> a session already exists.
     router.replace('/');
   };
 
+  if (confirmationSentTo) {
+    return (
+      <ScreenContainer>
+        <BackButton />
+        <View style={{ flex: 1, justifyContent: 'center' }}>
+          <Text style={{ fontSize: 48, textAlign: 'center', marginBottom: spacing.lg }}>📬</Text>
+          <Text style={{ fontSize: 26, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' }}>
+            Check your email
+          </Text>
+          <Text
+            style={{
+              fontSize: 15,
+              color: colors.textSecondary,
+              textAlign: 'center',
+              marginTop: spacing.md,
+              lineHeight: 22,
+            }}
+          >
+            We sent a confirmation link to{'\n'}
+            <Text style={{ fontWeight: '700', color: colors.textPrimary }}>{confirmationSentTo}</Text>.{'\n\n'}
+            Tap the link to activate your account, then come back here and sign in.
+          </Text>
+          <Button
+            label="Back to sign in"
+            variant="secondary"
+            onPress={() => router.replace('/auth/sign-in')}
+            style={{ marginTop: spacing.xl }}
+          />
+        </View>
+      </ScreenContainer>
+    );
+  }
+
   return (
     <ScreenContainer>
-      <Text style={{ fontSize: 28, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.xl }}>
+      <BackButton />
+      <Text style={{ fontSize: 28, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md }}>
         Create your account
       </Text>
       <Text style={{ fontSize: 15, color: colors.textSecondary, marginTop: spacing.sm, marginBottom: spacing.xl }}>

@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { colors, radii, spacing } from '@/constants/theme';
@@ -34,6 +35,7 @@ export default function ProfileSwitcher() {
 
   return (
     <ScreenContainer>
+      <BackButton />
       <Text style={styles.title}>Who&apos;s learning?</Text>
 
       <FlatList

@@ -2,6 +2,7 @@ import { Link, router } from 'expo-router';
 import { useState } from 'react';
 import { Text } from 'react-native';
 
+import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { TextField } from '@/components/ui/TextField';
@@ -29,7 +30,8 @@ export default function SignIn() {
 
   return (
     <ScreenContainer>
-      <Text style={{ fontSize: 28, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.xl }}>
+      <BackButton />
+      <Text style={{ fontSize: 28, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md }}>
         Welcome back
       </Text>
       <Text style={{ fontSize: 15, color: colors.textSecondary, marginTop: spacing.sm, marginBottom: spacing.xl }}>
