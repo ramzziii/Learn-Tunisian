@@ -1,15 +1,22 @@
 {
   "expo": {
-    "name": "learn-tunisian",
+    "name": "Learn Tunisian",
     "slug": "learn-tunisian",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "scheme": "learntunisian",
+    "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.learntunisian.app",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Learn Tunisian uses the microphone so you can record yourself practicing a word and play it back to compare your pronunciation. This is only used when you choose a speaking exercise."
+      }
     },
     "android": {
+      "package": "com.learntunisian.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -20,6 +27,27 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-status-bar",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Learn Tunisian uses the microphone so you can record yourself practicing a word and play it back to compare your pronunciation."
+        }
+      ],
+      "expo-splash-screen",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#3E7CB1"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
     }
   }
 }
