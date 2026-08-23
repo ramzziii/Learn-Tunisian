@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { BackButton } from '@/components/ui/BackButton';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { colors, radii, spacing } from '@/constants/theme';
 import { useOnboarding } from '@/lib/onboarding/OnboardingContext';
@@ -15,6 +16,7 @@ export default function WhoIsThisFor() {
 
   return (
     <ScreenContainer>
+      <BackButton />
       <View style={{ flex: 1, justifyContent: 'center' }}>
         <Text style={styles.eyebrow}>Ahla! Welcome to</Text>
         <Text style={styles.title}>Learn Tunisian</Text>

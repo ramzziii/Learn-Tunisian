@@ -109,7 +109,14 @@ create constraint trigger word_variants_group_rules
 -- PROGRESS: track mastery per word_group (the concept), not per variant —
 -- answering with any variant of a group demonstrates knowledge of the same
 -- concept, so that's the right grain for "what has this profile learned."
+--
+-- Existing progress rows reference the old words table's content
+-- (Greetings/Family/Numbers), which has no equivalent word_group in the new
+-- schema — there's nothing sensible to backfill them to, so they're cleared
+-- rather than migrated. This is a pre-launch content reset, not a concern
+-- for real user data.
 -- ============================================================================
+delete from public.progress;
 alter table public.progress add column word_group_id text references public.word_groups (id) on delete cascade;
 alter table public.progress drop constraint progress_profile_id_word_id_key;
 alter table public.progress drop column word_id;

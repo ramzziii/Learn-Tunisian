@@ -1,5 +1,6 @@
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { BackButton } from '@/components/ui/BackButton';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { colors, spacing } from '@/constants/theme';
 
@@ -14,6 +15,7 @@ export function OnboardingStepLayout({ title, subtitle, children, footer }: Onbo
   return (
     <ScreenContainer>
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+        <BackButton />
         <Text style={styles.title}>{title}</Text>
         {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
         <View style={styles.content}>{children}</View>

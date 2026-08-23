@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { TimeWheelPicker } from '@/components/onboarding/TimeWheelPicker';
+import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
@@ -91,6 +92,7 @@ export default function ProfileSettings() {
   return (
     <ScreenContainer>
       <ScrollView showsVerticalScrollIndicator={false}>
+        <BackButton />
         <Text style={styles.title}>{activeProfile.name}&apos;s settings</Text>
 
         <Text style={styles.sectionTitle}>What they&apos;ve learned</Text>

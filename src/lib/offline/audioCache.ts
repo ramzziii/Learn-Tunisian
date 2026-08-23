@@ -28,10 +28,14 @@ export function getCachedAudioUri(variant: Pick<WordVariant, 'audioPath'>): stri
 
 /**
  * Returns a playable URI for a variant's audio, preferring the local cache.
- * If not cached yet, attempts a download so future plays work offline; on
- * failure (e.g. placeholder audio that doesn't exist yet, or no network),
- * falls back to the remote URL so playback can still be attempted, and
- * returns null only if there is no audio at all.
+ * If not cached yet, attempts a download so future plays work offline. On
+ * failure, this distinguishes two cases rather than treating them the same:
+ *   - the file genuinely doesn't exist in storage yet (placeholder content
+ *     with no recording uploaded) -> returns null, so the UI can honestly
+ *     disable the play control instead of wiring up a button that silently
+ *     does nothing when tapped.
+ *   - a transient issue downloading it locally, but the remote file is
+ *     reachable -> falls back to streaming the remote URL directly.
  */
 export async function ensureAudioCached(variant: Pick<WordVariant, 'audioPath'>): Promise<string | null> {
   if (!variant.audioPath) return null;
@@ -51,9 +55,13 @@ export async function ensureAudioCached(variant: Pick<WordVariant, 'audioPath'>)
     const downloaded = await File.downloadFileAsync(remoteUrl, destination);
     return downloaded.uri;
   } catch {
-    // Offline, or the file doesn't exist remotely yet (placeholder content).
-    // Let the caller try the remote URL directly rather than failing hard.
-    return remoteUrl;
+    try {
+      const response = await fetch(remoteUrl, { method: 'HEAD' });
+      return response.ok ? remoteUrl : null;
+    } catch {
+      // Genuinely offline with nothing cached — no audio available right now.
+      return null;
+    }
   }
 }
 
