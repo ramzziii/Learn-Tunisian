@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase/client';
 import { mapDailyGoalSettings, mapProfile } from '@/data/mappers';
+import { trackForDateOfBirth } from '@/lib/age';
 import type { DailyGoalSettingsRow, ProfileRow } from '@/types/database';
 import type {
   DailyGoalMinutes,
@@ -7,14 +8,7 @@ import type {
   LearningGoal,
   Profile,
   StartingProficiency,
-  Track,
 } from '@/types/models';
-
-const KID_TRACK_MAX_AGE = 12;
-
-export function trackForAge(age: number): Track {
-  return age <= KID_TRACK_MAX_AGE ? 'kid' : 'adult';
-}
 
 export async function listProfiles(accountId: string): Promise<Profile[]> {
   const { data, error } = await supabase
@@ -29,8 +23,9 @@ export async function listProfiles(accountId: string): Promise<Profile[]> {
 export interface NewProfileInput {
   accountId: string;
   name: string;
-  age: number;
+  dateOfBirth: string;
   nativeLanguage: string;
+  country: string;
   startingProficiency: StartingProficiency;
   learningGoal: LearningGoal | null;
 }
@@ -41,11 +36,12 @@ export async function createProfile(input: NewProfileInput): Promise<Profile> {
     .insert({
       account_id: input.accountId,
       name: input.name,
-      age: input.age,
+      date_of_birth: input.dateOfBirth,
       native_language: input.nativeLanguage,
+      country: input.country,
       starting_proficiency: input.startingProficiency,
       learning_goal: input.learningGoal,
-      track: trackForAge(input.age),
+      track: trackForDateOfBirth(input.dateOfBirth),
     })
     .select('*')
     .single<ProfileRow>();

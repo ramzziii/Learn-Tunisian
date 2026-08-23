@@ -6,7 +6,8 @@ import type {
   ProfileRow,
   ProgressRow,
   UnitRow,
-  WordRow,
+  WordGroupRow,
+  WordVariantRow,
 } from '@/types/database';
 import type {
   Account,
@@ -21,7 +22,9 @@ import type {
   StartingProficiency,
   Track,
   Unit,
-  Word,
+  VariantLabel,
+  WordGroup,
+  WordVariant,
 } from '@/types/models';
 
 export function mapAccount(row: AccountRow): Account {
@@ -33,8 +36,9 @@ export function mapProfile(row: ProfileRow): Profile {
     id: row.id,
     accountId: row.account_id,
     name: row.name,
-    age: row.age,
+    dateOfBirth: row.date_of_birth,
     nativeLanguage: row.native_language,
+    country: row.country,
     startingProficiency: row.starting_proficiency as StartingProficiency,
     learningGoal: row.learning_goal as LearningGoal | null,
     track: row.track as Track,
@@ -80,15 +84,27 @@ export function mapLesson(row: LessonRow): Lesson {
   };
 }
 
-export function mapWord(row: WordRow): Word {
+export function mapWordGroup(row: WordGroupRow): WordGroup {
   return {
     id: row.id,
-    lessonId: row.lesson_id,
-    arabicScript: row.arabic_script,
-    transliteration: row.transliteration,
+    unitId: row.unit_id,
+    lessonNumber: row.lesson_number,
     englishMeaning: row.english_meaning,
-    audioPath: row.audio_path,
+    imageKeyword: row.image_keyword,
     imagePath: row.image_path,
+    sortOrder: row.sort_order,
+  };
+}
+
+export function mapWordVariant(row: WordVariantRow): WordVariant {
+  return {
+    id: row.id,
+    wordGroupId: row.word_group_id,
+    variantLabel: row.variant_label as VariantLabel,
+    wordArabic: row.word_arabic,
+    transliteration: row.transliteration,
+    audioPath: row.audio_path,
+    notes: row.notes,
     sortOrder: row.sort_order,
   };
 }
@@ -97,7 +113,7 @@ export function mapProgress(row: ProgressRow): Progress {
   return {
     id: row.id,
     profileId: row.profile_id,
-    wordId: row.word_id,
+    wordGroupId: row.word_group_id,
     status: row.status as ProgressStatus,
     correctCount: row.correct_count,
     incorrectCount: row.incorrect_count,

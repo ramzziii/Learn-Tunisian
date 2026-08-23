@@ -2,22 +2,25 @@ import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { useCallback, useEffect, useState } from 'react';
 
 import { ensureAudioCached } from '@/lib/offline/audioCache';
-import type { Word } from '@/types/models';
+import type { WordVariant } from '@/types/models';
 
 export interface WordAudioPlayer {
   play: () => void;
   isPlaying: boolean;
   isResolving: boolean;
-  /** False when the word has no audio yet (placeholder content) — UI should disable the play control. */
+  /** False when the variant has no audio yet (placeholder content) — UI should disable the play control. */
   hasAudio: boolean;
 }
 
 /**
- * Wraps expo-audio's player for one word at a time: resolves the best
- * available source (offline cache first, remote fallback) whenever the
- * word changes, and optionally plays it as soon as it's ready.
+ * Wraps expo-audio's player for one word variant at a time: resolves the
+ * best available source (offline cache first, remote fallback) whenever the
+ * variant changes, and optionally plays it as soon as it's ready.
  */
-export function useWordAudioPlayer(word: Word | null, options?: { autoPlay?: boolean }): WordAudioPlayer {
+export function useWordAudioPlayer(
+  variant: WordVariant | null,
+  options?: { autoPlay?: boolean }
+): WordAudioPlayer {
   const autoPlay = options?.autoPlay ?? false;
   const player = useAudioPlayer(null);
   const status = useAudioPlayerStatus(player);
@@ -27,10 +30,10 @@ export function useWordAudioPlayer(word: Word | null, options?: { autoPlay?: boo
   useEffect(() => {
     let cancelled = false;
     setHasAudio(false);
-    if (!word) return;
+    if (!variant) return;
 
     setIsResolving(true);
-    ensureAudioCached(word)
+    ensureAudioCached(variant)
       .then(async (uri) => {
         if (cancelled) return;
         if (uri) {
@@ -50,7 +53,7 @@ export function useWordAudioPlayer(word: Word | null, options?: { autoPlay?: boo
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [word?.id]);
+  }, [variant?.id]);
 
   const play = useCallback(() => {
     if (!hasAudio) return;

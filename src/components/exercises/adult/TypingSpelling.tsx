@@ -2,28 +2,26 @@ import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { AnswerFeedback } from '@/components/exercises/shared/AnswerFeedback';
+import { VariantCallout } from '@/components/exercises/shared/VariantCallout';
 import { adultTrackSizing, colors, radii, spacing } from '@/constants/theme';
 import { useWordAudioPlayer } from '@/hooks/useWordAudioPlayer';
+import { isAnyVariantTransliterationMatch } from '@/lib/wordVariants';
 import type { ExerciseItem } from '@/types/exercises';
 
 const FEEDBACK_DELAY_MS = 1400;
-
-function normalize(text: string): string {
-  return text.trim().toLowerCase();
-}
 
 interface TypingSpellingProps {
   exercise: ExerciseItem;
   onComplete: (wasCorrect: boolean) => void;
 }
 
-/** Adult/teen track: hear a word and its meaning, type its transliteration. */
+/** Adult/teen track: hear a word and its meaning, type its transliteration. Any variant of the concept counts as correct. */
 export function TypingSpelling({ exercise, onComplete }: TypingSpellingProps) {
-  const { play, hasAudio } = useWordAudioPlayer(exercise.targetWord, { autoPlay: true });
+  const { play, hasAudio } = useWordAudioPlayer(exercise.promptVariant, { autoPlay: true });
   const [input, setInput] = useState('');
   const [submitted, setSubmitted] = useState(false);
 
-  const isCorrect = normalize(input) === normalize(exercise.targetWord.transliteration);
+  const isCorrect = isAnyVariantTransliterationMatch(exercise.targetGroup, input);
 
   useEffect(() => {
     if (!submitted) return;
@@ -37,8 +35,9 @@ export function TypingSpelling({ exercise, onComplete }: TypingSpellingProps) {
       <Pressable onPress={play} disabled={!hasAudio} style={[styles.playButton, !hasAudio && styles.playButtonDisabled]}>
         <Text style={styles.playIcon}>🔊</Text>
       </Pressable>
-      <Text style={styles.meaning}>&ldquo;{exercise.targetWord.englishMeaning}&rdquo;</Text>
+      <Text style={styles.meaning}>&ldquo;{exercise.targetGroup.englishMeaning}&rdquo;</Text>
       <Text style={styles.instructions}>Type what you hear</Text>
+      <VariantCallout group={exercise.targetGroup} />
 
       <TextInput
         value={input}
@@ -61,7 +60,7 @@ export function TypingSpelling({ exercise, onComplete }: TypingSpellingProps) {
       </Pressable>
 
       {submitted ? (
-        <AnswerFeedback isCorrect={isCorrect} correctAnswerLabel={exercise.targetWord.transliteration} />
+        <AnswerFeedback isCorrect={isCorrect} correctAnswerLabel={exercise.promptVariant.transliteration} />
       ) : null}
     </View>
   );
@@ -85,7 +84,7 @@ const styles = StyleSheet.create({
     fontSize: adultTrackSizing.bodyFontSize,
     color: colors.textSecondary,
     marginTop: spacing.xs,
-    marginBottom: spacing.xl,
+    marginBottom: spacing.md,
   },
   input: {
     width: '100%',

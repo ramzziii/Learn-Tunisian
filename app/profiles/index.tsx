@@ -1,11 +1,12 @@
 import { router } from 'expo-router';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '@/components/ui/Button';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { colors, radii, spacing } from '@/constants/theme';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
 import { useAuth } from '@/lib/auth/AuthContext';
+import { calculateAge } from '@/lib/age';
 import type { Profile } from '@/types/models';
 
 export default function ProfileSwitcher() {
@@ -15,6 +16,20 @@ export default function ProfileSwitcher() {
   const choose = async (profile: Profile) => {
     await setActiveProfileId(profile.id);
     router.replace('/home');
+  };
+
+  const handleSignOut = () => {
+    Alert.alert('Sign out?', "You'll need to sign back in with your email and password.", [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Sign out',
+        style: 'destructive',
+        onPress: async () => {
+          await signOut();
+          router.replace('/');
+        },
+      },
+    ]);
   };
 
   return (
@@ -31,7 +46,7 @@ export default function ProfileSwitcher() {
             <View style={{ flex: 1 }}>
               <Text style={styles.name}>{item.name}</Text>
               <Text style={styles.meta}>
-                Age {item.age} · {item.track === 'kid' ? 'Kid track' : 'Adult/teen track'}
+                Age {calculateAge(item.dateOfBirth)} · {item.track === 'kid' ? 'Kid track' : 'Adult/teen track'}
               </Text>
             </View>
           </Pressable>
@@ -39,7 +54,7 @@ export default function ProfileSwitcher() {
       />
 
       <Button label="Add a profile" variant="secondary" onPress={() => router.push('/onboarding/who')} />
-      <Button label="Sign out" variant="ghost" onPress={signOut} style={{ marginTop: spacing.sm }} />
+      <Button label="Sign out" variant="ghost" onPress={handleSignOut} style={{ marginTop: spacing.sm }} />
     </ScreenContainer>
   );
 }

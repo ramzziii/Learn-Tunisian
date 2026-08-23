@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase/client';
-import { mapLesson, mapUnit, mapWord } from '@/data/mappers';
-import type { LessonRow, UnitRow, WordRow } from '@/types/database';
-import type { LessonWithState, Word } from '@/types/models';
+import { mapLesson, mapUnit, mapWordGroup, mapWordVariant } from '@/data/mappers';
+import type { LessonRow, UnitRow, WordGroupRow, WordVariantRow } from '@/types/database';
+import type { LessonWithState, WordGroupWithVariants } from '@/types/models';
 
 export interface UnitWithLessons {
   unit: ReturnType<typeof mapUnit>;
@@ -10,10 +10,14 @@ export interface UnitWithLessons {
 
 /**
  * Units -> lessons, annotated with this profile's per-lesson progress and
- * derived lock state. A lesson is "completed" once every word in it has
- * been answered correctly at least once; the next lesson (by sort_order
- * within its unit, then unit sort_order) unlocks once the previous one
- * completes. The very first lesson is always unlocked.
+ * derived lock state. word_groups aren't linked to lessons by a foreign key
+ * (see supabase/migrations/0003_word_variants.sql) — a lesson's groups are
+ * whichever word_groups share its (unit_id, lesson_number).
+ *
+ * A lesson is "completed" once every word_group in it has been answered
+ * correctly at least once; the next lesson (by sort_order within its unit,
+ * then unit sort_order) unlocks once the previous one completes. The very
+ * first lesson is always unlocked.
  */
 export async function fetchLessonMap(profileId: string): Promise<UnitWithLessons[]> {
   const [{ data: unitRows, error: unitsError }, { data: lessonRows, error: lessonsError }] =
@@ -26,29 +30,27 @@ export async function fetchLessonMap(profileId: string): Promise<UnitWithLessons
 
   const units = (unitRows ?? []) as UnitRow[];
   const lessons = (lessonRows ?? []) as LessonRow[];
-  const lessonIds = lessons.map((l) => l.id);
 
-  const { data: wordRows, error: wordsError } = await supabase
-    .from('words')
-    .select('*')
-    .in('lesson_id', lessonIds.length > 0 ? lessonIds : ['00000000-0000-0000-0000-000000000000']);
-  if (wordsError) throw wordsError;
-  const words = (wordRows ?? []) as WordRow[];
+  const { data: groupRows, error: groupsError } = await supabase.from('word_groups').select('*');
+  if (groupsError) throw groupsError;
+  const groups = (groupRows ?? []) as WordGroupRow[];
 
   const { data: progressRows, error: progressError } = await supabase
     .from('progress')
-    .select('word_id, correct_count')
+    .select('word_group_id, correct_count')
     .eq('profile_id', profileId);
   if (progressError) throw progressError;
-  const masteredWordIds = new Set(
-    (progressRows ?? []).filter((p) => p.correct_count > 0).map((p) => p.word_id as string)
+  const masteredGroupIds = new Set(
+    (progressRows ?? []).filter((p) => p.correct_count > 0).map((p) => p.word_group_id as string)
   );
 
-  const wordsByLesson = new Map<string, WordRow[]>();
-  for (const word of words) {
-    const list = wordsByLesson.get(word.lesson_id) ?? [];
-    list.push(word);
-    wordsByLesson.set(word.lesson_id, list);
+  const groupsByLesson = new Map<string, WordGroupRow[]>();
+  const lessonKey = (unitId: string, lessonNumber: number) => `${unitId}:${lessonNumber}`;
+  for (const group of groups) {
+    const key = lessonKey(group.unit_id, group.lesson_number);
+    const list = groupsByLesson.get(key) ?? [];
+    list.push(group);
+    groupsByLesson.set(key, list);
   }
 
   const sortedLessons = [...lessons].sort((a, b) => {
@@ -63,10 +65,10 @@ export async function fetchLessonMap(profileId: string): Promise<UnitWithLessons
   const masteredByLessonId = new Map<string, number>();
 
   for (const lesson of sortedLessons) {
-    const lessonWords = wordsByLesson.get(lesson.id) ?? [];
-    const masteredCount = lessonWords.filter((w) => masteredWordIds.has(w.id)).length;
+    const lessonGroups = groupsByLesson.get(lessonKey(lesson.unit_id, lesson.lesson_number)) ?? [];
+    const masteredCount = lessonGroups.filter((g) => masteredGroupIds.has(g.id)).length;
     masteredByLessonId.set(lesson.id, masteredCount);
-    const isCompleted = lessonWords.length > 0 && masteredCount === lessonWords.length;
+    const isCompleted = lessonGroups.length > 0 && masteredCount === lessonGroups.length;
 
     const state: LessonWithState['state'] = isCompleted
       ? 'completed'
@@ -84,11 +86,11 @@ export async function fetchLessonMap(profileId: string): Promise<UnitWithLessons
       .sort((a, b) => a.sort_order - b.sort_order)
       .map((lessonRow) => {
         const lesson = mapLesson(lessonRow);
-        const lessonWords = wordsByLesson.get(lessonRow.id) ?? [];
+        const lessonGroups = groupsByLesson.get(lessonKey(lessonRow.unit_id, lessonRow.lesson_number)) ?? [];
         return {
           ...lesson,
           unitName: unit.name,
-          wordCount: lessonWords.length,
+          wordCount: lessonGroups.length,
           masteredCount: masteredByLessonId.get(lessonRow.id) ?? 0,
           state: stateByLessonId.get(lessonRow.id) ?? 'locked',
         } satisfies LessonWithState;
@@ -97,12 +99,41 @@ export async function fetchLessonMap(profileId: string): Promise<UnitWithLessons
   });
 }
 
-export async function fetchWordsForLesson(lessonId: string): Promise<Word[]> {
-  const { data, error } = await supabase
-    .from('words')
+export async function fetchWordGroupsForLesson(lessonId: string): Promise<WordGroupWithVariants[]> {
+  const { data: lessonRow, error: lessonError } = await supabase
+    .from('lessons')
+    .select('unit_id, lesson_number')
+    .eq('id', lessonId)
+    .single<Pick<LessonRow, 'unit_id' | 'lesson_number'>>();
+  if (lessonError) throw lessonError;
+
+  const { data: groupRows, error: groupsError } = await supabase
+    .from('word_groups')
     .select('*')
-    .eq('lesson_id', lessonId)
+    .eq('unit_id', lessonRow.unit_id)
+    .eq('lesson_number', lessonRow.lesson_number)
     .order('sort_order');
-  if (error) throw error;
-  return (data ?? []).map(mapWord);
+  if (groupsError) throw groupsError;
+  const groups = (groupRows ?? []) as WordGroupRow[];
+  const groupIds = groups.map((g) => g.id);
+
+  const { data: variantRows, error: variantsError } = await supabase
+    .from('word_variants')
+    .select('*')
+    .in('word_group_id', groupIds.length > 0 ? groupIds : ['__none__'])
+    .order('sort_order');
+  if (variantsError) throw variantsError;
+  const variants = (variantRows ?? []) as WordVariantRow[];
+
+  const variantsByGroup = new Map<string, WordVariantRow[]>();
+  for (const variant of variants) {
+    const list = variantsByGroup.get(variant.word_group_id) ?? [];
+    list.push(variant);
+    variantsByGroup.set(variant.word_group_id, list);
+  }
+
+  return groups.map((group) => ({
+    ...mapWordGroup(group),
+    variants: (variantsByGroup.get(group.id) ?? []).map(mapWordVariant),
+  }));
 }

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AnswerFeedback } from '@/components/exercises/shared/AnswerFeedback';
+import { VariantCallout } from '@/components/exercises/shared/VariantCallout';
 import { adultTrackSizing, colors, radii, spacing } from '@/constants/theme';
 import { useWordAudioPlayer } from '@/hooks/useWordAudioPlayer';
 import type { ExerciseItem } from '@/types/exercises';
@@ -15,16 +16,16 @@ interface ReadingMatchProps {
 
 /** Adult/teen track: listen to a word, tap the matching written Arabic script. */
 export function ReadingMatch({ exercise, onComplete }: ReadingMatchProps) {
-  const { play, hasAudio } = useWordAudioPlayer(exercise.targetWord, { autoPlay: true });
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const { play, hasAudio } = useWordAudioPlayer(exercise.promptVariant, { autoPlay: true });
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!selectedId) return;
-    const timer = setTimeout(() => onComplete(selectedId === exercise.targetWord.id), FEEDBACK_DELAY_MS);
+    if (!selectedGroupId) return;
+    const timer = setTimeout(() => onComplete(selectedGroupId === exercise.targetGroup.id), FEEDBACK_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [selectedId, exercise.targetWord.id, onComplete]);
+  }, [selectedGroupId, exercise.targetGroup.id, onComplete]);
 
-  const isCorrectSelection = selectedId === exercise.targetWord.id;
+  const isCorrectSelection = selectedGroupId === exercise.targetGroup.id;
 
   return (
     <View style={styles.container}>
@@ -32,31 +33,32 @@ export function ReadingMatch({ exercise, onComplete }: ReadingMatchProps) {
         <Text style={styles.playIcon}>🔊</Text>
       </Pressable>
       <Text style={styles.instructions}>Tap the word you hear</Text>
+      <VariantCallout group={exercise.targetGroup} />
 
       <View style={styles.list}>
         {exercise.options.map((option) => {
-          const isSelected = selectedId === option.id;
-          const revealCorrect = selectedId !== null && option.id === exercise.targetWord.id;
+          const isSelected = selectedGroupId === option.group.id;
+          const revealCorrect = selectedGroupId !== null && option.group.id === exercise.targetGroup.id;
           return (
             <Pressable
-              key={option.id}
-              onPress={() => !selectedId && setSelectedId(option.id)}
-              disabled={!!selectedId}
+              key={option.group.id}
+              onPress={() => !selectedGroupId && setSelectedGroupId(option.group.id)}
+              disabled={!!selectedGroupId}
               style={[
                 styles.option,
                 isSelected && (isCorrectSelection ? styles.optionCorrect : styles.optionIncorrect),
                 revealCorrect && !isSelected && styles.optionCorrect,
               ]}
             >
-              <Text style={styles.arabicScript}>{option.arabicScript}</Text>
-              <Text style={styles.transliteration}>{option.transliteration}</Text>
+              <Text style={styles.arabicScript}>{option.variant.wordArabic}</Text>
+              <Text style={styles.transliteration}>{option.variant.transliteration}</Text>
             </Pressable>
           );
         })}
       </View>
 
-      {selectedId ? (
-        <AnswerFeedback isCorrect={isCorrectSelection} correctAnswerLabel={exercise.targetWord.englishMeaning} />
+      {selectedGroupId ? (
+        <AnswerFeedback isCorrect={isCorrectSelection} correctAnswerLabel={exercise.targetGroup.englishMeaning} />
       ) : null}
     </View>
   );
@@ -80,7 +82,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.textPrimary,
     marginTop: spacing.md,
-    marginBottom: spacing.xl,
+    marginBottom: spacing.md,
   },
   list: { width: '100%', gap: spacing.sm },
   option: {

@@ -12,8 +12,9 @@ export interface ProfileRow {
   id: string;
   account_id: string;
   name: string;
-  age: number;
+  date_of_birth: string;
   native_language: string;
+  country: string;
   starting_proficiency: string;
   learning_goal: string | null;
   track: string;
@@ -54,21 +55,31 @@ export interface LessonRow {
   sort_order: number;
 }
 
-export interface WordRow {
+export interface WordGroupRow {
   id: string;
-  lesson_id: string;
-  arabic_script: string;
-  transliteration: string;
+  unit_id: string;
+  lesson_number: number;
   english_meaning: string;
-  audio_path: string | null;
+  image_keyword: string | null;
   image_path: string | null;
+  sort_order: number;
+}
+
+export interface WordVariantRow {
+  id: string;
+  word_group_id: string;
+  variant_label: string;
+  word_arabic: string;
+  transliteration: string;
+  audio_path: string | null;
+  notes: string | null;
   sort_order: number;
 }
 
 export interface ProgressRow {
   id: string;
   profile_id: string;
-  word_id: string;
+  word_group_id: string;
   status: string;
   correct_count: number;
   incorrect_count: number;

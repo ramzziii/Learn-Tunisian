@@ -1,8 +1,8 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
-import { TimePicker } from '@/components/onboarding/TimePicker';
+import { TimeWheelPicker } from '@/components/onboarding/TimeWheelPicker';
 import { Button } from '@/components/ui/Button';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
@@ -11,6 +11,7 @@ import { colors, spacing } from '@/constants/theme';
 import { fetchDailyGoalSettings, updateDailyGoalSettings } from '@/data/profiles';
 import { fetchProgressSummary, type ProfileProgressSummary } from '@/data/progress';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
+import { useAuth } from '@/lib/auth/AuthContext';
 import { cancelDailyReminder, requestNotificationPermission, scheduleDailyReminder } from '@/lib/notifications/reminders';
 import type { DailyGoalMinutes, DailyGoalSettings } from '@/types/models';
 
@@ -18,6 +19,7 @@ const GOAL_OPTIONS: DailyGoalMinutes[] = [5, 10, 15];
 
 export default function ProfileSettings() {
   const { activeProfile, profiles } = useActiveProfile();
+  const { signOut } = useAuth();
   const [goalSettings, setGoalSettings] = useState<DailyGoalSettings | null>(null);
   const [progressSummary, setProgressSummary] = useState<ProfileProgressSummary | null>(null);
   const [dailyGoalMinutes, setDailyGoalMinutes] = useState<DailyGoalMinutes>(5);
@@ -70,6 +72,20 @@ export default function ProfileSettings() {
     setSaved(true);
   };
 
+  const handleSignOut = () => {
+    Alert.alert('Sign out?', "You'll need to sign back in with your email and password.", [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Sign out',
+        style: 'destructive',
+        onPress: async () => {
+          await signOut();
+          router.replace('/');
+        },
+      },
+    ]);
+  };
+
   if (!activeProfile || !goalSettings || !progressSummary) return <LoadingScreen />;
 
   return (
@@ -99,7 +115,7 @@ export default function ProfileSettings() {
           <Switch value={reminderEnabled} onValueChange={setReminderEnabled} trackColor={{ true: colors.primary }} />
         </View>
         {reminderEnabled ? (
-          <TimePicker
+          <TimeWheelPicker
             hour24={reminderHour}
             minute={reminderMinute}
             onChange={(h, m) => {
@@ -130,6 +146,9 @@ export default function ProfileSettings() {
           onPress={() => router.push('/onboarding/who')}
           style={{ marginTop: spacing.sm }}
         />
+
+        <Text style={styles.sectionTitle}>Account</Text>
+        <Button label="Sign out" variant="secondary" onPress={handleSignOut} />
       </ScrollView>
     </ScreenContainer>
   );

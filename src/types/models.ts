@@ -24,8 +24,10 @@ export interface Profile {
   id: string;
   accountId: string;
   name: string;
-  age: number;
+  /** ISO date string ("YYYY-MM-DD"). Use calculateAge() from @/lib/age for a display age. */
+  dateOfBirth: string;
   nativeLanguage: string;
+  country: string;
   startingProficiency: StartingProficiency;
   learningGoal: LearningGoal | null;
   track: Track;
@@ -66,21 +68,46 @@ export interface Lesson {
   sortOrder: number;
 }
 
-export interface Word {
+export type VariantLabel = 'primary' | 'also_heard' | 'masculine' | 'feminine';
+
+/** One concept (e.g. "let's go", "I'm hungry") — a lesson teaches/quizzes one word_group at a time. */
+export interface WordGroup {
   id: string;
-  lessonId: string;
-  arabicScript: string;
-  transliteration: string;
+  unitId: string;
+  lessonNumber: number;
   englishMeaning: string;
-  audioPath: string | null;
+  imageKeyword: string | null;
   imagePath: string | null;
   sortOrder: number;
+}
+
+/** One way of saying a word_group's concept — the primary/default form, a synonym, or a speaker-gender form. */
+export interface WordVariant {
+  id: string;
+  wordGroupId: string;
+  variantLabel: VariantLabel;
+  wordArabic: string;
+  transliteration: string;
+  audioPath: string | null;
+  notes: string | null;
+  sortOrder: number;
+}
+
+/**
+ * A word_group with all of its variants resolved — this is what the app
+ * actually renders and quizzes against everywhere. Every group has either
+ * exactly one 'primary' variant, or both a 'masculine' and a 'feminine' one
+ * (enforced by a DB constraint) — see src/lib/wordVariants.ts for the
+ * helpers that navigate this shape.
+ */
+export interface WordGroupWithVariants extends WordGroup {
+  variants: WordVariant[];
 }
 
 export interface Progress {
   id: string;
   profileId: string;
-  wordId: string;
+  wordGroupId: string;
   status: ProgressStatus;
   correctCount: number;
   incorrectCount: number;
