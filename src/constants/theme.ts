@@ -1,15 +1,47 @@
 export const colors = {
   background: '#FBF8F3',
   surface: '#FFFFFF',
+  surfaceRaised: '#FFFFFF',
   primary: '#3E7CB1',
+  primaryLight: '#5B95C9',
   primaryDark: '#2C5A85',
   accent: '#F2A65A',
+  accentLight: '#F6BE81',
   success: '#4CA771',
+  successLight: '#6FC291',
   error: '#D9634C',
   textPrimary: '#242021',
   textSecondary: '#6B6560',
+  textOnPrimary: '#FFFFFF',
   border: '#E7E0D6',
   locked: '#D9D2C6',
+} as const;
+
+// Gradient pairs — used with expo-linear-gradient for headers, primary
+// buttons, and celebration moments, so the app doesn't read as flat blocks
+// of solid color everywhere.
+export const gradients = {
+  primary: [colors.primaryLight, colors.primaryDark] as const,
+  accent: [colors.accentLight, colors.accent] as const,
+  celebration: ['#FFD97D', colors.accent] as const,
+  success: [colors.successLight, colors.success] as const,
+} as const;
+
+export const shadows = {
+  card: {
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+  raised: {
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
+  },
 } as const;
 
 export const spacing = {

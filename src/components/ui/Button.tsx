@@ -1,6 +1,8 @@
-import { ActivityIndicator, Pressable, StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { ActivityIndicator, StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native';
 
-import { colors, radii, spacing } from '@/constants/theme';
+import { PressableScale } from '@/components/ui/PressableScale';
+import { colors, gradients, radii, shadows, spacing } from '@/constants/theme';
 
 interface ButtonProps {
   label: string;
@@ -13,37 +15,59 @@ interface ButtonProps {
 
 export function Button({ label, onPress, variant = 'primary', disabled, loading, style }: ButtonProps) {
   const isDisabled = disabled || loading;
+
+  const content = loading ? (
+    <ActivityIndicator color={variant === 'primary' ? colors.textOnPrimary : colors.primary} />
+  ) : (
+    <Text
+      style={[
+        styles.label,
+        variant === 'primary' && styles.labelPrimary,
+        variant === 'secondary' && styles.labelSecondary,
+        variant === 'ghost' && styles.labelGhost,
+      ]}
+    >
+      {label}
+    </Text>
+  );
+
+  if (variant === 'primary') {
+    return (
+      <PressableScale
+        accessibilityRole="button"
+        accessibilityState={{ disabled: isDisabled }}
+        onPress={onPress}
+        disabled={isDisabled}
+        style={[isDisabled && styles.disabled, style]}
+      >
+        <LinearGradient
+          colors={gradients.primary}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.base, shadows.card]}
+        >
+          {content}
+        </LinearGradient>
+      </PressableScale>
+    );
+  }
+
   return (
-    <Pressable
+    <PressableScale
       accessibilityRole="button"
       accessibilityState={{ disabled: isDisabled }}
       onPress={onPress}
       disabled={isDisabled}
-      style={({ pressed }) => [
+      style={[
         styles.base,
-        variant === 'primary' && styles.primary,
         variant === 'secondary' && styles.secondary,
         variant === 'ghost' && styles.ghost,
         isDisabled && styles.disabled,
-        pressed && !isDisabled && styles.pressed,
         style,
       ]}
     >
-      {loading ? (
-        <ActivityIndicator color={variant === 'primary' ? '#fff' : colors.primary} />
-      ) : (
-        <Text
-          style={[
-            styles.label,
-            variant === 'primary' && styles.labelPrimary,
-            variant === 'secondary' && styles.labelSecondary,
-            variant === 'ghost' && styles.labelGhost,
-          ]}
-        >
-          {label}
-        </Text>
-      )}
-    </Pressable>
+      {content}
+    </PressableScale>
   );
 }
 
@@ -56,13 +80,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     minHeight: 52,
   },
-  primary: { backgroundColor: colors.primary },
   secondary: { backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.primary },
   ghost: { backgroundColor: 'transparent' },
   disabled: { opacity: 0.5 },
-  pressed: { opacity: 0.85 },
-  label: { fontSize: 16, fontWeight: '600' },
-  labelPrimary: { color: '#fff' },
+  label: { fontSize: 16, fontWeight: '700' },
+  labelPrimary: { color: colors.textOnPrimary },
   labelSecondary: { color: colors.primary },
   labelGhost: { color: colors.textSecondary },
 });

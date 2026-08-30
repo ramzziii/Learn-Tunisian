@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { TimeWheelPicker } from '@/components/onboarding/TimeWheelPicker';
@@ -8,7 +8,8 @@ import { Button } from '@/components/ui/Button';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { SelectableCard } from '@/components/ui/SelectableCard';
-import { colors, spacing } from '@/constants/theme';
+import { colors, radii, shadows, spacing } from '@/constants/theme';
+import { countCompletedLessons } from '@/data/content';
 import { fetchDailyGoalSettings, updateDailyGoalSettings } from '@/data/profiles';
 import { fetchProgressSummary, type ProfileProgressSummary } from '@/data/progress';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
@@ -18,11 +19,16 @@ import type { DailyGoalMinutes, DailyGoalSettings } from '@/types/models';
 
 const GOAL_OPTIONS: DailyGoalMinutes[] = [5, 10, 15];
 
+interface ProgressStats extends ProfileProgressSummary {
+  lessonsCompleted: number;
+}
+
 export default function ProfileSettings() {
   const { activeProfile, profiles } = useActiveProfile();
   const { signOut } = useAuth();
   const [goalSettings, setGoalSettings] = useState<DailyGoalSettings | null>(null);
-  const [progressSummary, setProgressSummary] = useState<ProfileProgressSummary | null>(null);
+  const [progressStats, setProgressStats] = useState<ProgressStats | null>(null);
+  const [loadError, setLoadError] = useState(false);
   const [dailyGoalMinutes, setDailyGoalMinutes] = useState<DailyGoalMinutes>(5);
   const [reminderEnabled, setReminderEnabled] = useState(true);
   const [reminderHour, setReminderHour] = useState(18);
@@ -30,15 +36,17 @@ export default function ProfileSettings() {
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     if (!activeProfile) return;
-    (async () => {
-      const [settings, summary] = await Promise.all([
+    setLoadError(false);
+    try {
+      const [settings, summary, lessonsCompleted] = await Promise.all([
         fetchDailyGoalSettings(activeProfile.id),
         fetchProgressSummary(activeProfile.id),
+        countCompletedLessons(activeProfile.id),
       ]);
       setGoalSettings(settings);
-      setProgressSummary(summary);
+      setProgressStats({ ...summary, lessonsCompleted });
       if (settings) {
         setDailyGoalMinutes(settings.dailyGoalMinutes);
         setReminderEnabled(settings.reminderEnabled);
@@ -46,8 +54,14 @@ export default function ProfileSettings() {
         setReminderHour(h);
         setReminderMinute(m);
       }
-    })();
+    } catch {
+      setLoadError(true);
+    }
   }, [activeProfile]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const handleSave = async () => {
     if (!activeProfile) return;
@@ -87,7 +101,23 @@ export default function ProfileSettings() {
     ]);
   };
 
-  if (!activeProfile || !goalSettings || !progressSummary) return <LoadingScreen />;
+  if (!activeProfile) return <LoadingScreen />;
+
+  if (loadError) {
+    return (
+      <ScreenContainer>
+        <BackButton />
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorEmoji}>😕</Text>
+          <Text style={styles.errorTitle}>Couldn&apos;t load settings</Text>
+          <Text style={styles.errorBody}>Check your connection and try again.</Text>
+          <Button label="Try again" variant="secondary" onPress={load} />
+        </View>
+      </ScreenContainer>
+    );
+  }
+
+  if (!goalSettings || !progressStats) return <LoadingScreen />;
 
   return (
     <ScreenContainer>
@@ -96,11 +126,16 @@ export default function ProfileSettings() {
         <Text style={styles.title}>{activeProfile.name}&apos;s settings</Text>
 
         <Text style={styles.sectionTitle}>What they&apos;ve learned</Text>
-        <View style={styles.progressRow}>
-          <ProgressStat label="Known" value={progressSummary.wordsKnown} />
-          <ProgressStat label="Learning" value={progressSummary.wordsLearning} />
-          <ProgressStat label="Words seen" value={progressSummary.totalWordsSeen} />
+        <View style={styles.progressGrid}>
+          <ProgressStat label="Learning" value={progressStats.wordsLearning} emoji="🌱" />
+          <ProgressStat label="Mastered" value={progressStats.wordsMastered} emoji="⭐" />
+          <ProgressStat label="Reviewed" value={progressStats.wordsReviewed} emoji="🔄" />
+          <ProgressStat label="Words seen" value={progressStats.totalWordsSeen} emoji="👀" />
+          <ProgressStat label="Lessons done" value={progressStats.lessonsCompleted} emoji="🏁" />
         </View>
+
+        <Text style={styles.sectionTitle}>Vocabulary</Text>
+        <Button label="View favorites" variant="secondary" onPress={() => router.push('/favorites')} />
 
         <Text style={styles.sectionTitle}>Daily goal</Text>
         {GOAL_OPTIONS.map((minutes) => (
@@ -156,9 +191,10 @@ export default function ProfileSettings() {
   );
 }
 
-function ProgressStat({ label, value }: { label: string; value: number }) {
+function ProgressStat({ label, value, emoji }: { label: string; value: number; emoji: string }) {
   return (
-    <View style={styles.statCard}>
+    <View style={[styles.statCard, shadows.card]}>
+      <Text style={styles.statEmoji}>{emoji}</Text>
       <Text style={styles.statValue}>{value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
     </View>
@@ -167,10 +203,30 @@ function ProgressStat({ label, value }: { label: string; value: number }) {
 
 const styles = StyleSheet.create({
   title: { fontSize: 24, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md, marginBottom: spacing.lg },
-  sectionTitle: { fontSize: 14, fontWeight: '700', color: colors.textSecondary, marginTop: spacing.xl, marginBottom: spacing.sm, textTransform: 'uppercase', letterSpacing: 0.5 },
-  progressRow: { flexDirection: 'row', gap: spacing.sm },
-  statCard: { flex: 1, backgroundColor: colors.surface, borderRadius: 14, borderWidth: 1.5, borderColor: colors.border, padding: spacing.md, alignItems: 'center' },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.textSecondary,
+    marginTop: spacing.xl,
+    marginBottom: spacing.sm,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  progressGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  statCard: {
+    width: '30%',
+    flexGrow: 1,
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    padding: spacing.md,
+    alignItems: 'center',
+  },
+  statEmoji: { fontSize: 20, marginBottom: 2 },
   statValue: { fontSize: 22, fontWeight: '800', color: colors.primaryDark },
-  statLabel: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  statLabel: { fontSize: 12, color: colors.textSecondary, marginTop: 2, textAlign: 'center' },
   reminderHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginRight: spacing.xs },
+  errorContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
+  errorEmoji: { fontSize: 48, marginBottom: spacing.sm },
+  errorTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
+  errorBody: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', marginBottom: spacing.md },
 });
