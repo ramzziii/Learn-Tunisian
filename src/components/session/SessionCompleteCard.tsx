@@ -1,7 +1,10 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useEffect, useRef } from 'react';
+import { Animated, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '@/components/ui/Button';
-import { colors, radii, spacing } from '@/constants/theme';
+import { PressableScale } from '@/components/ui/PressableScale';
+import { colors, gradients, radii, shadows, spacing } from '@/constants/theme';
 import type { DailyGoalMinutes } from '@/types/models';
 
 const ADD_MORE_OPTIONS: DailyGoalMinutes[] = [5, 10, 15];
@@ -18,26 +21,44 @@ interface SessionCompleteCardProps {
  * into more content.
  */
 export function SessionCompleteCard({ minutesLearned, onClose, onAddMore }: SessionCompleteCardProps) {
+  const pop = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.spring(pop, { toValue: 1, useNativeDriver: true, speed: 14, bounciness: 10 }).start();
+  }, [pop]);
+
   return (
     <View style={styles.overlay}>
-      <View style={styles.card}>
-        <Text style={styles.emoji}>🎉</Text>
+      <Animated.View
+        style={[
+          styles.card,
+          shadows.raised,
+          {
+            opacity: pop,
+            transform: [{ scale: pop.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1] }) }],
+          },
+        ]}
+      >
+        <LinearGradient colors={gradients.celebration} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.badge}>
+          <Text style={styles.emoji}>🎉</Text>
+        </LinearGradient>
+
         <Text style={styles.title}>Great job!</Text>
         <Text style={styles.subtitle}>
           You completed your learning for today ({minutesLearned} {minutesLearned === 1 ? 'minute' : 'minutes'}).
         </Text>
 
-        <Button label="Close" onPress={onClose} style={{ marginTop: spacing.xl }} />
+        <Button label="Close" onPress={onClose} style={{ marginTop: spacing.xl, width: '100%' }} />
 
         <Text style={styles.addMoreLabel}>Want to keep going?</Text>
         <View style={styles.addMoreRow}>
           {ADD_MORE_OPTIONS.map((minutes) => (
-            <Pressable key={minutes} style={styles.addMoreButton} onPress={() => onAddMore(minutes)}>
+            <PressableScale key={minutes} style={styles.addMoreButton} onPress={() => onAddMore(minutes)}>
               <Text style={styles.addMoreButtonText}>+{minutes} min</Text>
-            </Pressable>
+            </PressableScale>
           ))}
         </View>
-      </View>
+      </Animated.View>
     </View>
   );
 }
@@ -45,7 +66,7 @@ export function SessionCompleteCard({ minutesLearned, onClose, onAddMore }: Sess
 const styles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(36, 32, 33, 0.4)',
+    backgroundColor: 'rgba(36, 32, 33, 0.45)',
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.lg,
@@ -57,7 +78,15 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
     alignItems: 'center',
   },
-  emoji: { fontSize: 56 },
+  badge: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.sm,
+  },
+  emoji: { fontSize: 48 },
   title: { fontSize: 26, fontWeight: '800', color: colors.textPrimary, marginTop: spacing.sm },
   subtitle: { fontSize: 15, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.sm },
   addMoreLabel: { fontSize: 13, color: colors.textSecondary, marginTop: spacing.xl, marginBottom: spacing.sm },

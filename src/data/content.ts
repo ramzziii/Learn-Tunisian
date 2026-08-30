@@ -137,3 +137,52 @@ export async function fetchWordGroupsForLesson(lessonId: string): Promise<WordGr
     variants: (variantsByGroup.get(group.id) ?? []).map(mapWordVariant),
   }));
 }
+
+/** A word_group plus every other word_group in the same lesson — the latter used as a practice distractor pool. */
+export async function fetchWordGroupWithSiblings(
+  wordGroupId: string
+): Promise<{ group: WordGroupWithVariants; siblings: WordGroupWithVariants[] }> {
+  const { data: groupRow, error: groupError } = await supabase
+    .from('word_groups')
+    .select('*')
+    .eq('id', wordGroupId)
+    .single<WordGroupRow>();
+  if (groupError) throw groupError;
+
+  const { data: siblingRows, error: siblingsError } = await supabase
+    .from('word_groups')
+    .select('*')
+    .eq('unit_id', groupRow.unit_id)
+    .eq('lesson_number', groupRow.lesson_number)
+    .neq('id', wordGroupId);
+  if (siblingsError) throw siblingsError;
+  const siblings = (siblingRows ?? []) as WordGroupRow[];
+
+  const allIds = [groupRow.id, ...siblings.map((g) => g.id)];
+  const { data: variantRows, error: variantsError } = await supabase
+    .from('word_variants')
+    .select('*')
+    .in('word_group_id', allIds);
+  if (variantsError) throw variantsError;
+
+  const variantsByGroup = new Map<string, WordVariantRow[]>();
+  for (const variant of (variantRows as WordVariantRow[] | null) ?? []) {
+    const list = variantsByGroup.get(variant.word_group_id) ?? [];
+    list.push(variant);
+    variantsByGroup.set(variant.word_group_id, list);
+  }
+  const toWithVariants = (row: WordGroupRow): WordGroupWithVariants => ({
+    ...mapWordGroup(row),
+    variants: (variantsByGroup.get(row.id) ?? []).map(mapWordVariant),
+  });
+
+  return { group: toWithVariants(groupRow), siblings: siblings.map(toWithVariants) };
+}
+
+export async function countCompletedLessons(profileId: string): Promise<number> {
+  const unitsWithLessons = await fetchLessonMap(profileId);
+  return unitsWithLessons.reduce(
+    (total, { lessons }) => total + lessons.filter((lesson) => lesson.state === 'completed').length,
+    0
+  );
+}

@@ -20,6 +20,9 @@ speaking practice).
    1. [`0001_init.sql`](supabase/migrations/0001_init.sql) — every table, RLS policy, and the two storage buckets (`audio`, `images`).
    2. [`0002_profile_dob_country.sql`](supabase/migrations/0002_profile_dob_country.sql) — replaces `profiles.age` with `date_of_birth`, adds `country`.
    3. [`0003_word_variants.sql`](supabase/migrations/0003_word_variants.sql) — replaces the flat `words` table with `word_groups` + `word_variants` (see "Word variants" below).
+   4. [`0004_spaced_repetition.sql`](supabase/migrations/0004_spaced_repetition.sql) — adds review-scheduling fields to `progress`.
+   5. [`0005_favorites.sql`](supabase/migrations/0005_favorites.sql) — a `favorites` table (profile ↔ word_group).
+   6. [`0006_content_verification.sql`](supabase/migrations/0006_content_verification.sql) — adds `native_verified` to `word_variants`.
 3. Then run [`supabase/seed.sql`](supabase/seed.sql) — loads the current content set into `word_groups`/`word_variants` (see "Word variants").
 4. In Project Settings → API, copy the **Project URL** (not the REST/`/rest/v1/` URL — just the bare project URL) and **anon public key**.
 
@@ -89,15 +92,47 @@ it, then upload matching audio files to the **audio** bucket at the exact
 changes needed. Images work the same way via `word_groups.image_path` and
 the **images** bucket.
 
+## Spaced repetition & review
+
+`progress` tracks a simplified SM-2 schedule per word_group
+(`next_review_at`, `review_interval_days`, `ease_factor`,
+`consecutive_correct`/`incorrect` — see `src/lib/spacedRepetition.ts`,
+which is unit-tested in isolation from Supabase). Correct answers push the
+next review further out; incorrect answers reset it to 1 day. The `/review`
+screen (linked from a "Review time" card on Home whenever something is due)
+pulls only strictly-due items, most-overdue first, and runs them through
+the exact same session engine as a lesson — there's no separate progress
+system for review.
+
+## Speaking practice
+
+Adult/teen track only. `src/components/exercises/adult/SpeakingPractice.tsx`
+implements hear → record → play back → try again, with no automated
+pronunciation scoring by design. Microphone permission is requested
+contextually (only the first time this exercise type is reached, with an
+explanation screen first) and a denial is handled gracefully — the learner
+can still hear the word and continue the session.
+
+## Favorites & word detail
+
+Tap "See words" on any unit, or a favorited word from Settings, to reach a
+word detail screen (`app/word/[wordGroupId].tsx`): full variant info,
+progress, a one-word "Practice" drill, a favorite toggle, and an honest
+`native_verified` badge (everything currently seeded shows "Draft — pending
+native review," which is accurate).
+
 ## Project structure
 
 ```
 app/                     Expo Router routes only (screens + navigation)
+  word/[wordGroupId].tsx  word detail (variants, progress, favorite, practice)
+  words/[lessonId].tsx    word list for a lesson
+  favorites/, review.tsx  favorites list, review session
 src/
   components/            UI components, grouped by feature
     exercises/
       kid/                listen-and-tap
-      adult/              reading-match, typing-spelling
+      adult/              reading-match, typing-spelling, speaking
       shared/             exercise chrome shared by both tracks
     onboarding/, lesson-map/, session/, ui/
   data/                   Supabase queries + row->model mappers (data layer)
@@ -109,11 +144,21 @@ src/
     notifications/        daily reminder scheduling
     offline/              audio download/cache for offline playback
     supabase/              client setup
+    spacedRepetition.ts    pure SM-2-lite calculation (unit-tested, see __tests__/)
   types/                  TypeScript models (models.ts) + raw DB row types (database.ts)
 supabase/
-  migrations/0001_init.sql, 0002_profile_dob_country.sql, 0003_word_variants.sql
+  migrations/0001-0006_*.sql
   seed.sql
 ```
+
+## Testing
+
+```bash
+npm test
+```
+
+Runs Jest (`jest-expo` preset) against `src/**/__tests__`. Currently covers
+the spaced-repetition calculation; no integration/E2E tests yet.
 
 ## Notes on the v1 design decisions
 

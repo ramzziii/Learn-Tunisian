@@ -1,5 +1,6 @@
 import { ListenAndTap } from '@/components/exercises/kid/ListenAndTap';
 import { ReadingMatch } from '@/components/exercises/adult/ReadingMatch';
+import { SpeakingPractice } from '@/components/exercises/adult/SpeakingPractice';
 import { TypingSpelling } from '@/components/exercises/adult/TypingSpelling';
 import type { ExerciseItem } from '@/types/exercises';
 
@@ -17,5 +18,7 @@ export function ExerciseRenderer({ exercise, onComplete }: ExerciseRendererProps
       return <ReadingMatch key={exercise.key} exercise={exercise} onComplete={onComplete} />;
     case 'typing_spelling':
       return <TypingSpelling key={exercise.key} exercise={exercise} onComplete={onComplete} />;
+    case 'speaking':
+      return <SpeakingPractice key={exercise.key} exercise={exercise} onComplete={onComplete} />;
   }
 }

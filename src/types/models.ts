@@ -91,6 +91,8 @@ export interface WordVariant {
   audioPath: string | null;
   notes: string | null;
   sortOrder: number;
+  /** False until a native Tunisian Arabic speaker has reviewed this exact form. */
+  nativeVerified: boolean;
 }
 
 /**
@@ -111,9 +113,22 @@ export interface Progress {
   status: ProgressStatus;
   correctCount: number;
   incorrectCount: number;
+  /** ISO timestamp. See src/lib/spacedRepetition.ts for how this is calculated. */
+  nextReviewAt: string;
+  reviewIntervalDays: number;
+  easeFactor: number;
+  consecutiveCorrect: number;
+  consecutiveIncorrect: number;
   lastSeenAt: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface Favorite {
+  id: string;
+  profileId: string;
+  wordGroupId: string;
+  createdAt: string;
 }
 
 // Convenience shape for rendering the lesson map: a lesson with its

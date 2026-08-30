@@ -5,7 +5,7 @@ import type { AdultExerciseType, ExerciseItem, ExerciseOption } from '@/types/ex
 import type { Track, WordGroupWithVariants } from '@/types/models';
 
 const OPTION_COUNT = 4;
-const ADULT_TYPE_CYCLE: AdultExerciseType[] = ['reading_match', 'typing_spelling'];
+const ADULT_TYPE_CYCLE: AdultExerciseType[] = ['reading_match', 'typing_spelling', 'speaking'];
 
 function shuffled<T>(items: T[]): T[] {
   const copy = [...items];

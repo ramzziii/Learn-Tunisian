@@ -2,6 +2,7 @@ import type {
   AccountRow,
   ConsentRecordRow,
   DailyGoalSettingsRow,
+  FavoriteRow,
   LessonRow,
   ProfileRow,
   ProgressRow,
@@ -14,6 +15,7 @@ import type {
   ConsentRecord,
   DailyGoalSettings,
   DailyGoalMinutes,
+  Favorite,
   Lesson,
   LearningGoal,
   Profile,
@@ -106,6 +108,7 @@ export function mapWordVariant(row: WordVariantRow): WordVariant {
     audioPath: row.audio_path,
     notes: row.notes,
     sortOrder: row.sort_order,
+    nativeVerified: row.native_verified,
   };
 }
 
@@ -117,8 +120,22 @@ export function mapProgress(row: ProgressRow): Progress {
     status: row.status as ProgressStatus,
     correctCount: row.correct_count,
     incorrectCount: row.incorrect_count,
+    nextReviewAt: row.next_review_at,
+    reviewIntervalDays: row.review_interval_days,
+    easeFactor: row.ease_factor,
+    consecutiveCorrect: row.consecutive_correct,
+    consecutiveIncorrect: row.consecutive_incorrect,
     lastSeenAt: row.last_seen_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+export function mapFavorite(row: FavoriteRow): Favorite {
+  return {
+    id: row.id,
+    profileId: row.profile_id,
+    wordGroupId: row.word_group_id,
+    createdAt: row.created_at,
   };
 }

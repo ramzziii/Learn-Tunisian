@@ -74,6 +74,7 @@ export interface WordVariantRow {
   audio_path: string | null;
   notes: string | null;
   sort_order: number;
+  native_verified: boolean;
 }
 
 export interface ProgressRow {
@@ -83,7 +84,19 @@ export interface ProgressRow {
   status: string;
   correct_count: number;
   incorrect_count: number;
+  next_review_at: string;
+  review_interval_days: number;
+  ease_factor: number;
+  consecutive_correct: number;
+  consecutive_incorrect: number;
   last_seen_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface FavoriteRow {
+  id: string;
+  profile_id: string;
+  word_group_id: string;
+  created_at: string;
 }

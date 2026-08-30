@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { LessonNode } from '@/components/lesson-map/LessonNode';
 import { colors, spacing } from '@/constants/theme';
@@ -9,13 +9,23 @@ interface UnitSectionProps {
   unitWithLessons: UnitWithLessons;
   track: Track;
   onSelectLesson: (lessonId: string) => void;
+  onBrowseWords: (lessonId: string) => void;
 }
 
-export function UnitSection({ unitWithLessons, track, onSelectLesson }: UnitSectionProps) {
+export function UnitSection({ unitWithLessons, track, onSelectLesson, onBrowseWords }: UnitSectionProps) {
   const { unit, lessons } = unitWithLessons;
+  const browsableLesson = lessons.find((lesson) => lesson.state !== 'locked');
+
   return (
     <View style={styles.section}>
-      <Text style={styles.unitTitle}>{unit.name}</Text>
+      <View style={styles.headerRow}>
+        <Text style={styles.unitTitle}>{unit.name}</Text>
+        {browsableLesson ? (
+          <Pressable onPress={() => onBrowseWords(browsableLesson.id)} hitSlop={8}>
+            <Text style={styles.browseLink}>See words</Text>
+          </Pressable>
+        ) : null}
+      </View>
       <View style={styles.lessonRow}>
         {lessons.map((lesson) => (
           <LessonNode key={lesson.id} lesson={lesson} track={track} onPress={() => onSelectLesson(lesson.id)} />
@@ -27,6 +37,8 @@ export function UnitSection({ unitWithLessons, track, onSelectLesson }: UnitSect
 
 const styles = StyleSheet.create({
   section: { marginBottom: spacing.xxl },
-  unitTitle: { fontSize: 15, fontWeight: '700', color: colors.textSecondary, marginBottom: spacing.lg, textTransform: 'uppercase', letterSpacing: 0.5 },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.lg },
+  unitTitle: { fontSize: 15, fontWeight: '700', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 },
+  browseLink: { fontSize: 13, fontWeight: '600', color: colors.primary },
   lessonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xl, paddingBottom: spacing.md },
 });
