@@ -27,6 +27,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   invalid_response: 'Something unexpected happened. Let\'s try again.',
   provider_error: 'Something went wrong on our end. Let\'s try again.',
   not_configured: 'This feature isn\'t fully set up yet.',
+  daily_limit_reached: "You've reached today's conversation limit — come back tomorrow!",
 };
 
 // Voice input needs a real network call (speech-to-text) every time, so it's
@@ -170,7 +171,11 @@ export default function TalkConversation() {
         {status === 'error' && error ? (
           <View style={styles.errorBanner}>
             <Text style={styles.errorText}>{ERROR_MESSAGES[error.kind] ?? ERROR_MESSAGES.provider_error}</Text>
-            <Button label="Try again" variant="secondary" onPress={retry} />
+            {error.kind === 'daily_limit_reached' ? (
+              <Button label="Back to situations" variant="secondary" onPress={() => router.replace('/talk')} />
+            ) : (
+              <Button label="Try again" variant="secondary" onPress={retry} />
+            )}
           </View>
         ) : null}
 

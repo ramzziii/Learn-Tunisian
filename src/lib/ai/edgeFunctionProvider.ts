@@ -34,7 +34,13 @@ export const edgeFunctionAiProvider: AiProvider = {
     let invokeResult;
     try {
       invokeResult = await supabase.functions.invoke(FUNCTION_NAME, {
-        body: { systemPrompt, history: request.history, learnerMessage: request.learnerMessage },
+        body: {
+          systemPrompt,
+          history: request.history,
+          learnerMessage: request.learnerMessage,
+          profileId: request.profileId,
+          retrievalQuery: request.retrievalQuery,
+        },
       });
     } catch {
       return { ok: false, error: { kind: 'network', message: 'Could not reach the conversation service.' } };
@@ -42,7 +48,7 @@ export const edgeFunctionAiProvider: AiProvider = {
 
     const { data, error } = invokeResult;
     if (error) {
-      return { ok: false, error: mapInvokeError(error) };
+      return { ok: false, error: await mapInvokeError(error) };
     }
     if (data?.error) {
       return { ok: false, error: { kind: data.error.kind ?? 'provider_error', message: data.error.message } };
@@ -67,7 +73,25 @@ export const edgeFunctionAiProvider: AiProvider = {
   },
 };
 
-function mapInvokeError(error: unknown): AiProviderError {
+/**
+ * The Edge Function always returns a { error: { kind, message } } JSON body,
+ * even on a non-2xx response — supabase-js's FunctionsHttpError carries that
+ * original Response on `.context`, so prefer reading the real kind straight
+ * from it over guessing from the error message text.
+ */
+async function mapInvokeError(error: unknown): Promise<AiProviderError> {
+  const context = (error as { context?: Response })?.context;
+  if (context && typeof context.json === 'function') {
+    try {
+      const body = await context.clone().json();
+      if (body?.error?.kind && body?.error?.message) {
+        return { kind: body.error.kind, message: body.error.message };
+      }
+    } catch {
+      // Not a JSON body — fall through to the heuristic below.
+    }
+  }
+
   const message = error instanceof Error ? error.message : 'The conversation service failed.';
   if (/rate.?limit/i.test(message)) return { kind: 'rate_limited', message };
   if (/timeout|timed out/i.test(message)) return { kind: 'timeout', message };

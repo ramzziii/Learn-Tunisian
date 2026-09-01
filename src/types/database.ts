@@ -108,3 +108,16 @@ export interface SessionLogRow {
   duration_seconds: number;
   completed_at: string;
 }
+
+export interface CorrectionRow {
+  id: string;
+  profile_id: string;
+  ai_generated_text: string;
+  target_table: string;
+  is_correct: boolean | null;
+  corrected_text: string | null;
+  reviewer_name: string | null;
+  reviewed_at: string | null;
+  notes: string | null;
+  created_at: string;
+}

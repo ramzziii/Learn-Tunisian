@@ -31,11 +31,19 @@ export interface LearnerContext {
 
 export interface ConversationRequest {
   scenarioId: string;
+  profileId: string;
   vocabulary: GroundedVocabularyItem[];
   learnerContext: LearnerContext;
   history: ConversationTurn[];
   /** The learner's newest message — absent only for the tutor's opening line. */
   learnerMessage: string | null;
+  /**
+   * What to embed for RAG retrieval (see supabase/functions/talk-to-a-tunisian) —
+   * the learner's message, or for the opening line (no message yet), the
+   * scenario's title + description. Only used by the live provider; mock
+   * ignores it entirely.
+   */
+  retrievalQuery: string;
 }
 
 export interface SuggestedReply {
@@ -60,7 +68,7 @@ export interface TutorResponse {
 }
 
 export interface AiProviderError {
-  kind: 'network' | 'timeout' | 'rate_limited' | 'invalid_response' | 'provider_error' | 'not_configured';
+  kind: 'network' | 'timeout' | 'rate_limited' | 'invalid_response' | 'provider_error' | 'not_configured' | 'daily_limit_reached';
   message: string;
 }
 

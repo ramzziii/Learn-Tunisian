@@ -76,12 +76,20 @@ export function useConversation(scenarioId: string, profileId: string, track: 'k
         return;
       }
 
+      // RAG retrieval (live mode only — see supabase/functions/talk-to-a-tunisian)
+      // embeds this to find relevant verified examples. For the opening line
+      // there's no learner message yet, so fall back to what the scenario is
+      // actually about.
+      const retrievalQuery = learnerMessage?.trim() || `${scenario.title} ${scenario.description}`;
+
       const result = await aiProvider.generateReply({
         scenarioId,
+        profileId,
         vocabulary: stateRef.current.vocabulary,
         learnerContext: learnerContextRef.current,
         history: toHistory(stateRef.current.messages),
         learnerMessage,
+        retrievalQuery,
       });
 
       if (!result.ok) {
@@ -96,7 +104,7 @@ export function useConversation(scenarioId: string, profileId: string, track: 'k
         messages: [...s.messages, { id: nextMessageId(), role: 'tutor', response: result.response }],
       }));
     },
-    [scenarioId]
+    [scenarioId, profileId]
   );
 
   const start = useCallback(async () => {
