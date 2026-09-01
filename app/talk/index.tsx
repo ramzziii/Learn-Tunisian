@@ -1,26 +1,40 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { BackButton } from '@/components/ui/BackButton';
+import { Button } from '@/components/ui/Button';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
-import { SelectableCard } from '@/components/ui/SelectableCard';
 import { TALK_SCENARIOS } from '@/constants/talkScenarios';
 import { colors, radii, shadows, spacing } from '@/constants/theme';
+import { fetchTalkLevel } from '@/data/talkContext';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
 import { canAccessTalkFeature } from '@/lib/ai/accessControl';
-import type { ConversationDifficulty } from '@/lib/ai/types';
+import { meetsTalkLevel, type TalkLevel } from '@/lib/talkLevel';
 
-const DIFFICULTIES: { value: ConversationDifficulty; label: string }[] = [
-  { value: 'beginner', label: 'Beginner' },
-  { value: 'intermediate', label: 'Intermediate' },
-];
+const LEVEL_LABEL: Record<TalkLevel, string> = { beginner: 'Beginner', intermediate: 'Intermediate', advanced: 'Advanced' };
+const LEVEL_EMOJI: Record<TalkLevel, string> = { beginner: '🌱', intermediate: '🌿', advanced: '🌳' };
 
 export default function TalkScenarioPicker() {
   const { activeProfile } = useActiveProfile();
-  const [difficulty, setDifficulty] = useState<ConversationDifficulty>('beginner');
+  const [level, setLevel] = useState<TalkLevel | null>(null);
+  const [loadError, setLoadError] = useState(false);
+
+  const load = useCallback(async () => {
+    if (!activeProfile) return;
+    setLoadError(false);
+    try {
+      setLevel(await fetchTalkLevel(activeProfile.id));
+    } catch {
+      setLoadError(true);
+    }
+  }, [activeProfile]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   if (!activeProfile) return <LoadingScreen />;
 
@@ -42,66 +56,92 @@ export default function TalkScenarioPicker() {
     );
   }
 
+  if (loadError || level === null) {
+    return (
+      <ScreenContainer>
+        <BackButton />
+        {loadError ? (
+          <View style={styles.unavailableContainer}>
+            <Text style={styles.unavailableEmoji}>😕</Text>
+            <Text style={styles.unavailableTitle}>Couldn&apos;t load this</Text>
+            <Text style={styles.unavailableBody}>Check your connection and try again.</Text>
+            <Button label="Try again" variant="secondary" onPress={load} style={{ marginTop: spacing.md }} />
+          </View>
+        ) : (
+          <LoadingScreen />
+        )}
+      </ScreenContainer>
+    );
+  }
+
   return (
     <ScreenContainer>
       <BackButton />
-      <Text style={styles.title}>Talk to a Tunisian 🇹🇳</Text>
-      <Text style={styles.subtitle}>Choose a situation to practice a real conversation.</Text>
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <Text style={styles.title}>Talk to a Tunisian 🇹🇳</Text>
+        <Text style={styles.subtitle}>Choose a situation to practice a real conversation.</Text>
 
-      <Text style={styles.sectionLabel}>Difficulty</Text>
-      <View style={styles.difficultyRow}>
-        {DIFFICULTIES.map((option) => (
-          <SelectableCard
-            key={option.value}
-            title={option.label}
-            selected={difficulty === option.value}
-            onPress={() => setDifficulty(option.value)}
-          />
-        ))}
-      </View>
+        <View style={styles.levelBadge}>
+          <Text style={styles.levelBadgeText}>
+            {LEVEL_EMOJI[level]} Your level: {LEVEL_LABEL[level]}
+          </Text>
+        </View>
 
-      <Text style={styles.sectionLabel}>Choose a situation</Text>
-      <View style={styles.scenarioGrid}>
-        {TALK_SCENARIOS.map((scenario) => (
-          <PressableScale
-            key={scenario.id}
-            style={[styles.scenarioCard, shadows.card]}
-            onPress={() => router.push(`/talk/${scenario.id}?difficulty=${difficulty}`)}
-          >
-            <Text style={styles.scenarioEmoji}>{scenario.emoji}</Text>
-            <Text style={styles.scenarioTitle}>{scenario.title}</Text>
-            <Text style={styles.scenarioDescription}>{scenario.description}</Text>
-          </PressableScale>
-        ))}
-      </View>
+        <View style={styles.scenarioList}>
+          {TALK_SCENARIOS.map((scenario) => {
+            const unlocked = meetsTalkLevel(level, scenario.minLevel);
+            return (
+              <PressableScale
+                key={scenario.id}
+                disabled={!unlocked}
+                style={[styles.scenarioRow, shadows.card, !unlocked && styles.scenarioRowLocked]}
+                onPress={() => router.push(`/talk/${scenario.id}`)}
+              >
+                <Text style={styles.scenarioEmoji}>{unlocked ? scenario.emoji : '🔒'}</Text>
+                <View style={styles.scenarioTextColumn}>
+                  <Text style={styles.scenarioTitle} numberOfLines={1} maxFontSizeMultiplier={1.3}>
+                    {scenario.title}
+                  </Text>
+                  <Text style={styles.scenarioDescription} numberOfLines={2} maxFontSizeMultiplier={1.3}>
+                    {unlocked ? scenario.description : `Unlocks at ${LEVEL_LABEL[scenario.minLevel]} level`}
+                  </Text>
+                </View>
+              </PressableScale>
+            );
+          })}
+        </View>
+      </ScrollView>
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
   title: { fontSize: 26, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md },
-  subtitle: { fontSize: 14, color: colors.textSecondary, marginTop: spacing.xs, marginBottom: spacing.lg },
-  sectionLabel: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.textSecondary,
-    marginTop: spacing.lg,
-    marginBottom: spacing.sm,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+  subtitle: { fontSize: 14, color: colors.textSecondary, marginTop: spacing.xs },
+  levelBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: colors.surface,
+    borderRadius: radii.pill,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    marginTop: spacing.md,
+    marginBottom: spacing.lg,
   },
-  difficultyRow: { flexDirection: 'row', gap: spacing.sm },
-  scenarioGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, paddingBottom: spacing.xl },
-  scenarioCard: {
-    width: '47%',
+  levelBadgeText: { fontSize: 13, fontWeight: '700', color: colors.primaryDark },
+  scenarioList: { gap: spacing.sm, paddingBottom: spacing.xl },
+  scenarioRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
     backgroundColor: colors.surface,
     borderRadius: radii.lg,
     padding: spacing.md,
-    alignItems: 'center',
   },
-  scenarioEmoji: { fontSize: 36, marginBottom: spacing.xs },
-  scenarioTitle: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
-  scenarioDescription: { fontSize: 12, color: colors.textSecondary, textAlign: 'center', marginTop: 2 },
+  scenarioRowLocked: { opacity: 0.55 },
+  scenarioEmoji: { fontSize: 32 },
+  scenarioTextColumn: { flex: 1 },
+  scenarioTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
+  scenarioDescription: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
   unavailableContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm, padding: spacing.lg },
   unavailableEmoji: { fontSize: 48, marginBottom: spacing.sm },
   unavailableTitle: { fontSize: 20, fontWeight: '700', color: colors.textPrimary },

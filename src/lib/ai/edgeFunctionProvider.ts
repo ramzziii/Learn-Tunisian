@@ -26,7 +26,7 @@ export const edgeFunctionAiProvider: AiProvider = {
 
     const systemPrompt = buildSystemPrompt(
       scenario,
-      request.learnerContext.difficulty,
+      request.learnerContext.level,
       request.vocabulary,
       request.learnerContext
     );

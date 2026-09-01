@@ -1,6 +1,9 @@
 import { findTalkScenario } from '@/constants/talkScenarios';
+import { countCompletedLessons } from '@/data/content';
+import { fetchProgressSummary } from '@/data/progress';
 import { supabase } from '@/lib/supabase/client';
-import type { GroundedVocabularyItem, LearnerContext, ConversationDifficulty } from '@/lib/ai/types';
+import { calculateTalkLevel, type TalkLevel } from '@/lib/talkLevel';
+import type { GroundedVocabularyItem, LearnerContext } from '@/lib/ai/types';
 import type { ProgressRow, WordGroupRow, WordVariantRow } from '@/types/database';
 
 const MAX_CONTEXT_WORDS = 6;
@@ -41,7 +44,20 @@ export async function fetchScenarioVocabulary(scenarioId: string): Promise<Groun
 }
 
 /**
- * Minimal, non-identifying learner context: track, difficulty, and a
+ * The learner's level for "Talk to a Tunisian" (see src/lib/talkLevel.ts),
+ * derived from the same progress data already shown elsewhere in the app —
+ * there's no separate manual rating to keep in sync.
+ */
+export async function fetchTalkLevel(profileId: string): Promise<TalkLevel> {
+  const [summary, lessonsCompleted] = await Promise.all([
+    fetchProgressSummary(profileId),
+    countCompletedLessons(profileId),
+  ]);
+  return calculateTalkLevel({ wordsMastered: summary.wordsMastered, lessonsCompleted });
+}
+
+/**
+ * Minimal, non-identifying learner context: track, level, and a
  * handful of English-meaning labels for words the learner knows well or is
  * struggling with — enough for the tutor to personalize without sending
  * anything resembling account/personal information.
@@ -49,7 +65,7 @@ export async function fetchScenarioVocabulary(scenarioId: string): Promise<Groun
 export async function fetchLearnerContext(
   profileId: string,
   track: 'kid' | 'adult',
-  difficulty: ConversationDifficulty
+  level: TalkLevel
 ): Promise<LearnerContext> {
   const { data, error } = await supabase
     .from('progress')
@@ -78,7 +94,7 @@ export async function fetchLearnerContext(
 
   return {
     track,
-    difficulty,
+    level,
     knownWords: knownGroupIds.map((id) => meaningById.get(id)).filter((v): v is string => !!v).slice(0, MAX_CONTEXT_WORDS),
     strugglingWords: strugglingGroupIds
       .map((id) => meaningById.get(id))

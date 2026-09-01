@@ -18,7 +18,7 @@ function vocabItem(overrides: Partial<GroundedVocabularyItem>): GroundedVocabula
 
 const emptyLearnerContext: LearnerContext = {
   track: 'adult',
-  difficulty: 'beginner',
+  level: 'beginner',
   knownWords: [],
   strugglingWords: [],
 };
@@ -60,6 +60,13 @@ describe('buildSystemPrompt', () => {
   it('relaxes translation hand-holding at intermediate difficulty', () => {
     const prompt = buildSystemPrompt(scenario, 'intermediate', [], emptyLearnerContext);
     expect(prompt).toMatch(/intermediate/i);
+    expect(prompt).not.toContain(DIFFICULTY_TEXT_ONLY_IN_BEGINNER);
+  });
+
+  it('drops suggestedReplies and simplification language at advanced level', () => {
+    const prompt = buildSystemPrompt(scenario, 'advanced', [], emptyLearnerContext);
+    expect(prompt).toMatch(/advanced/i);
+    expect(prompt).toMatch(/drop suggestedReplies entirely/i);
     expect(prompt).not.toContain(DIFFICULTY_TEXT_ONLY_IN_BEGINNER);
   });
 

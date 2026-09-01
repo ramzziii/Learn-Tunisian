@@ -12,7 +12,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.learntunisian.app",
       "infoPlist": {
-        "NSMicrophoneUsageDescription": "Learn Tunisian uses the microphone so you can record yourself practicing a word and play it back to compare your pronunciation. This is only used when you choose a speaking exercise."
+        "NSMicrophoneUsageDescription": "Learn Tunisian uses the microphone so you can record yourself practicing a word and play it back to compare your pronunciation, and so you can speak your replies in Talk to a Tunisian conversations."
       }
     },
     "android": {
@@ -33,7 +33,7 @@
       [
         "expo-audio",
         {
-          "microphonePermission": "Learn Tunisian uses the microphone so you can record yourself practicing a word and play it back to compare your pronunciation."
+          "microphonePermission": "Learn Tunisian uses the microphone so you can record yourself practicing a word and speak your replies in Talk to a Tunisian conversations."
         }
       ],
       "expo-splash-screen",

@@ -17,6 +17,7 @@ describe('TALK_SCENARIOS', () => {
       expect(scenario.emoji.length).toBeGreaterThan(0);
       expect(scenario.systemInstructions.length).toBeGreaterThan(0);
       expect(Array.isArray(scenario.targetVocabulary)).toBe(true);
+      expect(['beginner', 'intermediate', 'advanced']).toContain(scenario.minLevel);
     }
   });
 

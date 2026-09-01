@@ -2,15 +2,24 @@ import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+const rawSupabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const rawSupabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey) {
+if (!rawSupabaseUrl || !rawSupabaseAnonKey) {
   throw new Error(
     'Missing EXPO_PUBLIC_SUPABASE_URL / EXPO_PUBLIC_SUPABASE_ANON_KEY. ' +
       'Copy .env.example to .env and fill in your Supabase project values.'
   );
 }
+// Narrowed to plain `string` (rather than `string | undefined`) now that the
+// throw above has guaranteed it, so callers don't need to re-check.
+const supabaseUrl: string = rawSupabaseUrl;
+const supabaseAnonKey: string = rawSupabaseAnonKey;
+
+// Exposed for the binary (audio) Edge Function calls in src/lib/ai/functionsClient.ts,
+// which can't go through supabase.functions.invoke (JSON in/out only) since
+// they move raw audio bytes.
+export { supabaseUrl, supabaseAnonKey };
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {

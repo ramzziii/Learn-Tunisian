@@ -122,32 +122,58 @@ progress, a one-word "Practice" drill, a favorite toggle, and an honest
 `native_verified` badge (everything currently seeded shows "Draft — pending
 native review," which is accurate).
 
-## Talk to a Tunisian (AI conversation — Phase 1: text only)
+## Talk to a Tunisian (AI conversation, voice-first)
 
 Adult/teen track only — a kid profile never sees the entry point, and the
 route itself refuses the feature if reached directly (`src/lib/ai/accessControl.ts`).
-The learner picks a scenario + difficulty (`app/talk/index.tsx`) and has a
-text conversation (`app/talk/[scenarioId].tsx`) grounded in the app's own
-`word_groups`/`word_variants` — there's no second vocabulary source for the
-AI. Audio playback and speech input (Phases 2/3 from the product brief) are
-intentionally not built yet.
+
+The learner's level (beginner/intermediate/advanced) is derived automatically
+from their existing progress (`src/lib/talkLevel.ts` — words mastered and
+lessons completed, no separate manual rating) and gates which scenarios are
+unlocked in the picker (`app/talk/index.tsx`); the conversation itself
+(`app/talk/[scenarioId].tsx`) is grounded in the app's own
+`word_groups`/`word_variants` — there's no second vocabulary source for the AI.
+
+The conversation is spoken, not typed: the tutor's replies are read aloud as
+they arrive, and the learner records their reply with the mic — typing stays
+available as a fallback at all times. Voice input needs a real network call
+(speech-to-text) every time, so it's only offered in live mode; mock mode
+speaks the tutor's side with the on-device `expo-speech` engine and offers
+typing only, keeping it fully offline like the rest of the mock provider.
 
 **Works out of the box with no AI provider configured** — it defaults to a
 mock provider (`src/lib/ai/mockProvider.ts`) that returns real-shaped, scenario-
 grounded responses with zero network calls. To connect a real provider:
 
-1. Deploy the proxy Edge Function (holds the secret key — it never reaches
-   the client):
+1. Deploy the three proxy Edge Functions (each holds the secret key — it
+   never reaches the client):
    ```bash
    supabase functions deploy talk-to-a-tunisian
+   supabase functions deploy talk-tts
+   supabase functions deploy talk-stt
    supabase secrets set AI_API_KEY=sk-...
    ```
-   `AI_MODEL` and `AI_BASE_URL` secrets are optional (default to
-   `gpt-4o-mini` / `https://api.openai.com/v1` — any OpenAI-compatible chat
-   completions endpoint works). **This function hasn't been exercised
-   against a live key in this environment** — it's written carefully against
-   the documented API shape, but treat it as reviewed-not-verified until you
-   test it with real credentials.
+   `AI_MODEL`/`AI_BASE_URL` (chat), `AI_TTS_MODEL`/`AI_TTS_VOICE` (text-to-speech,
+   default `tts-1`/`alloy`), and `AI_STT_MODEL`/`AI_STT_LANGUAGE` (speech-to-text,
+   default `whisper-1`/`ar`) are all optional and reuse the same `AI_API_KEY`.
+   All three are verified working end-to-end against a live key (confirmed via
+   direct curl, including a full TTS→STT round trip). `AI_STT_LANGUAGE` pins
+   Whisper's language rather than letting it auto-detect — without it, a
+   short/ambiguous clip can get transcribed in a completely unrelated script
+   (Hebrew and Korean have both been observed). Whisper still has no dedicated
+   Tunisian Derja mode, so it transcribes into standard Arabic script rather
+   than genuinely understanding the dialect — accuracy on spoken Derja is an
+   open question beyond "wrong script."
+
+   **If OpenAI returns `403 ... does not have access to model`** even for a
+   model you can see is allowed in your project's dashboard: this project
+   restriction feature has a known, long-standing OpenAI-side bug where the
+   UI doesn't reliably reflect what's actually enforced (see
+   [community reports](https://community.openai.com/t/api-project-limits-bug-can-not-allow-retrieve-models-for-project/936668)).
+   Removing the restriction entirely (rather than trying to get the allow-list
+   itself to work) can still leave the project in a flaky, intermittently-failing
+   state — the reliable fix is a fresh OpenAI project that's never had a model
+   restriction touched, with its own `AI_API_KEY`.
 2. Set `EXPO_PUBLIC_TALK_AI_MODE=live` in `.env` (this only picks which
    client-side wrapper to use — it carries no secret).
 
@@ -155,7 +181,8 @@ The AI's structured response is validated against a fixed shape
 (`src/lib/ai/validateTutorResponse.ts`, hand-rolled — no new dependency) before
 anything reaches the UI; a malformed response is treated as a failure with a
 retry, never rendered as-is. Conversation history is in-memory only for now
-— nothing is persisted (see the design-decisions note below on why).
+— nothing is persisted, and a recorded voice reply is deleted immediately
+after transcription (see the design-decisions note below on why).
 
 ## Project structure
 
@@ -173,8 +200,9 @@ src/
       shared/             exercise chrome shared by both tracks
     onboarding/, lesson-map/, session/, ui/
   data/                   Supabase queries + row->model mappers (data layer)
-    talkContext.ts         scenario vocabulary + learner-context fetching for Talk to a Tunisian
-  hooks/                  useSessionTimer, useExerciseQueue, useWordAudioPlayer, useConversation
+    talkContext.ts         scenario vocabulary, learner-context, and level fetching for Talk to a Tunisian
+  hooks/                  useSessionTimer, useExerciseQueue, useWordAudioPlayer, useConversation,
+                          useTutorSpeech (AI voice), useVoiceRecorder (learner mic input)
   lib/
     auth/                 AuthContext (email/password now; built to add Google/Apple later)
     account/              ActiveProfileContext (which profile is active)
@@ -183,14 +211,18 @@ src/
     offline/              audio download/cache for offline playback
     supabase/              client setup
     ai/                    AI provider abstraction (mock + Edge Function), prompt building,
-                            response validation — see "Talk to a Tunisian" above
+                            response validation, binary (TTS/STT) function calls —
+                            see "Talk to a Tunisian" above
+    talkLevel.ts           pure beginner/intermediate/advanced level calculation
     spacedRepetition.ts, reviewSelection.ts, masteryStatus.ts,
     lessonCompletion.ts, age.ts, wordVariants.ts   pure, unit-tested business logic
   types/                  TypeScript models (models.ts) + raw DB row types (database.ts)
 supabase/
   migrations/0001-0007_*.sql
   seed.sql
-  functions/talk-to-a-tunisian/   Edge Function proxy (holds the AI secret server-side)
+  functions/talk-to-a-tunisian/   Edge Function proxy: chat (holds the AI secret server-side)
+  functions/talk-tts/             Edge Function proxy: text-to-speech
+  functions/talk-stt/             Edge Function proxy: speech-to-text
 ```
 
 ## Testing
@@ -199,16 +231,18 @@ supabase/
 npm test
 ```
 
-Runs Jest (`jest-expo` preset) against `src/**/__tests__` — 91 tests across
-12 suites, covering: spaced repetition, review-queue ordering, mastery
+Runs Jest (`jest-expo` preset) against `src/**/__tests__` — 102 tests across
+13 suites, covering: spaced repetition, review-queue ordering, mastery
 status, lesson lock/unlock/completion, age → track derivation (including a
 real timezone bug these tests caught — see `parseIsoDateLocal` in
-`src/lib/age.ts`), word-variant selection/answer-matching, and the Talk to a
-Tunisian AI layer (scenario config, prompt building, response validation
-including malformed-AI-output cases, the mock provider, word-help lookup,
-and child/adult access control — all against the mock provider, never a
-real AI call). No integration/E2E tests yet — everything above is
-pure-function-level.
+`src/lib/age.ts`), word-variant selection/answer-matching, talk-level
+calculation, and the Talk to a Tunisian AI layer (scenario config including
+per-scenario level gating, prompt building across all three levels, response
+validation including malformed-AI-output cases, the mock provider, word-help
+lookup, and child/adult access control — all against the mock provider,
+never a real AI call). No integration/E2E tests yet, and nothing exercises
+real audio recording/playback or the two new binary Edge Functions
+(talk-tts/talk-stt) — everything above is pure-function-level.
 
 ## Notes on the v1 design decisions
 
