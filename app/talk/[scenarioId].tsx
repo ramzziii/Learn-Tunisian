@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { File } from 'expo-file-system';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
@@ -9,11 +10,15 @@ import { PressableScale } from '@/components/ui/PressableScale';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { findTalkScenario } from '@/constants/talkScenarios';
 import { colors, radii, shadows, spacing } from '@/constants/theme';
-import { buildWordHelp } from '@/lib/ai/buildWordHelp';
-import type { ConversationDifficulty, GroundedVocabularyItem, SuggestedReply, TutorResponse } from '@/lib/ai/types';
-import { canAccessTalkFeature } from '@/lib/ai/accessControl';
-import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
 import { type ConversationMessage, useConversation } from '@/hooks/useConversation';
+import { useTutorSpeech } from '@/hooks/useTutorSpeech';
+import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
+import { isUsingMockAiProvider } from '@/lib/ai';
+import { canAccessTalkFeature } from '@/lib/ai/accessControl';
+import { transcribeAudio } from '@/lib/ai/functionsClient';
+import { buildWordHelp } from '@/lib/ai/buildWordHelp';
+import type { GroundedVocabularyItem, SuggestedReply, TutorResponse } from '@/lib/ai/types';
+import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
 
 const ERROR_MESSAGES: Record<string, string> = {
   network: "Couldn't connect. Check your internet and try again.",
@@ -24,21 +29,39 @@ const ERROR_MESSAGES: Record<string, string> = {
   not_configured: 'This feature isn\'t fully set up yet.',
 };
 
+// Voice input needs a real network call (speech-to-text) every time, so it's
+// only offered in live mode — mock mode stays fully offline like the rest of
+// the mock AI provider, with typing as the only input.
+const VOICE_INPUT_AVAILABLE = !isUsingMockAiProvider;
+
 export default function TalkConversation() {
-  const { scenarioId, difficulty } = useLocalSearchParams<{ scenarioId: string; difficulty?: string }>();
+  const { scenarioId } = useLocalSearchParams<{ scenarioId: string }>();
   const { activeProfile } = useActiveProfile();
   const [input, setInput] = useState('');
   const [helpForMessageId, setHelpForMessageId] = useState<string | null>(null);
+  const [micError, setMicError] = useState<string | null>(null);
+  const [isTranscribing, setIsTranscribing] = useState(false);
 
-  const resolvedDifficulty: ConversationDifficulty = difficulty === 'intermediate' ? 'intermediate' : 'beginner';
   const scenario = findTalkScenario(scenarioId ?? '');
-
   const { status, messages, vocabulary, error, sendMessage, retry } = useConversation(
     scenarioId ?? '',
     activeProfile?.id ?? '',
-    activeProfile?.track ?? 'adult',
-    resolvedDifficulty
+    activeProfile?.track ?? 'adult'
   );
+  const tutorSpeech = useTutorSpeech();
+  const voiceRecorder = useVoiceRecorder();
+  const spokenMessageIds = useRef(new Set<string>());
+
+  // Auto-play each new tutor turn once, as soon as it arrives — this is a
+  // spoken conversation first, with text kept alongside for reading support.
+  useEffect(() => {
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage?.role === 'tutor' && !spokenMessageIds.current.has(lastMessage.id)) {
+      spokenMessageIds.current.add(lastMessage.id);
+      tutorSpeech.speak(lastMessage.response.tunisian);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages]);
 
   if (!activeProfile) return <LoadingScreen />;
 
@@ -70,12 +93,48 @@ export default function TalkConversation() {
 
   const handleSend = (text: string) => {
     setHelpForMessageId(null);
+    setMicError(null);
     setInput('');
     sendMessage(text);
   };
 
+  const handleMicPress = async () => {
+    setMicError(null);
+    if (voiceRecorder.permission === 'needs-explanation') {
+      await voiceRecorder.requestPermission();
+      return;
+    }
+    if (voiceRecorder.permission !== 'ready') return;
+
+    if (voiceRecorder.isRecording) {
+      const uri = await voiceRecorder.stop();
+      if (!uri) {
+        setMicError("That recording didn't save properly. Try again.");
+        return;
+      }
+      setIsTranscribing(true);
+      try {
+        const file = new File(uri);
+        const bytes = await file.bytes();
+        file.delete();
+        const result = await transcribeAudio(bytes, 'audio/m4a');
+        if (!result.ok) {
+          setMicError(result.error.message);
+          return;
+        }
+        handleSend(result.text);
+      } catch {
+        setMicError("Couldn't understand that. Try again or type instead.");
+      } finally {
+        setIsTranscribing(false);
+      }
+    } else {
+      await voiceRecorder.start();
+    }
+  };
+
   const lastTutorMessage = [...messages].reverse().find((m): m is Extract<ConversationMessage, { role: 'tutor' }> => m.role === 'tutor');
-  const isBusy = status === 'sending' || status === 'loading';
+  const isBusy = status === 'sending' || status === 'loading' || isTranscribing;
 
   return (
     <ScreenContainer>
@@ -95,6 +154,9 @@ export default function TalkConversation() {
               showHelp={helpForMessageId === message.id}
               onToggleHelp={() => setHelpForMessageId((current) => (current === message.id ? null : message.id))}
               vocabulary={vocabulary}
+              onReplay={() => tutorSpeech.speak(message.response.tunisian)}
+              isSpeaking={tutorSpeech.isSpeaking}
+              speechError={tutorSpeech.hasError}
             />
           ) : (
             <LearnerBubble key={message.id} text={message.text} />
@@ -103,6 +165,7 @@ export default function TalkConversation() {
 
         {status === 'loading' ? <Text style={styles.typingIndicator}>The tutor is typing…</Text> : null}
         {status === 'sending' ? <Text style={styles.typingIndicator}>The tutor is typing…</Text> : null}
+        {isTranscribing ? <Text style={styles.typingIndicator}>Listening…</Text> : null}
 
         {status === 'error' && error ? (
           <View style={styles.errorBanner}>
@@ -123,23 +186,44 @@ export default function TalkConversation() {
         ) : null}
       </ScrollView>
 
+      {tutorSpeech.hasError && tutorSpeech.errorMessage ? (
+        <Text style={styles.micErrorText}>Couldn&apos;t play the tutor&apos;s voice: {tutorSpeech.errorMessage}</Text>
+      ) : null}
+      {micError ? <Text style={styles.micErrorText}>{micError}</Text> : null}
+
       {status !== 'finished' && lastTutorMessage?.response.suggestedReplies?.length ? (
         <View style={styles.suggestedRow}>
           {lastTutorMessage.response.suggestedReplies.map((reply, index) => (
-            <SuggestedReplyChip key={index} reply={reply} disabled={isBusy} onPress={() => handleSend(reply.tunisian)} />
+            <SuggestedReplyChip
+              key={index}
+              reply={reply}
+              disabled={isBusy}
+              onPress={() => handleSend(reply.tunisian)}
+              onSpeak={() => tutorSpeech.speak(reply.tunisian)}
+            />
           ))}
         </View>
       ) : null}
 
       {status !== 'finished' ? (
         <View style={styles.composer}>
+          {VOICE_INPUT_AVAILABLE && voiceRecorder.permission !== 'denied' ? (
+            <PressableScale
+              onPress={handleMicPress}
+              disabled={isBusy && !voiceRecorder.isRecording}
+              style={[styles.micButton, voiceRecorder.isRecording && styles.micButtonRecording]}
+              accessibilityLabel={voiceRecorder.isRecording ? 'Stop recording' : 'Record your reply'}
+            >
+              <Text style={styles.micIcon}>{voiceRecorder.isRecording ? '⏹' : '🎤'}</Text>
+            </PressableScale>
+          ) : null}
           <TextInput
             value={input}
             onChangeText={setInput}
-            placeholder="Type your reply…"
+            placeholder={voiceRecorder.isRecording ? `Recording… ${(voiceRecorder.durationMillis / 1000).toFixed(0)}s` : 'Type your reply…'}
             placeholderTextColor={colors.textSecondary}
             style={styles.input}
-            editable={!isBusy}
+            editable={!isBusy && !voiceRecorder.isRecording}
             onSubmitEditing={() => input.trim() && handleSend(input)}
           />
           <PressableScale
@@ -160,17 +244,32 @@ function TutorBubble({
   showHelp,
   onToggleHelp,
   vocabulary,
+  onReplay,
+  isSpeaking,
+  speechError,
 }: {
   response: TutorResponse;
   showHelp: boolean;
   onToggleHelp: () => void;
   vocabulary: GroundedVocabularyItem[];
+  onReplay: () => void;
+  isSpeaking: boolean;
+  speechError: boolean;
 }) {
   const wordHelp = buildWordHelp(response.tunisian, vocabulary);
 
   return (
     <View style={[styles.bubble, styles.tutorBubble, shadows.card]}>
-      <Text style={styles.tutorLabel}>🇹🇳 Tutor</Text>
+      <View style={styles.tutorHeaderRow}>
+        <Text style={styles.tutorLabel}>🇹🇳 Tutor</Text>
+        <PressableScale onPress={onReplay} accessibilityLabel="Replay" style={styles.replayButton}>
+          {isSpeaking ? (
+            <ActivityIndicator size="small" color={colors.primary} />
+          ) : (
+            <Text style={styles.replayIcon}>{speechError ? '↻' : '🔊'}</Text>
+          )}
+        </PressableScale>
+      </View>
       <Text style={styles.tunisianText}>{response.tunisian}</Text>
       {response.transliteration ? <Text style={styles.transliterationText}>{response.transliteration}</Text> : null}
       <Text style={styles.englishText}>{response.english}</Text>
@@ -225,12 +324,27 @@ function LearnerBubble({ text }: { text: string }) {
   );
 }
 
-function SuggestedReplyChip({ reply, disabled, onPress }: { reply: SuggestedReply; disabled: boolean; onPress: () => void }) {
+function SuggestedReplyChip({
+  reply,
+  disabled,
+  onPress,
+  onSpeak,
+}: {
+  reply: SuggestedReply;
+  disabled: boolean;
+  onPress: () => void;
+  onSpeak: () => void;
+}) {
   return (
-    <PressableScale onPress={onPress} disabled={disabled} style={[styles.chip, disabled && styles.chipDisabled]}>
-      <Text style={styles.chipTunisian}>{reply.tunisian}</Text>
-      <Text style={styles.chipEnglish}>{reply.english}</Text>
-    </PressableScale>
+    <View style={[styles.chip, disabled && styles.chipDisabled]}>
+      <PressableScale onPress={onSpeak} accessibilityLabel="Hear this phrase" style={styles.chipSpeakButton}>
+        <Text style={styles.chipSpeakIcon}>🔊</Text>
+      </PressableScale>
+      <PressableScale onPress={onPress} disabled={disabled} style={styles.chipTextButton}>
+        <Text style={styles.chipTunisian}>{reply.tunisian}</Text>
+        <Text style={styles.chipEnglish}>{reply.english}</Text>
+      </PressableScale>
+    </View>
   );
 }
 
@@ -241,8 +355,11 @@ const styles = StyleSheet.create({
   messagesContent: { paddingBottom: spacing.md, gap: spacing.sm },
   bubble: { borderRadius: radii.lg, padding: spacing.md, maxWidth: '90%' },
   tutorBubble: { backgroundColor: colors.surface, alignSelf: 'flex-start' },
-  tutorLabel: { fontSize: 11, fontWeight: '700', color: colors.textSecondary, marginBottom: spacing.xs },
-  tunisianText: { fontSize: 20, fontWeight: '700', color: colors.textPrimary },
+  tutorHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  tutorLabel: { fontSize: 11, fontWeight: '700', color: colors.textSecondary },
+  replayButton: { padding: spacing.xs },
+  replayIcon: { fontSize: 16 },
+  tunisianText: { fontSize: 20, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.xs },
   transliterationText: { fontSize: 13, color: colors.textSecondary, fontStyle: 'italic', marginTop: 2 },
   englishText: { fontSize: 14, color: colors.textSecondary, marginTop: spacing.xs },
   correctionBox: { backgroundColor: '#FFF8E7', borderRadius: radii.sm, padding: spacing.sm, marginTop: spacing.sm },
@@ -259,6 +376,7 @@ const styles = StyleSheet.create({
   learnerLabel: { fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.75)', marginBottom: 2 },
   learnerText: { fontSize: 16, color: colors.textOnPrimary },
   typingIndicator: { fontSize: 13, color: colors.textSecondary, fontStyle: 'italic', marginTop: spacing.xs },
+  micErrorText: { fontSize: 12, color: colors.error, textAlign: 'center', marginTop: spacing.xs },
   errorBanner: {
     backgroundColor: '#FBEAE6',
     borderRadius: radii.md,
@@ -281,17 +399,36 @@ const styles = StyleSheet.create({
   finishedBody: { fontSize: 13, color: colors.textSecondary, textAlign: 'center', marginBottom: spacing.sm },
   suggestedRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, paddingVertical: spacing.sm },
   chip: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
     borderRadius: radii.pill,
     borderWidth: 1.5,
     borderColor: colors.primary,
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.sm,
     backgroundColor: colors.surface,
+    overflow: 'hidden',
   },
   chipDisabled: { opacity: 0.5 },
+  chipSpeakButton: {
+    justifyContent: 'center',
+    paddingHorizontal: spacing.sm,
+    borderRightWidth: 1,
+    borderRightColor: colors.border,
+  },
+  chipSpeakIcon: { fontSize: 14 },
+  chipTextButton: { paddingVertical: spacing.xs, paddingHorizontal: spacing.sm },
   chipTunisian: { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
   chipEnglish: { fontSize: 11, color: colors.textSecondary },
   composer: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center', paddingTop: spacing.sm },
+  micButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  micButtonRecording: { backgroundColor: colors.error },
+  micIcon: { fontSize: 18 },
   input: {
     flex: 1,
     borderWidth: 1.5,

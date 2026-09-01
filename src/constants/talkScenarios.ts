@@ -8,6 +8,8 @@
 // Some scenarios (family, in particular) are thin right now because the
 // seeded content doesn't cover them well yet; that's honest, not a bug.
 
+import type { TalkLevel } from '@/lib/talkLevel';
+
 export interface ConversationScenario {
   id: string;
   title: string;
@@ -17,6 +19,8 @@ export interface ConversationScenario {
   targetVocabulary: string[];
   /** Scenario-specific addition to the base system prompt (see buildSystemPrompt.ts). */
   systemInstructions: string;
+  /** The learner's level (see src/lib/talkLevel.ts) required to unlock this scenario in the picker. */
+  minLevel: TalkLevel;
 }
 
 export const TALK_SCENARIOS: ConversationScenario[] = [
@@ -28,6 +32,7 @@ export const TALK_SCENARIOS: ConversationScenario[] = [
     targetVocabulary: ['water', 'milk', 'im_thirsty', 'more_please', 'all_done'],
     systemInstructions:
       "You are a friendly café server (garçon) in Tunisia. Greet the learner, ask what they'd like to drink, and respond naturally to their order. Keep the exchange focused on ordering a drink.",
+    minLevel: 'beginner',
   },
   {
     id: 'market',
@@ -37,6 +42,7 @@ export const TALK_SCENARIOS: ConversationScenario[] = [
     targetVocabulary: ['apple', 'banana', 'bread', 'cheese', 'red', 'more_please'],
     systemInstructions:
       'You are a friendly vendor at a Tunisian market (souk). Greet the learner, ask what they want to buy, and describe items naturally (e.g. by color or freshness) as the conversation continues.',
+    minLevel: 'beginner',
   },
   {
     id: 'meeting_someone',
@@ -46,6 +52,7 @@ export const TALK_SCENARIOS: ConversationScenario[] = [
     targetVocabulary: ['good_morning', 'good_night', 'im_happy', 'letsgo', 'i_love_you'],
     systemInstructions:
       'You are a new acquaintance greeting the learner for the first time. Keep it warm and simple: greetings, how they are doing, and a natural way to part ways.',
+    minLevel: 'beginner',
   },
   {
     id: 'family',
@@ -55,6 +62,7 @@ export const TALK_SCENARIOS: ConversationScenario[] = [
     targetVocabulary: ['i_love_you', 'im_happy', 'im_tired', 'good_morning'],
     systemInstructions:
       "You are chatting with the learner about family life in a warm, casual way. The app's current vocabulary for family topics is limited, so keep sentences very short and simple, and lean on the supplied vocabulary rather than introducing unrelated family-specific words.",
+    minLevel: 'intermediate',
   },
   {
     id: 'food',
@@ -75,6 +83,7 @@ export const TALK_SCENARIOS: ConversationScenario[] = [
     ],
     systemInstructions:
       'You are a server at a casual Tunisian restaurant. Ask what the learner would like to eat, take their order, and check if they want anything else, all in short natural exchanges.',
+    minLevel: 'intermediate',
   },
 ];
 

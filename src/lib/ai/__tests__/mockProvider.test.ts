@@ -19,7 +19,7 @@ function request(overrides: Partial<ConversationRequest>): ConversationRequest {
   return {
     scenarioId: 'cafe',
     vocabulary,
-    learnerContext: { track: 'adult', difficulty: 'beginner', knownWords: [], strugglingWords: [] },
+    learnerContext: { track: 'adult', level: 'beginner', knownWords: [], strugglingWords: [] },
     history: [],
     learnerMessage: null,
     ...overrides,
@@ -72,5 +72,13 @@ describe('mockAiProvider', () => {
     const result = await mockAiProvider.generateReply(request({ learnerMessage: 'نحب قهوة' }));
     if (!result.ok) throw new Error('expected ok');
     expect(result.response.correction).toBeNull();
+  });
+
+  it('omits suggestedReplies at the advanced level, matching the live prompt rules', async () => {
+    const result = await mockAiProvider.generateReply(
+      request({ learnerContext: { track: 'adult', level: 'advanced', knownWords: [], strugglingWords: [] } })
+    );
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.response.suggestedReplies).toBeUndefined();
   });
 });

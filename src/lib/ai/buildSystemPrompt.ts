@@ -1,5 +1,6 @@
 import type { ConversationScenario } from '@/constants/talkScenarios';
-import type { ConversationDifficulty, GroundedVocabularyItem, LearnerContext } from '@/lib/ai/types';
+import type { GroundedVocabularyItem, LearnerContext } from '@/lib/ai/types';
+import type { TalkLevel } from '@/lib/talkLevel';
 
 const BASE_RULES = `You are a Tunisian Arabic (Derja) conversation tutor for the Learn Tunisian app.
 
@@ -37,16 +38,22 @@ Respond ONLY with a single JSON object matching this exact shape, no prose outsi
   "continueConversation": boolean
 }`;
 
-const DIFFICULTY_RULES: Record<ConversationDifficulty, string> = {
-  beginner: `Difficulty: beginner. Use short, simple, natural Tunisian sentences. Prefer the
+const LEVEL_RULES: Record<TalkLevel, string> = {
+  beginner: `Level: beginner. Use short, simple, natural Tunisian sentences. Prefer the
 most common vocabulary supplied below and reuse words the learner already knows.
 Avoid complicated grammar. Always include 2-3 suggestedReplies built from the
-supplied vocabulary so the learner can participate even before typing confidently.`,
-  intermediate: `Difficulty: intermediate. Longer, more natural responses are fine. Reduce
+supplied vocabulary so the learner can participate even before speaking or typing
+confidently.`,
+  intermediate: `Level: intermediate. Longer, more natural responses are fine. Reduce
 translation hand-holding slightly, but still always include an English
 translation. You may introduce natural conversational variation and, when
 verified, vocabulary beyond what's listed below. suggestedReplies are optional
 at this level.`,
+  advanced: `Level: advanced. Respond at a natural conversational pace with no
+simplification — use idiomatic Tunisian freely, including verified vocabulary
+beyond what's listed below when it fits. Keep the English translation (it's
+always required), but drop suggestedReplies entirely; this learner should be
+producing their own responses, not picking from a list.`,
 };
 
 function formatVocabulary(vocabulary: GroundedVocabularyItem[]): string {
@@ -76,7 +83,7 @@ function formatLearnerContext(context: LearnerContext): string {
  */
 export function buildSystemPrompt(
   scenario: ConversationScenario,
-  difficulty: ConversationDifficulty,
+  level: TalkLevel,
   vocabulary: GroundedVocabularyItem[],
   learnerContext: LearnerContext
 ): string {
@@ -84,7 +91,7 @@ export function buildSystemPrompt(
     BASE_RULES,
     `Scenario: ${scenario.title} — ${scenario.description}`,
     scenario.systemInstructions,
-    DIFFICULTY_RULES[difficulty],
+    LEVEL_RULES[level],
     `Approved vocabulary for this scenario:\n${formatVocabulary(vocabulary)}`,
   ];
 

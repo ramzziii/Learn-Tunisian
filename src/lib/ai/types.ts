@@ -1,4 +1,6 @@
-export type ConversationDifficulty = 'beginner' | 'intermediate';
+import type { TalkLevel } from '@/lib/talkLevel';
+
+export type { TalkLevel } from '@/lib/talkLevel';
 
 export interface ConversationTurn {
   role: 'tutor' | 'learner';
@@ -20,7 +22,7 @@ export interface GroundedVocabularyItem {
 /** Minimal, non-identifying learner context — no email, no account info, nothing unrelated to learning. */
 export interface LearnerContext {
   track: 'kid' | 'adult';
-  difficulty: ConversationDifficulty;
+  level: TalkLevel;
   /** English meanings the learner already knows well (status = 'known'), for the tutor to reuse naturally. */
   knownWords: string[];
   /** English meanings the learner has gotten wrong more than they've gotten right, worth reinforcing gently. */

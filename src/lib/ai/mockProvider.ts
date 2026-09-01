@@ -9,6 +9,10 @@ function buildSuggestedReplies(vocabulary: GroundedVocabularyItem[]): SuggestedR
 function buildMockResponse(request: ConversationRequest): TutorResponse {
   const tutorTurnCount = request.history.filter((turn) => turn.role === 'tutor').length;
   const vocabulary = request.vocabulary;
+  // Advanced learners get no suggestedReplies, matching the live prompt's
+  // LEVEL_RULES (see buildSystemPrompt.ts) — they should produce their own
+  // responses, not pick from a list.
+  const suggestedReplies = request.learnerContext.level === 'advanced' ? undefined : buildSuggestedReplies(vocabulary);
 
   if (!request.learnerMessage) {
     return {
@@ -16,7 +20,7 @@ function buildMockResponse(request: ConversationRequest): TutorResponse {
       english: 'Hello! What would you like?',
       transliteration: 'Aslema! Chnowa t7eb?',
       correction: null,
-      suggestedReplies: buildSuggestedReplies(vocabulary),
+      suggestedReplies,
       continueConversation: true,
     };
   }
@@ -29,7 +33,7 @@ function buildMockResponse(request: ConversationRequest): TutorResponse {
     tunisian,
     english,
     correction: null,
-    suggestedReplies: buildSuggestedReplies(vocabulary),
+    suggestedReplies,
     continueConversation: tutorTurnCount < MAX_MOCK_TURNS,
   };
 }

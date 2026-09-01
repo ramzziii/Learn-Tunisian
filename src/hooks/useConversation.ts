@@ -1,17 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { findTalkScenario } from '@/constants/talkScenarios';
-import { fetchLearnerContext, fetchScenarioVocabulary } from '@/data/talkContext';
+import { fetchLearnerContext, fetchScenarioVocabulary, fetchTalkLevel } from '@/data/talkContext';
 import { aiProvider } from '@/lib/ai';
 import { canAccessTalkFeature } from '@/lib/ai/accessControl';
-import type {
-  AiProviderError,
-  ConversationDifficulty,
-  ConversationTurn,
-  GroundedVocabularyItem,
-  LearnerContext,
-  TutorResponse,
-} from '@/lib/ai/types';
+import type { AiProviderError, ConversationTurn, GroundedVocabularyItem, LearnerContext, TutorResponse } from '@/lib/ai/types';
 
 export type ConversationMessage =
   | { id: string; role: 'learner'; text: string }
@@ -58,12 +51,7 @@ export interface UseConversationResult {
  * history only needs to exist for the current session (see APP_OVERVIEW.md
  * for why permanent storage is deferred).
  */
-export function useConversation(
-  scenarioId: string,
-  profileId: string,
-  track: 'kid' | 'adult',
-  difficulty: ConversationDifficulty
-): UseConversationResult {
+export function useConversation(scenarioId: string, profileId: string, track: 'kid' | 'adult'): UseConversationResult {
   const [state, setState] = useState<ConversationState>({
     status: 'loading',
     messages: [],
@@ -130,9 +118,10 @@ export function useConversation(
     }
 
     try {
+      const level = await fetchTalkLevel(profileId);
       const [vocabulary, learnerContext] = await Promise.all([
         fetchScenarioVocabulary(scenarioId),
-        fetchLearnerContext(profileId, track, difficulty),
+        fetchLearnerContext(profileId, track, level),
       ]);
       learnerContextRef.current = learnerContext;
       setState((s) => ({ ...s, vocabulary }));
@@ -145,12 +134,12 @@ export function useConversation(
       }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scenarioId, profileId, track, difficulty]);
+  }, [scenarioId, profileId, track]);
 
   useEffect(() => {
     start();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scenarioId, profileId, track, difficulty]);
+  }, [scenarioId, profileId, track]);
 
   const sendMessage = useCallback(
     (text: string) => {
