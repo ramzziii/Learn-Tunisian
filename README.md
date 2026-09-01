@@ -23,6 +23,7 @@ speaking practice).
    4. [`0004_spaced_repetition.sql`](supabase/migrations/0004_spaced_repetition.sql) — adds review-scheduling fields to `progress`.
    5. [`0005_favorites.sql`](supabase/migrations/0005_favorites.sql) — a `favorites` table (profile ↔ word_group).
    6. [`0006_content_verification.sql`](supabase/migrations/0006_content_verification.sql) — adds `native_verified` to `word_variants`.
+   7. [`0007_session_logs.sql`](supabase/migrations/0007_session_logs.sql) — a `session_logs` table, so Home can show "X / Y minutes today" across multiple sessions in a day.
 3. Then run [`supabase/seed.sql`](supabase/seed.sql) — loads the current content set into `word_groups`/`word_variants` (see "Word variants").
 4. In Project Settings → API, copy the **Project URL** (not the REST/`/rest/v1/` URL — just the bare project URL) and **anon public key**.
 
@@ -121,6 +122,41 @@ progress, a one-word "Practice" drill, a favorite toggle, and an honest
 `native_verified` badge (everything currently seeded shows "Draft — pending
 native review," which is accurate).
 
+## Talk to a Tunisian (AI conversation — Phase 1: text only)
+
+Adult/teen track only — a kid profile never sees the entry point, and the
+route itself refuses the feature if reached directly (`src/lib/ai/accessControl.ts`).
+The learner picks a scenario + difficulty (`app/talk/index.tsx`) and has a
+text conversation (`app/talk/[scenarioId].tsx`) grounded in the app's own
+`word_groups`/`word_variants` — there's no second vocabulary source for the
+AI. Audio playback and speech input (Phases 2/3 from the product brief) are
+intentionally not built yet.
+
+**Works out of the box with no AI provider configured** — it defaults to a
+mock provider (`src/lib/ai/mockProvider.ts`) that returns real-shaped, scenario-
+grounded responses with zero network calls. To connect a real provider:
+
+1. Deploy the proxy Edge Function (holds the secret key — it never reaches
+   the client):
+   ```bash
+   supabase functions deploy talk-to-a-tunisian
+   supabase secrets set AI_API_KEY=sk-...
+   ```
+   `AI_MODEL` and `AI_BASE_URL` secrets are optional (default to
+   `gpt-4o-mini` / `https://api.openai.com/v1` — any OpenAI-compatible chat
+   completions endpoint works). **This function hasn't been exercised
+   against a live key in this environment** — it's written carefully against
+   the documented API shape, but treat it as reviewed-not-verified until you
+   test it with real credentials.
+2. Set `EXPO_PUBLIC_TALK_AI_MODE=live` in `.env` (this only picks which
+   client-side wrapper to use — it carries no secret).
+
+The AI's structured response is validated against a fixed shape
+(`src/lib/ai/validateTutorResponse.ts`, hand-rolled — no new dependency) before
+anything reaches the UI; a malformed response is treated as a failure with a
+retry, never rendered as-is. Conversation history is in-memory only for now
+— nothing is persisted (see the design-decisions note below on why).
+
 ## Project structure
 
 ```
@@ -128,6 +164,7 @@ app/                     Expo Router routes only (screens + navigation)
   word/[wordGroupId].tsx  word detail (variants, progress, favorite, practice)
   words/[lessonId].tsx    word list for a lesson
   favorites/, review.tsx  favorites list, review session
+  talk/                   Talk to a Tunisian (scenario picker + conversation)
 src/
   components/            UI components, grouped by feature
     exercises/
@@ -136,7 +173,8 @@ src/
       shared/             exercise chrome shared by both tracks
     onboarding/, lesson-map/, session/, ui/
   data/                   Supabase queries + row->model mappers (data layer)
-  hooks/                  useSessionTimer, useExerciseQueue, useWordAudioPlayer
+    talkContext.ts         scenario vocabulary + learner-context fetching for Talk to a Tunisian
+  hooks/                  useSessionTimer, useExerciseQueue, useWordAudioPlayer, useConversation
   lib/
     auth/                 AuthContext (email/password now; built to add Google/Apple later)
     account/              ActiveProfileContext (which profile is active)
@@ -144,11 +182,15 @@ src/
     notifications/        daily reminder scheduling
     offline/              audio download/cache for offline playback
     supabase/              client setup
-    spacedRepetition.ts    pure SM-2-lite calculation (unit-tested, see __tests__/)
+    ai/                    AI provider abstraction (mock + Edge Function), prompt building,
+                            response validation — see "Talk to a Tunisian" above
+    spacedRepetition.ts, reviewSelection.ts, masteryStatus.ts,
+    lessonCompletion.ts, age.ts, wordVariants.ts   pure, unit-tested business logic
   types/                  TypeScript models (models.ts) + raw DB row types (database.ts)
 supabase/
-  migrations/0001-0006_*.sql
+  migrations/0001-0007_*.sql
   seed.sql
+  functions/talk-to-a-tunisian/   Edge Function proxy (holds the AI secret server-side)
 ```
 
 ## Testing
@@ -157,11 +199,28 @@ supabase/
 npm test
 ```
 
-Runs Jest (`jest-expo` preset) against `src/**/__tests__`. Currently covers
-the spaced-repetition calculation; no integration/E2E tests yet.
+Runs Jest (`jest-expo` preset) against `src/**/__tests__` — 91 tests across
+12 suites, covering: spaced repetition, review-queue ordering, mastery
+status, lesson lock/unlock/completion, age → track derivation (including a
+real timezone bug these tests caught — see `parseIsoDateLocal` in
+`src/lib/age.ts`), word-variant selection/answer-matching, and the Talk to a
+Tunisian AI layer (scenario config, prompt building, response validation
+including malformed-AI-output cases, the mock provider, word-help lookup,
+and child/adult access control — all against the mock provider, never a
+real AI call). No integration/E2E tests yet — everything above is
+pure-function-level.
 
 ## Notes on the v1 design decisions
 
+- **Talk to a Tunisian never touches `progress`/mastery.** A conversation
+  practicing a word doesn't call `recordWordGroupResult` or affect its
+  spaced-repetition schedule — only explicit exercises do that. Mixing an AI
+  conversation's fuzzy notion of "practiced" into the existing mastery
+  system would corrupt a signal the rest of the app relies on being
+  precise. Conversation history itself is kept in memory only, not
+  persisted, for the same "don't build more than the product needs yet"
+  reasoning as everywhere else in this file — see `useConversation`'s
+  docstring.
 - **Progress model**: tracked per word_group (`progress` table), not per
   lesson — lesson lock/unlock/completion state is derived client-side
   (`src/data/content.ts`) from word_group-level progress, so a fuller

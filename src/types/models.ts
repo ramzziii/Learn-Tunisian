@@ -131,6 +131,16 @@ export interface Favorite {
   createdAt: string;
 }
 
+export type SessionType = 'lesson' | 'review';
+
+export interface SessionLog {
+  id: string;
+  profileId: string;
+  sessionType: SessionType;
+  durationSeconds: number;
+  completedAt: string;
+}
+
 // Convenience shape for rendering the lesson map: a lesson with its
 // derived unlock/completion state for one profile.
 export interface LessonWithState extends Lesson {

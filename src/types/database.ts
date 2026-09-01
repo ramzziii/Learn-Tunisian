@@ -100,3 +100,11 @@ export interface FavoriteRow {
   word_group_id: string;
   created_at: string;
 }
+
+export interface SessionLogRow {
+  id: string;
+  profile_id: string;
+  session_type: string;
+  duration_seconds: number;
+  completed_at: string;
+}

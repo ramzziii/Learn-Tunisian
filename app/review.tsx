@@ -61,6 +61,7 @@ export default function ReviewSession() {
       goalMinutes={goalMinutes}
       profileId={activeProfile.id}
       track={activeProfile.track}
+      sessionType="review"
       emptyMessage="Nothing is due for review right now."
     />
   );

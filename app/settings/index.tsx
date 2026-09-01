@@ -39,23 +39,34 @@ export default function ProfileSettings() {
   const load = useCallback(async () => {
     if (!activeProfile) return;
     setLoadError(false);
+
+    // The daily goal settings are what this screen actually edits, so that
+    // failure is the only one that shows the full-screen error state.
+    let settings: DailyGoalSettings | null;
     try {
-      const [settings, summary, lessonsCompleted] = await Promise.all([
-        fetchDailyGoalSettings(activeProfile.id),
-        fetchProgressSummary(activeProfile.id),
-        countCompletedLessons(activeProfile.id),
-      ]);
-      setGoalSettings(settings);
-      setProgressStats({ ...summary, lessonsCompleted });
-      if (settings) {
-        setDailyGoalMinutes(settings.dailyGoalMinutes);
-        setReminderEnabled(settings.reminderEnabled);
-        const [h, m] = settings.reminderTime.split(':').map(Number);
-        setReminderHour(h);
-        setReminderMinute(m);
-      }
+      settings = await fetchDailyGoalSettings(activeProfile.id);
     } catch {
       setLoadError(true);
+      return;
+    }
+
+    // The stats below are supplementary — a failure fetching them (e.g. a
+    // migration that hasn't been run yet) shouldn't block editing the goal.
+    const [summary, lessonsCompleted] = await Promise.all([
+      fetchProgressSummary(activeProfile.id).catch(
+        () => ({ wordsLearning: 0, wordsMastered: 0, wordsReviewed: 0, totalWordsSeen: 0 }) satisfies ProfileProgressSummary
+      ),
+      countCompletedLessons(activeProfile.id).catch(() => 0),
+    ]);
+
+    setGoalSettings(settings);
+    setProgressStats({ ...summary, lessonsCompleted });
+    if (settings) {
+      setDailyGoalMinutes(settings.dailyGoalMinutes);
+      setReminderEnabled(settings.reminderEnabled);
+      const [h, m] = settings.reminderTime.split(':').map(Number);
+      setReminderHour(h);
+      setReminderMinute(m);
     }
   }, [activeProfile]);
 

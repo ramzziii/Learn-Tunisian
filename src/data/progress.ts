@@ -1,8 +1,10 @@
 import { supabase } from '@/lib/supabase/client';
 import { mapProgress, mapWordGroup, mapWordVariant } from '@/data/mappers';
+import { calculateMasteryStatus } from '@/lib/masteryStatus';
+import { sortReviewCandidates } from '@/lib/reviewSelection';
 import { calculateNextReview, INITIAL_SPACED_REPETITION_STATE } from '@/lib/spacedRepetition';
 import type { ProgressRow, WordGroupRow, WordVariantRow } from '@/types/database';
-import type { Progress, ProgressStatus, WordGroupWithVariants } from '@/types/models';
+import type { Progress, WordGroupWithVariants } from '@/types/models';
 
 export async function fetchProgressForWordGroup(profileId: string, wordGroupId: string): Promise<Progress | null> {
   const { data, error } = await supabase
@@ -41,7 +43,7 @@ export async function recordWordGroupResult(
 
   const correctCount = (existing?.correct_count ?? 0) + (wasCorrect ? 1 : 0);
   const incorrectCount = (existing?.incorrect_count ?? 0) + (wasCorrect ? 0 : 1);
-  const status: ProgressStatus = correctCount > 0 ? (correctCount >= 3 ? 'known' : 'learning') : 'new';
+  const status = calculateMasteryStatus(correctCount);
 
   const schedule = calculateNextReview(
     existing
@@ -118,15 +120,16 @@ export async function fetchReviewQueue(profileId: string): Promise<WordGroupWith
   const due = dueRows ?? [];
   if (due.length === 0) return [];
 
-  const sorted = [...due].sort((a, b) => {
-    const overdueDiff = new Date(a.next_review_at).getTime() - new Date(b.next_review_at).getTime();
-    if (overdueDiff !== 0) return overdueDiff; // most overdue (oldest due date) first
-    const incorrectDiff = b.consecutive_incorrect - a.consecutive_incorrect;
-    if (incorrectDiff !== 0) return incorrectDiff; // recently-incorrect concepts next
-    return a.correct_count - b.correct_count; // then lowest mastery
-  });
+  const sorted = sortReviewCandidates(
+    due.map((row) => ({
+      wordGroupId: row.word_group_id as string,
+      nextReviewAt: row.next_review_at as string,
+      consecutiveIncorrect: row.consecutive_incorrect as number,
+      correctCount: row.correct_count as number,
+    }))
+  );
 
-  const groupIds = sorted.map((row) => row.word_group_id as string);
+  const groupIds = sorted.map((row) => row.wordGroupId);
 
   const { data: groupRows, error: groupsError } = await supabase.from('word_groups').select('*').in('id', groupIds);
   if (groupsError) throw groupsError;

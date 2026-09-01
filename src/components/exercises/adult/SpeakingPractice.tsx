@@ -9,10 +9,12 @@ import {
   useAudioRecorderState,
 } from 'expo-audio';
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Text, View, StyleSheet } from 'react-native';
 
 import { VariantCallout } from '@/components/exercises/shared/VariantCallout';
+import { AudioPlayButton } from '@/components/ui/AudioPlayButton';
 import { Button } from '@/components/ui/Button';
+import { PressableScale } from '@/components/ui/PressableScale';
 import { adultTrackSizing, colors, radii, spacing } from '@/constants/theme';
 import { useWordAudioPlayer } from '@/hooks/useWordAudioPlayer';
 import type { ExerciseItem } from '@/types/exercises';
@@ -32,9 +34,17 @@ interface SpeakingPracticeProps {
  * always counts as correct.
  */
 export function SpeakingPractice({ exercise, onComplete }: SpeakingPracticeProps) {
-  const { play: playNative, hasAudio } = useWordAudioPlayer(exercise.promptVariant, { autoPlay: true });
+  const {
+    play: playNative,
+    hasAudio,
+    isResolving,
+    hasError: nativeAudioHasError,
+    retry: retryNativeAudio,
+  } = useWordAudioPlayer(exercise.promptVariant, { autoPlay: true });
   const [permissionStage, setPermissionStage] = useState<PermissionStage>('checking');
   const [recordingStage, setRecordingStage] = useState<RecordingStage>('idle');
+  const [isBusy, setIsBusy] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const recorderState = useAudioRecorderState(recorder, 100);
@@ -49,28 +59,62 @@ export function SpeakingPractice({ exercise, onComplete }: SpeakingPracticeProps
 
   const requestPermission = async () => {
     setPermissionStage('requesting');
-    await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
-    const { status } = await requestRecordingPermissionsAsync();
-    setPermissionStage(status === 'granted' ? 'ready' : 'denied');
+    try {
+      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+      const { status } = await requestRecordingPermissionsAsync();
+      setPermissionStage(status === 'granted' ? 'ready' : 'denied');
+    } catch {
+      setPermissionStage('denied');
+    }
   };
 
   const startRecording = async () => {
-    await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
-    await recorder.prepareToRecordAsync();
-    recorder.record();
-    setRecordingStage('recording');
+    if (isBusy) return; // guards against a rapid double-tap firing two recordings
+    setIsBusy(true);
+    setErrorMessage(null);
+    try {
+      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+      await recorder.prepareToRecordAsync();
+      recorder.record();
+      setRecordingStage('recording');
+    } catch {
+      setErrorMessage("Couldn't start recording. Give it another try.");
+    } finally {
+      setIsBusy(false);
+    }
   };
 
   const stopRecording = async () => {
-    await recorder.stop();
-    if (recorder.uri) recordingPlayer.replace({ uri: recorder.uri });
-    setRecordingStage('recorded');
+    if (isBusy) return;
+    setIsBusy(true);
+    try {
+      await recorder.stop();
+      if (!recorder.uri) {
+        setErrorMessage("That recording didn't save properly. Give it another try.");
+        setRecordingStage('idle');
+        return;
+      }
+      recordingPlayer.replace({ uri: recorder.uri });
+      setRecordingStage('recorded');
+    } catch {
+      setErrorMessage("Couldn't finish recording. Give it another try.");
+      setRecordingStage('idle');
+    } finally {
+      setIsBusy(false);
+    }
   };
 
-  const tryAgain = () => setRecordingStage('idle');
+  const tryAgain = () => {
+    setErrorMessage(null);
+    setRecordingStage('idle');
+  };
 
   const playRecording = () => {
-    recordingPlayer.seekTo(0).then(() => recordingPlayer.play());
+    try {
+      recordingPlayer.seekTo(0).then(() => recordingPlayer.play());
+    } catch {
+      setErrorMessage("Couldn't play that back — try recording again.");
+    }
   };
 
   if (permissionStage === 'checking' || permissionStage === 'requesting') {
@@ -104,9 +148,14 @@ export function SpeakingPractice({ exercise, onComplete }: SpeakingPracticeProps
           You can still hear the word below. Turn on microphone access in your device Settings if you&apos;d like to
           practice speaking it.
         </Text>
-        <Pressable onPress={playNative} disabled={!hasAudio} style={[styles.playButton, !hasAudio && styles.disabled]}>
-          <Text style={styles.playIcon}>🔊</Text>
-        </Pressable>
+        <AudioPlayButton
+          onPress={playNative}
+          hasAudio={hasAudio}
+          isResolving={isResolving}
+          hasError={nativeAudioHasError}
+          onRetry={retryNativeAudio}
+          style={{ marginTop: spacing.lg }}
+        />
         <Button label="Continue" onPress={() => onComplete(true)} style={{ marginTop: spacing.lg }} />
       </View>
     );
@@ -114,22 +163,38 @@ export function SpeakingPractice({ exercise, onComplete }: SpeakingPracticeProps
 
   return (
     <View style={styles.container}>
-      <Pressable onPress={playNative} disabled={!hasAudio} style={[styles.playButton, !hasAudio && styles.disabled]}>
-        <Text style={styles.playIcon}>🔊</Text>
-      </Pressable>
+      <AudioPlayButton
+        onPress={playNative}
+        hasAudio={hasAudio}
+        isResolving={isResolving}
+        hasError={nativeAudioHasError}
+        onRetry={retryNativeAudio}
+      />
       <Text style={styles.instructions}>Listen, then record yourself saying it</Text>
       <VariantCallout group={exercise.targetGroup} />
 
+      {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+
       {recordingStage === 'idle' ? (
-        <Pressable onPress={startRecording} style={styles.recordButton} accessibilityLabel="Start recording">
+        <PressableScale
+          onPress={startRecording}
+          disabled={isBusy}
+          style={[styles.recordButton, isBusy && styles.disabled]}
+          accessibilityLabel="Start recording"
+        >
           <View style={styles.recordDot} />
-        </Pressable>
+        </PressableScale>
       ) : null}
 
       {recordingStage === 'recording' ? (
-        <Pressable onPress={stopRecording} style={[styles.recordButton, styles.recordButtonActive]}>
+        <PressableScale
+          onPress={stopRecording}
+          disabled={isBusy}
+          style={[styles.recordButton, styles.recordButtonActive]}
+          accessibilityLabel="Stop recording"
+        >
           <View style={styles.stopSquare} />
-        </Pressable>
+        </PressableScale>
       ) : null}
       {recordingStage === 'recording' ? (
         <Text style={styles.recordingTime}>{(recorderState.durationMillis / 1000).toFixed(1)}s</Text>
@@ -137,10 +202,10 @@ export function SpeakingPractice({ exercise, onComplete }: SpeakingPracticeProps
 
       {recordingStage === 'recorded' ? (
         <View style={styles.recordedRow}>
-          <Pressable onPress={playRecording} style={styles.playbackButton}>
+          <PressableScale onPress={playRecording} style={styles.playbackButton}>
             <Text style={styles.playbackIcon}>{recordingPlayerStatus.playing ? '⏸' : '▶️'}</Text>
             <Text style={styles.playbackLabel}>Your recording</Text>
-          </Pressable>
+          </PressableScale>
         </View>
       ) : null}
 
@@ -156,17 +221,7 @@ export function SpeakingPractice({ exercise, onComplete }: SpeakingPracticeProps
 
 const styles = StyleSheet.create({
   container: { flex: 1, alignItems: 'center' },
-  playButton: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: spacing.lg,
-  },
-  disabled: { opacity: 0.4 },
-  playIcon: { fontSize: 28 },
+  disabled: { opacity: 0.5 },
   instructions: {
     fontSize: adultTrackSizing.bodyFontSize,
     fontWeight: '600',
@@ -175,6 +230,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     textAlign: 'center',
   },
+  errorText: { fontSize: 13, color: colors.error, textAlign: 'center', marginBottom: spacing.sm },
   permissionEmoji: { fontSize: 48, marginTop: spacing.xl },
   permissionTitle: { fontSize: 22, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md },
   permissionBody: {

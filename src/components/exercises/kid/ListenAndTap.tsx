@@ -4,11 +4,13 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { AnswerFeedback } from '@/components/exercises/shared/AnswerFeedback';
 import { VariantCallout } from '@/components/exercises/shared/VariantCallout';
 import { WordPicture } from '@/components/exercises/shared/WordPicture';
+import { AudioPlayButton } from '@/components/ui/AudioPlayButton';
 import { colors, kidTrackSizing, radii, spacing } from '@/constants/theme';
 import { useWordAudioPlayer } from '@/hooks/useWordAudioPlayer';
 import type { ExerciseItem } from '@/types/exercises';
 
-const FEEDBACK_DELAY_MS = 900;
+const CORRECT_FEEDBACK_DELAY_MS = 900;
+const INCORRECT_FEEDBACK_DELAY_MS = 1800; // a little longer so there's time to hear the replay
 const PICTURE_SIZE = 120;
 
 interface ListenAndTapProps {
@@ -18,27 +20,30 @@ interface ListenAndTapProps {
 
 /** Kid track: listen to a word, tap the matching picture. No reading required to answer. */
 export function ListenAndTap({ exercise, onComplete }: ListenAndTapProps) {
-  const { play, hasAudio } = useWordAudioPlayer(exercise.promptVariant, { autoPlay: true });
+  const { play, hasAudio, isResolving, hasError, retry } = useWordAudioPlayer(exercise.promptVariant, { autoPlay: true });
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!selectedGroupId) return;
-    const timer = setTimeout(() => onComplete(selectedGroupId === exercise.targetGroup.id), FEEDBACK_DELAY_MS);
-    return () => clearTimeout(timer);
-  }, [selectedGroupId, exercise.targetGroup.id, onComplete]);
 
   const isCorrectSelection = selectedGroupId === exercise.targetGroup.id;
 
+  useEffect(() => {
+    if (!selectedGroupId) return;
+    const delay = isCorrectSelection ? CORRECT_FEEDBACK_DELAY_MS : INCORRECT_FEEDBACK_DELAY_MS;
+    const timer = setTimeout(() => onComplete(isCorrectSelection), delay);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedGroupId]);
+
   return (
     <View style={styles.container}>
-      <Pressable
+      <AudioPlayButton
         onPress={play}
-        disabled={!hasAudio}
-        style={[styles.playButton, !hasAudio && styles.playButtonDisabled]}
-        accessibilityLabel="Play word"
-      >
-        <Text style={styles.playIcon}>🔊</Text>
-      </Pressable>
+        hasAudio={hasAudio}
+        isResolving={isResolving}
+        hasError={hasError}
+        onRetry={retry}
+        size={96}
+        style={{ marginTop: spacing.lg }}
+      />
       <Text style={styles.instructions}>Tap the matching picture</Text>
       <VariantCallout group={exercise.targetGroup} />
 
@@ -65,7 +70,11 @@ export function ListenAndTap({ exercise, onComplete }: ListenAndTapProps) {
       </View>
 
       {selectedGroupId ? (
-        <AnswerFeedback isCorrect={isCorrectSelection} correctAnswerLabel={exercise.targetGroup.englishMeaning} />
+        <AnswerFeedback
+          isCorrect={isCorrectSelection}
+          correctWordArabic={exercise.promptVariant.wordArabic}
+          onListenAgain={play}
+        />
       ) : null}
     </View>
   );
@@ -73,17 +82,6 @@ export function ListenAndTap({ exercise, onComplete }: ListenAndTapProps) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, alignItems: 'center' },
-  playButton: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: spacing.lg,
-  },
-  playButtonDisabled: { opacity: 0.4 },
-  playIcon: { fontSize: 36 },
   instructions: { fontSize: kidTrackSizing.bodyFontSize, fontWeight: '600', color: colors.textPrimary, marginTop: spacing.md, marginBottom: spacing.xl },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: spacing.lg },
   card: {
