@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { AnswerFeedback } from '@/components/exercises/shared/AnswerFeedback';
 import { VariantCallout } from '@/components/exercises/shared/VariantCallout';
+import { AudioPlayButton } from '@/components/ui/AudioPlayButton';
+import { PressableScale } from '@/components/ui/PressableScale';
 import { adultTrackSizing, colors, radii, spacing } from '@/constants/theme';
 import { useWordAudioPlayer } from '@/hooks/useWordAudioPlayer';
 import type { ExerciseItem } from '@/types/exercises';
 
-const FEEDBACK_DELAY_MS = 900;
+const CORRECT_FEEDBACK_DELAY_MS = 900;
+const INCORRECT_FEEDBACK_DELAY_MS = 1800; // a little longer so there's time to read/hear the replay
 
 interface ReadingMatchProps {
   exercise: ExerciseItem;
@@ -16,22 +19,29 @@ interface ReadingMatchProps {
 
 /** Adult/teen track: listen to a word, tap the matching written Arabic script. */
 export function ReadingMatch({ exercise, onComplete }: ReadingMatchProps) {
-  const { play, hasAudio } = useWordAudioPlayer(exercise.promptVariant, { autoPlay: true });
+  const { play, hasAudio, isResolving, hasError, retry } = useWordAudioPlayer(exercise.promptVariant, { autoPlay: true });
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!selectedGroupId) return;
-    const timer = setTimeout(() => onComplete(selectedGroupId === exercise.targetGroup.id), FEEDBACK_DELAY_MS);
-    return () => clearTimeout(timer);
-  }, [selectedGroupId, exercise.targetGroup.id, onComplete]);
 
   const isCorrectSelection = selectedGroupId === exercise.targetGroup.id;
 
+  useEffect(() => {
+    if (!selectedGroupId) return;
+    const delay = isCorrectSelection ? CORRECT_FEEDBACK_DELAY_MS : INCORRECT_FEEDBACK_DELAY_MS;
+    const timer = setTimeout(() => onComplete(isCorrectSelection), delay);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedGroupId]);
+
   return (
     <View style={styles.container}>
-      <Pressable onPress={play} disabled={!hasAudio} style={[styles.playButton, !hasAudio && styles.playButtonDisabled]}>
-        <Text style={styles.playIcon}>🔊</Text>
-      </Pressable>
+      <AudioPlayButton
+        onPress={play}
+        hasAudio={hasAudio}
+        isResolving={isResolving}
+        hasError={hasError}
+        onRetry={retry}
+        style={{ marginTop: spacing.lg }}
+      />
       <Text style={styles.instructions}>Tap the word you hear</Text>
       <VariantCallout group={exercise.targetGroup} />
 
@@ -40,8 +50,9 @@ export function ReadingMatch({ exercise, onComplete }: ReadingMatchProps) {
           const isSelected = selectedGroupId === option.group.id;
           const revealCorrect = selectedGroupId !== null && option.group.id === exercise.targetGroup.id;
           return (
-            <Pressable
+            <PressableScale
               key={option.group.id}
+              scaleTo={0.98}
               onPress={() => !selectedGroupId && setSelectedGroupId(option.group.id)}
               disabled={!!selectedGroupId}
               style={[
@@ -52,13 +63,19 @@ export function ReadingMatch({ exercise, onComplete }: ReadingMatchProps) {
             >
               <Text style={styles.arabicScript}>{option.variant.wordArabic}</Text>
               <Text style={styles.transliteration}>{option.variant.transliteration}</Text>
-            </Pressable>
+            </PressableScale>
           );
         })}
       </View>
 
       {selectedGroupId ? (
-        <AnswerFeedback isCorrect={isCorrectSelection} correctAnswerLabel={exercise.targetGroup.englishMeaning} />
+        <AnswerFeedback
+          isCorrect={isCorrectSelection}
+          correctWordArabic={exercise.promptVariant.wordArabic}
+          correctTransliteration={exercise.promptVariant.transliteration}
+          correctMeaning={exercise.targetGroup.englishMeaning}
+          onListenAgain={play}
+        />
       ) : null}
     </View>
   );
@@ -66,17 +83,6 @@ export function ReadingMatch({ exercise, onComplete }: ReadingMatchProps) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, alignItems: 'center' },
-  playButton: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: spacing.lg,
-  },
-  playButtonDisabled: { opacity: 0.4 },
-  playIcon: { fontSize: 28 },
   instructions: {
     fontSize: adultTrackSizing.bodyFontSize,
     fontWeight: '600',

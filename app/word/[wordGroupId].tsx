@@ -4,6 +4,8 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { ExerciseRenderer } from '@/components/exercises/shared/ExerciseRenderer';
 import { VariantCallout } from '@/components/exercises/shared/VariantCallout';
+import { WordPicture } from '@/components/exercises/shared/WordPicture';
+import { AudioPlayButton } from '@/components/ui/AudioPlayButton';
 import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
@@ -61,7 +63,7 @@ export default function WordDetail() {
   }, [activeProfile, wordGroupId]);
 
   const displayVariant = group ? getPromptVariant(group, 0) : null;
-  const { play, hasAudio } = useWordAudioPlayer(displayVariant);
+  const { play, hasAudio, isResolving, hasError, retry } = useWordAudioPlayer(displayVariant);
 
   if (!activeProfile || !group || !displayVariant) return <LoadingScreen />;
 
@@ -123,12 +125,18 @@ export default function WordDetail() {
         </View>
 
         <View style={styles.heroCard}>
-          <Text style={styles.arabic}>{displayVariant.wordArabic}</Text>
+          <WordPicture group={group} size={100} />
+          <Text style={[styles.arabic, { marginTop: spacing.md }]}>{displayVariant.wordArabic}</Text>
           <Text style={styles.transliteration}>{displayVariant.transliteration}</Text>
           <Text style={styles.meaning}>{group.englishMeaning}</Text>
-          <PressableScale onPress={play} disabled={!hasAudio} style={[styles.playButton, !hasAudio && styles.disabled]}>
-            <Text style={styles.playIcon}>🔊</Text>
-          </PressableScale>
+          <AudioPlayButton
+            onPress={play}
+            hasAudio={hasAudio}
+            isResolving={isResolving}
+            hasError={hasError}
+            onRetry={retry}
+            style={{ marginTop: spacing.lg }}
+          />
           <Text style={[styles.verificationBadge, displayVariant.nativeVerified && styles.verificationBadgeVerified]}>
             {displayVariant.nativeVerified ? '✓ Native-speaker verified' : '⚠️ Draft — pending native review'}
           </Text>
@@ -181,17 +189,6 @@ const styles = StyleSheet.create({
   arabic: { fontSize: 40, fontWeight: '700', color: colors.textPrimary },
   transliteration: { fontSize: 16, color: colors.textSecondary, fontStyle: 'italic', marginTop: spacing.xs },
   meaning: { fontSize: 18, color: colors.textPrimary, marginTop: spacing.sm, textTransform: 'capitalize' },
-  playButton: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: spacing.lg,
-  },
-  disabled: { opacity: 0.4 },
-  playIcon: { fontSize: 26 },
   verificationBadge: { fontSize: 12, color: colors.accent, marginTop: spacing.md, fontWeight: '600' },
   verificationBadgeVerified: { color: colors.success },
   sectionTitle: {

@@ -1,14 +1,17 @@
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { AnswerFeedback } from '@/components/exercises/shared/AnswerFeedback';
 import { VariantCallout } from '@/components/exercises/shared/VariantCallout';
+import { AudioPlayButton } from '@/components/ui/AudioPlayButton';
+import { PressableScale } from '@/components/ui/PressableScale';
 import { adultTrackSizing, colors, radii, spacing } from '@/constants/theme';
 import { useWordAudioPlayer } from '@/hooks/useWordAudioPlayer';
 import { isAnyVariantTransliterationMatch } from '@/lib/wordVariants';
 import type { ExerciseItem } from '@/types/exercises';
 
-const FEEDBACK_DELAY_MS = 1400;
+const CORRECT_FEEDBACK_DELAY_MS = 900;
+const INCORRECT_FEEDBACK_DELAY_MS = 1800; // a little longer so there's time to read/hear the replay
 
 interface TypingSpellingProps {
   exercise: ExerciseItem;
@@ -17,7 +20,7 @@ interface TypingSpellingProps {
 
 /** Adult/teen track: hear a word and its meaning, type its transliteration. Any variant of the concept counts as correct. */
 export function TypingSpelling({ exercise, onComplete }: TypingSpellingProps) {
-  const { play, hasAudio } = useWordAudioPlayer(exercise.promptVariant, { autoPlay: true });
+  const { play, hasAudio, isResolving, hasError, retry } = useWordAudioPlayer(exercise.promptVariant, { autoPlay: true });
   const [input, setInput] = useState('');
   const [submitted, setSubmitted] = useState(false);
 
@@ -25,16 +28,22 @@ export function TypingSpelling({ exercise, onComplete }: TypingSpellingProps) {
 
   useEffect(() => {
     if (!submitted) return;
-    const timer = setTimeout(() => onComplete(isCorrect), FEEDBACK_DELAY_MS);
+    const delay = isCorrect ? CORRECT_FEEDBACK_DELAY_MS : INCORRECT_FEEDBACK_DELAY_MS;
+    const timer = setTimeout(() => onComplete(isCorrect), delay);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [submitted]);
 
   return (
     <View style={styles.container}>
-      <Pressable onPress={play} disabled={!hasAudio} style={[styles.playButton, !hasAudio && styles.playButtonDisabled]}>
-        <Text style={styles.playIcon}>🔊</Text>
-      </Pressable>
+      <AudioPlayButton
+        onPress={play}
+        hasAudio={hasAudio}
+        isResolving={isResolving}
+        hasError={hasError}
+        onRetry={retry}
+        style={{ marginTop: spacing.lg }}
+      />
       <Text style={styles.meaning}>&ldquo;{exercise.targetGroup.englishMeaning}&rdquo;</Text>
       <Text style={styles.instructions}>Type what you hear</Text>
       <VariantCallout group={exercise.targetGroup} />
@@ -43,6 +52,7 @@ export function TypingSpelling({ exercise, onComplete }: TypingSpellingProps) {
         value={input}
         onChangeText={setInput}
         editable={!submitted}
+        autoFocus
         autoCapitalize="none"
         autoCorrect={false}
         placeholder="Type the transliteration"
@@ -51,16 +61,22 @@ export function TypingSpelling({ exercise, onComplete }: TypingSpellingProps) {
         onSubmitEditing={() => input.trim().length > 0 && setSubmitted(true)}
       />
 
-      <Pressable
+      <PressableScale
         onPress={() => setSubmitted(true)}
         disabled={submitted || input.trim().length === 0}
         style={[styles.submitButton, (submitted || input.trim().length === 0) && styles.submitButtonDisabled]}
       >
         <Text style={styles.submitLabel}>Check</Text>
-      </Pressable>
+      </PressableScale>
 
       {submitted ? (
-        <AnswerFeedback isCorrect={isCorrect} correctAnswerLabel={exercise.promptVariant.transliteration} />
+        <AnswerFeedback
+          isCorrect={isCorrect}
+          correctWordArabic={exercise.promptVariant.wordArabic}
+          correctTransliteration={exercise.promptVariant.transliteration}
+          correctMeaning={exercise.targetGroup.englishMeaning}
+          onListenAgain={play}
+        />
       ) : null}
     </View>
   );
@@ -68,17 +84,6 @@ export function TypingSpelling({ exercise, onComplete }: TypingSpellingProps) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, alignItems: 'center' },
-  playButton: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: spacing.lg,
-  },
-  playButtonDisabled: { opacity: 0.4 },
-  playIcon: { fontSize: 28 },
   meaning: { fontSize: 20, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md },
   instructions: {
     fontSize: adultTrackSizing.bodyFontSize,

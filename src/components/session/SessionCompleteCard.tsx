@@ -5,12 +5,16 @@ import { Animated, StyleSheet, Text, View } from 'react-native';
 import { Button } from '@/components/ui/Button';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { colors, gradients, radii, shadows, spacing } from '@/constants/theme';
-import type { DailyGoalMinutes } from '@/types/models';
+import type { DailyGoalMinutes, SessionType } from '@/types/models';
 
 const ADD_MORE_OPTIONS: DailyGoalMinutes[] = [5, 10, 15];
 
 interface SessionCompleteCardProps {
   minutesLearned: number;
+  wordsCount: number;
+  correctCount: number;
+  incorrectCount: number;
+  sessionType: SessionType;
   onClose: () => void;
   onAddMore: (minutes: DailyGoalMinutes) => void;
 }
@@ -20,8 +24,17 @@ interface SessionCompleteCardProps {
  * exactly two choices, "Close" or "Add more time" — never an auto-advance
  * into more content.
  */
-export function SessionCompleteCard({ minutesLearned, onClose, onAddMore }: SessionCompleteCardProps) {
+export function SessionCompleteCard({
+  minutesLearned,
+  wordsCount,
+  correctCount,
+  incorrectCount,
+  sessionType,
+  onClose,
+  onAddMore,
+}: SessionCompleteCardProps) {
   const pop = useRef(new Animated.Value(0)).current;
+  const isReview = sessionType === 'review';
 
   useEffect(() => {
     Animated.spring(pop, { toValue: 1, useNativeDriver: true, speed: 14, bounciness: 10 }).start();
@@ -40,13 +53,24 @@ export function SessionCompleteCard({ minutesLearned, onClose, onAddMore }: Sess
         ]}
       >
         <LinearGradient colors={gradients.celebration} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.badge}>
-          <Text style={styles.emoji}>🎉</Text>
+          <Text style={styles.emoji}>{isReview ? '🔄' : '🎉'}</Text>
         </LinearGradient>
 
-        <Text style={styles.title}>Great job!</Text>
+        <Text style={styles.title}>{isReview ? 'Review complete!' : 'Great job!'}</Text>
         <Text style={styles.subtitle}>
-          You completed your learning for today ({minutesLearned} {minutesLearned === 1 ? 'minute' : 'minutes'}).
+          {isReview ? 'Nice work keeping your Tunisian fresh.' : "You completed your learning for today."}
         </Text>
+
+        <View style={styles.statsRow}>
+          <Stat value={minutesLearned} label={minutesLearned === 1 ? 'minute' : 'minutes'} />
+          <Stat value={wordsCount} label={isReview ? 'reviewed' : 'practiced'} />
+          <Stat value={correctCount} label="correct" />
+        </View>
+        {incorrectCount > 0 ? (
+          <Text style={styles.needsPractice}>
+            {incorrectCount} {incorrectCount === 1 ? 'word' : 'words'} could use more practice next time.
+          </Text>
+        ) : null}
 
         <Button label="Close" onPress={onClose} style={{ marginTop: spacing.xl, width: '100%' }} />
 
@@ -59,6 +83,15 @@ export function SessionCompleteCard({ minutesLearned, onClose, onAddMore }: Sess
           ))}
         </View>
       </Animated.View>
+    </View>
+  );
+}
+
+function Stat({ value, label }: { value: number; label: string }) {
+  return (
+    <View style={styles.stat}>
+      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
     </View>
   );
 }
@@ -89,6 +122,11 @@ const styles = StyleSheet.create({
   emoji: { fontSize: 48 },
   title: { fontSize: 26, fontWeight: '800', color: colors.textPrimary, marginTop: spacing.sm },
   subtitle: { fontSize: 15, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.sm },
+  statsRow: { flexDirection: 'row', gap: spacing.lg, marginTop: spacing.lg },
+  stat: { alignItems: 'center', minWidth: 56 },
+  statValue: { fontSize: 22, fontWeight: '800', color: colors.primaryDark },
+  statLabel: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  needsPractice: { fontSize: 12, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.md },
   addMoreLabel: { fontSize: 13, color: colors.textSecondary, marginTop: spacing.xl, marginBottom: spacing.sm },
   addMoreRow: { flexDirection: 'row', gap: spacing.sm },
   addMoreButton: {

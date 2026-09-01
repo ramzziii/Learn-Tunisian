@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase/client';
 import { mapLesson, mapUnit, mapWordGroup, mapWordVariant } from '@/data/mappers';
+import { computeLessonStates } from '@/lib/lessonCompletion';
 import type { LessonRow, UnitRow, WordGroupRow, WordVariantRow } from '@/types/database';
 import type { LessonWithState, WordGroupWithVariants } from '@/types/models';
 
@@ -60,24 +61,14 @@ export async function fetchLessonMap(profileId: string): Promise<UnitWithLessons
     return unitOrder !== 0 ? unitOrder : a.sort_order - b.sort_order;
   });
 
-  let previousCompleted = true; // first lesson is always unlocked
-  const stateByLessonId = new Map<string, LessonWithState['state']>();
   const masteredByLessonId = new Map<string, number>();
-
-  for (const lesson of sortedLessons) {
+  const lessonCompletionInputs = sortedLessons.map((lesson) => {
     const lessonGroups = groupsByLesson.get(lessonKey(lesson.unit_id, lesson.lesson_number)) ?? [];
     const masteredCount = lessonGroups.filter((g) => masteredGroupIds.has(g.id)).length;
     masteredByLessonId.set(lesson.id, masteredCount);
-    const isCompleted = lessonGroups.length > 0 && masteredCount === lessonGroups.length;
-
-    const state: LessonWithState['state'] = isCompleted
-      ? 'completed'
-      : previousCompleted
-        ? 'unlocked'
-        : 'locked';
-    stateByLessonId.set(lesson.id, state);
-    previousCompleted = isCompleted;
-  }
+    return { lessonId: lesson.id, wordCount: lessonGroups.length, masteredCount };
+  });
+  const stateByLessonId = computeLessonStates(lessonCompletionInputs);
 
   return units.map((unitRow) => {
     const unit = mapUnit(unitRow);

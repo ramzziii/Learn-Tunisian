@@ -46,6 +46,7 @@ export default function LessonSession() {
       goalMinutes={goalMinutes}
       profileId={activeProfile.id}
       track={activeProfile.track}
+      sessionType="lesson"
       emptyMessage="This lesson doesn't have any words yet."
     />
   );

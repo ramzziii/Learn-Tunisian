@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors, radii, spacing } from '@/constants/theme';
-import { dateToIsoDate, formatDateOfBirth } from '@/lib/age';
+import { dateToIsoDate, formatDateOfBirth, parseIsoDateLocal } from '@/lib/age';
 
 const TODAY = new Date();
 const EARLIEST_BIRTH_DATE = new Date(TODAY.getFullYear() - 100, 0, 1);
@@ -25,7 +25,7 @@ export function DateOfBirthField({ label, value, onChange }: DateOfBirthFieldPro
     }
   };
 
-  const pickerValue = value ? new Date(value) : DEFAULT_PICKER_DATE;
+  const pickerValue = value ? parseIsoDateLocal(value) : DEFAULT_PICKER_DATE;
 
   return (
     <View style={styles.container}>

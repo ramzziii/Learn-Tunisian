@@ -10,6 +10,15 @@ export interface WordAudioPlayer {
   isResolving: boolean;
   /** False when the variant has no audio yet (placeholder content) — UI should disable the play control. */
   hasAudio: boolean;
+  /**
+   * True when this word does have an audio_path but resolving it failed
+   * this time (e.g. offline with nothing cached yet) — distinct from
+   * hasAudio=false, since this is a transient state worth retrying rather
+   * than "there's genuinely nothing here."
+   */
+  hasError: boolean;
+  /** Re-attempts resolving audio for the current variant. */
+  retry: () => void;
 }
 
 /**
@@ -26,10 +35,13 @@ export function useWordAudioPlayer(
   const status = useAudioPlayerStatus(player);
   const [isResolving, setIsResolving] = useState(false);
   const [hasAudio, setHasAudio] = useState(false);
+  const [hasError, setHasError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     setHasAudio(false);
+    setHasError(false);
     if (!variant) return;
 
     setIsResolving(true);
@@ -43,6 +55,9 @@ export function useWordAudioPlayer(
             await player.seekTo(0);
             player.play();
           }
+        } else if (variant.audioPath) {
+          // Had a path to try but resolution failed (vs. never having one at all) — worth a retry.
+          setHasError(true);
         }
       })
       .finally(() => {
@@ -53,12 +68,14 @@ export function useWordAudioPlayer(
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [variant?.id]);
+  }, [variant?.id, retryCount]);
 
   const play = useCallback(() => {
     if (!hasAudio) return;
     player.seekTo(0).then(() => player.play());
   }, [player, hasAudio]);
 
-  return { play, isPlaying: status.playing, isResolving, hasAudio };
+  const retry = useCallback(() => setRetryCount((count) => count + 1), []);
+
+  return { play, isPlaying: status.playing, isResolving, hasAudio, hasError, retry };
 }
