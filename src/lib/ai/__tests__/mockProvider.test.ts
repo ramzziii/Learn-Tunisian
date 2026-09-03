@@ -18,10 +18,12 @@ const vocabulary = [vocabItem('ما', 'water'), vocabItem('حليب', 'milk')];
 function request(overrides: Partial<ConversationRequest>): ConversationRequest {
   return {
     scenarioId: 'cafe',
+    profileId: 'profile-1',
     vocabulary,
     learnerContext: { track: 'adult', level: 'beginner', knownWords: [], strugglingWords: [] },
     history: [],
     learnerMessage: null,
+    retrievalQuery: 'water',
     ...overrides,
   };
 }

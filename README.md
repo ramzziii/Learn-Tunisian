@@ -24,7 +24,8 @@ speaking practice).
    5. [`0005_favorites.sql`](supabase/migrations/0005_favorites.sql) — a `favorites` table (profile ↔ word_group).
    6. [`0006_content_verification.sql`](supabase/migrations/0006_content_verification.sql) — adds `native_verified` to `word_variants`.
    7. [`0007_session_logs.sql`](supabase/migrations/0007_session_logs.sql) — a `session_logs` table, so Home can show "X / Y minutes today" across multiple sessions in a day.
-3. Then run [`supabase/seed.sql`](supabase/seed.sql) — loads the current content set into `word_groups`/`word_variants` (see "Word variants").
+   8. [`0008_talk_rag_content.sql`](supabase/migrations/0008_talk_rag_content.sql) — enables `pgvector` and adds `phrases`/`sentences`/`conversation_examples`/`corrections`/`ai_usage_log`, for RAG-grounded conversation (see "RAG grounding" below).
+3. Then run [`supabase/seed.sql`](supabase/seed.sql) — loads the current content set into `word_groups`/`word_variants` (see "Word variants"). Optionally also run `scripts/seed-talk-rag-content.mjs` (see "RAG grounding" below) once you have an OpenAI key.
 4. In Project Settings → API, copy the **Project URL** (not the REST/`/rest/v1/` URL — just the bare project URL) and **anon public key**.
 
 ## 2. Configure environment variables
@@ -145,20 +146,23 @@ typing only, keeping it fully offline like the rest of the mock provider.
 mock provider (`src/lib/ai/mockProvider.ts`) that returns real-shaped, scenario-
 grounded responses with zero network calls. To connect a real provider:
 
-1. Deploy the three proxy Edge Functions (each holds the secret key — it
+1. Deploy the four proxy Edge Functions (each holds the secret key — it
    never reaches the client):
    ```bash
    supabase functions deploy talk-to-a-tunisian
    supabase functions deploy talk-tts
    supabase functions deploy talk-stt
+   supabase functions deploy talk-review
    supabase secrets set AI_API_KEY=sk-...
    ```
    `AI_MODEL`/`AI_BASE_URL` (chat), `AI_TTS_MODEL`/`AI_TTS_VOICE` (text-to-speech,
-   default `tts-1`/`alloy`), and `AI_STT_MODEL`/`AI_STT_LANGUAGE` (speech-to-text,
-   default `whisper-1`/`ar`) are all optional and reuse the same `AI_API_KEY`.
-   All three are verified working end-to-end against a live key (confirmed via
-   direct curl, including a full TTS→STT round trip). `AI_STT_LANGUAGE` pins
-   Whisper's language rather than letting it auto-detect — without it, a
+   default `tts-1`/`alloy`), `AI_STT_MODEL`/`AI_STT_LANGUAGE` (speech-to-text,
+   default `whisper-1`/`ar`), and `AI_EMBEDDING_MODEL` (RAG retrieval, default
+   `text-embedding-3-small`) are all optional and reuse the same `AI_API_KEY`.
+   All four are verified working end-to-end against a live key (confirmed via
+   direct curl — including a full TTS→STT round trip, and a `talk-review`
+   embed+insert round trip against a real authenticated session). `AI_STT_LANGUAGE`
+   pins Whisper's language rather than letting it auto-detect — without it, a
    short/ambiguous clip can get transcribed in a completely unrelated script
    (Hebrew and Korean have both been observed). Whisper still has no dedicated
    Tunisian Derja mode, so it transcribes into standard Arabic script rather
@@ -184,6 +188,63 @@ retry, never rendered as-is. Conversation history is in-memory only for now
 — nothing is persisted, and a recorded voice reply is deleted immediately
 after transcription (see the design-decisions note below on why).
 
+### RAG grounding
+
+`word_groups`/`word_variants` vocabulary is real grounding, but it's a word
+list, not example phrases, full sentences, or verified exchanges. In live
+mode, `talk-to-a-tunisian` additionally retrieves the most relevant
+native-speaker-verified examples for whatever the learner just said (or, for
+the tutor's opening line, what the scenario is about) and adds them to the
+prompt as the model's primary source of truth — on top of the vocabulary
+grounding, not instead of it.
+
+- **Content**: `phrases` (short common phrases), `sentences` (fuller
+  examples, optionally tied to a `word_group`), `conversation_examples`
+  (short verified exchanges per scenario) — see
+  `supabase/migrations/0008_talk_rag_content.sql`. Every row has
+  `native_verified`/`native_reviewer`, same principle as `word_variants`:
+  **only verified rows are ever retrievable** (enforced twice — in the
+  `match_verified_content()` function's own filter, and again in RLS).
+- **Retrieval**: the learner's message (or the opening-line fallback) gets
+  embedded (`text-embedding-3-small`) and matched against those three tables
+  via `pgvector` cosine similarity (`match_verified_content`, `extensions.vector`).
+  This has to happen server-side — embedding requires the same secret API
+  key — which is why `talk-to-a-tunisian` is no longer a pure "thin proxy"
+  the way `talk-tts`/`talk-stt` still are; see the comment at the top of that
+  function for why this is a deliberate, narrow exception.
+- **Reviewer workflow**: every AI-generated turn gets logged as a pending
+  candidate in `corrections`. `app/admin/corrections.tsx` — reachable only by
+  its direct route, not linked from Settings/Home nav, no new auth/role
+  system for now (a deliberate scope choice for this single-household app;
+  revisit if that ever changes) — lists pending turns, and either
+  ("✅ Correct as shown") promotes the AI's text as-is or ("❌ Save
+  correction") promotes an edited version, via the `talk-review` Edge
+  Function (embeds the final text, inserts into `phrases`/`sentences` with
+  `native_verified: true`). This is how the verified corpus grows from real
+  usage, not just manual seeding.
+- **Seed content**: `scripts/seed-talk-rag-content.mjs` inserts ~8 rows
+  spanning the existing scenarios so retrieval has something to find while
+  testing. **Deliberately inserted as `native_verified: false`** — this
+  content is AI-drafted, not checked by a native Tunisian speaker, and
+  marking it verified would be exactly the misrepresentation the whole
+  `native_verified` system exists to prevent. Review it yourself and flip
+  specific rows via direct SQL/the Supabase table editor (not through the
+  corrections screen — that only reviews AI *conversation* turns, not these
+  seed rows) once you're comfortable with them:
+  ```bash
+  OPENAI_API_KEY=sk-... SUPABASE_URL=https://your-project-ref.supabase.co \
+    SUPABASE_SERVICE_ROLE_KEY=... node scripts/seed-talk-rag-content.mjs
+  ```
+  Needs the service-role key specifically (Project Settings → API) since it
+  writes content before any user session exists — never put these values in
+  `.env`/`EXPO_PUBLIC_*`.
+- **Cost controls**: a 20-conversation-turn/profile/day cap (UTC calendar
+  day), checked before any paid call — the client surfaces a
+  `daily_limit_reached` error with its own copy, not the generic rate-limit
+  message. Every chat and embedding call logs its token usage to
+  `ai_usage_log` (`profile_id`, `call_type`, `model`, token counts) — no
+  dashboard for it yet, query the table directly to see actual spend.
+
 ## Project structure
 
 ```
@@ -192,6 +253,7 @@ app/                     Expo Router routes only (screens + navigation)
   words/[lessonId].tsx    word list for a lesson
   favorites/, review.tsx  favorites list, review session
   talk/                   Talk to a Tunisian (scenario picker + conversation)
+  admin/corrections.tsx   native-reviewer correction queue (unlinked route)
 src/
   components/            UI components, grouped by feature
     exercises/
@@ -201,6 +263,7 @@ src/
     onboarding/, lesson-map/, session/, ui/
   data/                   Supabase queries + row->model mappers (data layer)
     talkContext.ts         scenario vocabulary, learner-context, and level fetching for Talk to a Tunisian
+    corrections.ts          pending corrections + submitting a review decision
   hooks/                  useSessionTimer, useExerciseQueue, useWordAudioPlayer, useConversation,
                           useTutorSpeech (AI voice), useVoiceRecorder (learner mic input)
   lib/
@@ -218,11 +281,14 @@ src/
     lessonCompletion.ts, age.ts, wordVariants.ts   pure, unit-tested business logic
   types/                  TypeScript models (models.ts) + raw DB row types (database.ts)
 supabase/
-  migrations/0001-0007_*.sql
+  migrations/0001-0008_*.sql
   seed.sql
-  functions/talk-to-a-tunisian/   Edge Function proxy: chat (holds the AI secret server-side)
+  functions/talk-to-a-tunisian/   Edge Function: chat + RAG retrieval + daily cap + corrections logging
   functions/talk-tts/             Edge Function proxy: text-to-speech
   functions/talk-stt/             Edge Function proxy: speech-to-text
+  functions/talk-review/          Edge Function: reviewer's approve/reject-with-correction promotion
+scripts/
+  seed-talk-rag-content.mjs   one-off: seeds draft RAG content with real embeddings (see "RAG grounding")
 ```
 
 ## Testing
