@@ -63,7 +63,7 @@ not in progress. See Section 9.
 
 | Layer | Choice |
 |---|---|
-| App framework | React Native via **Expo SDK 54**, TypeScript throughout |
+| App framework | React Native via **Expo SDK 57**, TypeScript throughout |
 | Navigation | **Expo Router** (file-based routing under `app/`) |
 | Backend | **Supabase**: Postgres (schema + RLS), Auth (email/password), Storage (audio/images) |
 | Audio playback & recording | **expo-audio** (the modern replacement for the deprecated expo-av) |
@@ -75,12 +75,15 @@ not in progress. See Section 9.
 | Local state/data fetching | Plain React Context + hooks — no Redux/Zustand/React Query; deliberately lightweight for a solo-dev codebase |
 | Testing | **Jest** (`jest-expo` preset) for pure business-logic unit tests; no integration/E2E tests yet |
 
-**Why SDK 54 specifically (not the newest SDK):** Apple's App Store build of
-Expo Go only tracks SDK 54 as of this writing — newer SDKs are only
-reachable via a custom dev-client build or TestFlight. Since the whole
-point of the current workflow is being able to test on a physical iPhone
-via the ordinary App Store Expo Go app, the project is deliberately pinned
-here rather than on whatever the latest SDK is.
+**Why SDK 57 specifically (not necessarily the newest SDK):** Apple's App
+Store build of Expo Go tracks one SDK at a time — whichever one is
+currently on the App Store listing is the only one reachable without a
+custom dev-client build or TestFlight. The project is pinned to match that
+build (SDK 54 originally; moved to SDK 57 in 2026-09 when Expo Go's App
+Store build moved on and stopped opening SDK 54 projects), since the whole
+point of the current workflow is testing on a physical iPhone via the
+ordinary App Store Expo Go app. See `AGENTS.md` for what that upgrade
+involved and what to check before bumping again.
 
 ## 3. Data model (Postgres / Supabase)
 
@@ -220,6 +223,47 @@ auto-hides when there's nowhere meaningful to go back to.
 **Profiles**
 - One account can hold multiple profiles; a switcher lists them and lets
   you add another. The active profile persists across app restarts.
+
+**Alphabet practice** (`app/alphabet*.tsx`, `src/lib/alphabet.ts`,
+`src/components/alphabet/`)
+- A separate, bite-sized (count-based, not time-based) practice mode
+  alongside the main vocabulary engine, covering the 27-letter Arabic
+  alphabet plus the three short vowel diacritics (fatha/damma/kasra).
+- `/alphabet` — the library hub: overall progress %, a grid of every letter
+  and diacritic (tapping one opens a detail modal), and a "Learn the
+  letters" entry point.
+- Letter detail modal: audio (on-device TTS, no Supabase content needed for
+  this), the letter's four contextual forms (isolated/initial/medial/final,
+  derived by padding with U+0640 tatweel so the platform's own Arabic text
+  shaper draws the correct connected glyphs instead of hardcoded
+  presentation-form codepoints), and two example words with audio.
+- `/alphabet-practice` — a fixed-length (8-question) round cycling four
+  exercise kinds: true/false listening, listen-and-choose (pick the letter
+  that was spoken), choose-the-sound (pick the audio that matches a shown
+  letter), and sound-match (text-only, no audio — "Choose the letter which
+  is similar to (Ba) as in (Bank)", matching an English phonetic cue to the
+  Arabic letter vocalized with a fatha). Sound-match's distractors are drawn
+  from `similarShapeGroup` — letters that share a base glyph and differ only
+  in dot count/placement (ب/ت/ث/ن/ي, ج/ح/خ, etc.), the classic beginner
+  mix-up set, rather than random letters. Ends with a "you have some
+  mistakes" screen offering Review Mistakes (re-drills just the missed
+  letters) or Skip.
+- `/alphabet-matching` — a timed pair-matching game (glyph ↔ name) over a
+  random subset of letters.
+- `/alphabet-flashcards` — a simple browse-and-listen flashcard flow.
+- Every exercise kind shares `AlphabetExerciseFooter` for the Check → feedback
+  → Next flow, which is also where the correct/incorrect sound + haptic
+  fire from (`src/hooks/useAnswerFeedback.ts` — two short WAV chimes
+  synthesized locally rather than sourced from an external sound library,
+  paired with `expo-haptics`). Answer cards bounce or gently shake via
+  `AnimatedAnswerCard`, and question-to-question transitions crossfade via
+  the same `useFadeInOnChange` hook the main lesson engine uses.
+- Progress (`src/lib/alphabetProgress.ts`) is deliberately local-only
+  (AsyncStorage, per profile id) — a lightweight "has this letter been
+  practiced" signal for the library screen, not Supabase-backed mastery
+  tracking like `progress` gets. No streak or score mechanic was added here,
+  consistent with Section 1's no-streak-loss-aversion principle; a "Days in
+  a Row" style streak calendar was considered and explicitly declined.
 
 **Home / lesson map** (`app/home.tsx`)
 - Gradient header, units rendered as sections, each lesson a node showing

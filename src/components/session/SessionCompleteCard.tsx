@@ -98,7 +98,7 @@ function Stat({ value, label }: { value: number; label: string }) {
 
 const styles = StyleSheet.create({
   overlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(36, 32, 33, 0.45)',
     alignItems: 'center',
     justifyContent: 'center',
