@@ -177,6 +177,7 @@ function AdultHomeContent({ data }: { data: HomeData }) {
       {reviewDueCount > 0 ? <ReviewCard dueCount={reviewDueCount} /> : null}
 
       <TalkToATunisianCard />
+      <AlphabetPracticeCard />
 
       <View style={styles.progressTeaserRow}>
         <ProgressTeaser value={progressSummary.wordsLearning} label="learning" />
@@ -219,8 +220,23 @@ function KidHomeContent({ data }: { data: HomeData }) {
         </PressableScale>
       ) : null}
 
+      <AlphabetPracticeCard />
+
       <LessonMap unitsWithLessons={unitsWithLessons} track="kid" />
     </>
+  );
+}
+
+function AlphabetPracticeCard() {
+  return (
+    <PressableScale onPress={() => router.push('/alphabet')} style={[styles.alphabetCard, shadows.card]}>
+      <Text style={styles.alphabetCardEmoji}>🅰️</Text>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.alphabetCardTitle}>Alphabet practice</Text>
+        <Text style={styles.alphabetCardSubtitle}>Learn letters and sounds</Text>
+      </View>
+      <Text style={styles.alphabetCardChevron}>›</Text>
+    </PressableScale>
   );
 }
 
@@ -354,6 +370,19 @@ const styles = StyleSheet.create({
   reviewTitle: { fontSize: 17, fontWeight: '700', color: colors.textPrimary },
   reviewSubtitle: { fontSize: 13, color: colors.textPrimary, opacity: 0.75, marginTop: 2 },
   reviewChevron: { fontSize: 28, color: colors.textPrimary, opacity: 0.5 },
+  alphabetCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
+    padding: spacing.md,
+    gap: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  alphabetCardEmoji: { fontSize: 32 },
+  alphabetCardTitle: { fontSize: 17, fontWeight: '700', color: colors.textPrimary },
+  alphabetCardSubtitle: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  alphabetCardChevron: { fontSize: 30, color: colors.textSecondary },
   kidHeroCard: { borderRadius: radii.lg, marginBottom: spacing.lg, overflow: 'hidden' },
   kidHeroGradient: { alignItems: 'center', paddingVertical: spacing.xl },
   kidHeroEmoji: { fontSize: 56 },
