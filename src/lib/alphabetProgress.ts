@@ -2,10 +2,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface AlphabetProgressData {
   practicedLetterIds: string[];
-  practicedDiacriticIds: string[];
 }
 
-const EMPTY: AlphabetProgressData = { practicedLetterIds: [], practicedDiacriticIds: [] };
+const EMPTY: AlphabetProgressData = { practicedLetterIds: [] };
 
 function storageKey(profileId: string): string {
   return `learn-tunisian.alphabet-progress.${profileId}`;
@@ -24,7 +23,6 @@ export async function getAlphabetProgress(profileId: string): Promise<AlphabetPr
     const parsed = JSON.parse(raw);
     return {
       practicedLetterIds: Array.isArray(parsed.practicedLetterIds) ? parsed.practicedLetterIds : [],
-      practicedDiacriticIds: Array.isArray(parsed.practicedDiacriticIds) ? parsed.practicedDiacriticIds : [],
     };
   } catch {
     return EMPTY;
@@ -39,14 +37,6 @@ export async function markLettersPracticed(profileId: string, letterIds: string[
   const current = await getAlphabetProgress(profileId);
   const merged = Array.from(new Set([...current.practicedLetterIds, ...letterIds]));
   const next = { ...current, practicedLetterIds: merged };
-  await save(profileId, next);
-  return next;
-}
-
-export async function markDiacriticPracticed(profileId: string, diacriticId: string): Promise<AlphabetProgressData> {
-  const current = await getAlphabetProgress(profileId);
-  if (current.practicedDiacriticIds.includes(diacriticId)) return current;
-  const next = { ...current, practicedDiacriticIds: [...current.practicedDiacriticIds, diacriticId] };
   await save(profileId, next);
   return next;
 }

@@ -229,14 +229,21 @@ auto-hides when there's nowhere meaningful to go back to.
 - A separate, bite-sized (count-based, not time-based) practice mode
   alongside the main vocabulary engine, covering the 27-letter Arabic
   alphabet plus the three short vowel diacritics (fatha/damma/kasra).
-- `/alphabet` — the library hub: overall progress %, a grid of every letter
-  and diacritic (tapping one opens a detail modal), and a "Learn the
-  letters" entry point.
+- `/alphabet` — the library hub: overall progress %, three quick-link cards
+  (Flashcards, Speed Match, Diacritics), a grid of every letter (tapping one
+  opens a detail modal), and a "Learn the letters" entry point.
 - Letter detail modal: audio (on-device TTS, no Supabase content needed for
   this), the letter's four contextual forms (isolated/initial/medial/final,
   derived by padding with U+0640 tatweel so the platform's own Arabic text
   shaper draws the correct connected glyphs instead of hardcoded
   presentation-form codepoints), and two example words with audio.
+- `/alphabet-diacritics` — pick any letter from a grid of all 27, then see
+  it vocalized with each of the three short vowels (e.g. ب → "Baa"/"Boo"/
+  "Bee"), each tappable to hear it, alongside one example word per vowel.
+  The friendly phonetic reading is derived from the letter's own
+  transliteration (`buildVocalizedReading`) rather than authored per letter,
+  so it stays consistent; only the 81 example words (27 letters × 3 vowels)
+  are hand-authored (`ArabicLetter.vowelExamples`).
 - `/alphabet-practice` — a fixed-length (8-question) round cycling four
   exercise kinds: true/false listening, listen-and-choose (pick the letter
   that was spoken), choose-the-sound (pick the audio that matches a shown
