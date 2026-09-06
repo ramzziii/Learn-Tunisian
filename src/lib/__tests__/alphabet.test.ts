@@ -1,12 +1,16 @@
 import {
   ARABIC_LETTERS,
+  DIACRITICS,
   buildAlphabetChoices,
   buildAlphabetExerciseQueue,
   buildAlphabetSet,
   buildMatchingGrid,
   buildSimilarLetterChoices,
   buildTrueFalseQuestion,
+  buildVocalizedReading,
   getLetterById,
+  getVocalizedForms,
+  splitAtLetter,
   withFatha,
 } from '@/lib/alphabet';
 
@@ -70,6 +74,64 @@ describe('alphabet data', () => {
 
   it('renders a letter vocalized with a fatha', () => {
     expect(withFatha(getLetterById('baa')!)).toBe('بَ');
+  });
+
+  it('gives every letter an example word (with a placeholder emoji) for each of the three short vowels', () => {
+    for (const letter of ARABIC_LETTERS) {
+      for (const id of ['fatha', 'damma', 'kasra'] as const) {
+        const example = letter.vowelExamples[id];
+        expect(example.arabic.length).toBeGreaterThan(0);
+        expect(example.transliteration.length).toBeGreaterThan(0);
+        expect(example.english.length).toBeGreaterThan(0);
+        expect(example.emoji?.length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('builds a friendly phonetic reading per vowel from the transliteration', () => {
+    expect(buildVocalizedReading(getLetterById('baa')!, 'fatha')).toBe('Baa');
+    expect(buildVocalizedReading(getLetterById('baa')!, 'damma')).toBe('Boo');
+    expect(buildVocalizedReading(getLetterById('baa')!, 'kasra')).toBe('Bee');
+    // Ayn's transliteration is itself a vowel ("a"), so the consonant is dropped to avoid "Aaa".
+    expect(buildVocalizedReading(getLetterById('ain')!, 'fatha')).toBe('Aa');
+  });
+
+  it('builds all three vocalized forms for a letter, in fatha/damma/kasra order', () => {
+    const forms = getVocalizedForms(getLetterById('baa')!);
+
+    expect(forms).toHaveLength(3);
+    expect(forms.map((f) => f.diacritic.id)).toEqual(['fatha', 'damma', 'kasra']);
+    expect(forms[0].glyph).toBe('بَ');
+    expect(forms[0].reading).toBe('Baa');
+    expect(forms[0].example.arabic.length).toBeGreaterThan(0);
+  });
+
+  it('exposes exactly the three short-vowel diacritics', () => {
+    expect(DIACRITICS.map((d) => d.id)).toEqual(['fatha', 'damma', 'kasra']);
+  });
+
+  it('splits a word around a letter, keeping its diacritic attached to the match', () => {
+    const baa = getLetterById('baa')!;
+    const split = splitAtLetter('بَطة', baa);
+
+    expect(split).not.toBeNull();
+    expect(split!.before).toBe('');
+    expect(split!.match).toBe('بَ');
+    expect(split!.after).toBe('طة');
+    expect(split!.before + split!.match + split!.after).toBe('بَطة');
+  });
+
+  it('finds every letter within its own vowel example words', () => {
+    for (const letter of ARABIC_LETTERS) {
+      for (const id of ['fatha', 'damma', 'kasra'] as const) {
+        const example = letter.vowelExamples[id];
+        expect(splitAtLetter(example.arabic, letter)).not.toBeNull();
+      }
+    }
+  });
+
+  it('returns null when the letter is not in the word', () => {
+    expect(splitAtLetter('طاولة', getLetterById('baa')!)).toBeNull();
   });
 
   it('prefers same-shape-group distractors, falling back to random ones for singleton groups', () => {

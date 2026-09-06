@@ -2,14 +2,13 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { DiacriticDetailModal } from '@/components/alphabet/DiacriticDetailModal';
 import { LetterDetailModal } from '@/components/alphabet/LetterDetailModal';
 import { Button } from '@/components/ui/Button';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { colors, radii, shadows, spacing } from '@/constants/theme';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
-import { ARABIC_LETTERS, DIACRITICS, type ArabicLetter, type Diacritic } from '@/lib/alphabet';
+import { ARABIC_LETTERS, type ArabicLetter } from '@/lib/alphabet';
 import { getAlphabetProgress } from '@/lib/alphabetProgress';
 import { useColumnWidth } from '@/hooks/useColumnWidth';
 
@@ -19,9 +18,7 @@ export default function AlphabetScreen() {
   const { activeProfile } = useActiveProfile();
   const cardWidth = useColumnWidth(GRID_COLUMNS, spacing.lg, spacing.sm);
   const [practicedLetterIds, setPracticedLetterIds] = useState<string[]>([]);
-  const [practicedDiacriticIds, setPracticedDiacriticIds] = useState<string[]>([]);
   const [selectedLetter, setSelectedLetter] = useState<ArabicLetter | null>(null);
-  const [selectedDiacritic, setSelectedDiacritic] = useState<Diacritic | null>(null);
 
   // Re-read local progress every time this screen regains focus (e.g. after
   // finishing a practice round), since the Stack keeps this screen mounted
@@ -33,7 +30,6 @@ export default function AlphabetScreen() {
       getAlphabetProgress(activeProfile.id).then((data) => {
         if (cancelled) return;
         setPracticedLetterIds(data.practicedLetterIds);
-        setPracticedDiacriticIds(data.practicedDiacriticIds);
       });
       return () => {
         cancelled = true;
@@ -78,6 +74,12 @@ export default function AlphabetScreen() {
             color="#E6DEF2"
             onPress={() => router.push('/alphabet-matching')}
           />
+          <QuickLinkCard
+            label="Diacritics"
+            icon="ً"
+            color="#DDEFE3"
+            onPress={() => router.push('/alphabet-diacritics')}
+          />
         </View>
 
         <View style={styles.sectionHeaderRow}>
@@ -105,41 +107,10 @@ export default function AlphabetScreen() {
           ))}
         </View>
 
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>Diacritics</Text>
-          <Text style={styles.sectionCount}>
-            {practicedDiacriticIds.length}/{DIACRITICS.length}
-          </Text>
-        </View>
-
-        <View style={styles.grid}>
-          {DIACRITICS.map((diacritic) => (
-            <PressableScale
-              key={diacritic.id}
-              onPress={() => setSelectedDiacritic(diacritic)}
-              style={[
-                styles.letterCard,
-                { width: cardWidth },
-                practicedDiacriticIds.includes(diacritic.id) && styles.letterCardPracticed,
-              ]}
-            >
-              <Text style={styles.letter}>
-                {diacritic.exampleLetter}
-                {diacritic.symbol}
-              </Text>
-              <Text style={styles.letterName}>{diacritic.name}</Text>
-              <View
-                style={[styles.underline, practicedDiacriticIds.includes(diacritic.id) && styles.underlineDone]}
-              />
-            </PressableScale>
-          ))}
-        </View>
-
         <Button label="Learn the letters" onPress={() => router.push('/alphabet-practice')} style={styles.cta} />
       </ScrollView>
 
       <LetterDetailModal letter={selectedLetter} onClose={() => setSelectedLetter(null)} />
-      <DiacriticDetailModal diacritic={selectedDiacritic} onClose={() => setSelectedDiacritic(null)} />
     </ScreenContainer>
   );
 }
