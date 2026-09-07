@@ -1,10 +1,11 @@
 import { router, type Href } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
-import { Alert, Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Animated, StyleSheet, Text, View } from 'react-native';
 
 import { ExerciseRenderer } from '@/components/exercises/shared/ExerciseRenderer';
 import { SessionCompleteCard } from '@/components/session/SessionCompleteCard';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
+import { PressableScale } from '@/components/ui/PressableScale';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { colors, spacing } from '@/constants/theme';
@@ -96,9 +97,9 @@ export function SessionRunner({
   return (
     <ScreenContainer>
       <View style={styles.header}>
-        <Pressable onPress={handleExitPress} accessibilityLabel="Exit session" style={styles.closeButton}>
+        <PressableScale haptic onPress={handleExitPress} accessibilityLabel="Exit session" style={styles.closeButton}>
           <Text style={styles.closeIcon}>✕</Text>
-        </Pressable>
+        </PressableScale>
         <View style={{ flex: 1 }}>
           <ProgressBar progress={timer.goalSeconds > 0 ? timer.elapsedSeconds / timer.goalSeconds : 0} />
         </View>

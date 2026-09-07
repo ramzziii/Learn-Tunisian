@@ -5,6 +5,7 @@ import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { BackButton } from '@/components/ui/BackButton';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { PressableScale } from '@/components/ui/PressableScale';
+import { Reveal } from '@/components/ui/Reveal';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { colors, radii, shadows, spacing } from '@/constants/theme';
 import { fetchFavoriteWordGroups } from '@/data/favorites';
@@ -29,26 +30,32 @@ export default function Favorites() {
       <Text style={styles.title}>Favorites</Text>
 
       {groups.length === 0 ? (
-        <View style={styles.emptyContainer}>
+        <Reveal style={styles.emptyContainer}>
           <Text style={styles.emptyEmoji}>☆</Text>
           <Text style={styles.emptyTitle}>No favorites yet</Text>
           <Text style={styles.emptyBody}>Tap the star on any word to save it here.</Text>
-        </View>
+        </Reveal>
       ) : (
         <FlatList
           data={groups}
           keyExtractor={(g) => g.id}
           contentContainerStyle={{ gap: spacing.sm, paddingVertical: spacing.lg }}
-          renderItem={({ item }) => {
+          renderItem={({ item, index }) => {
             const display = getPromptVariant(item, 0);
             return (
-              <PressableScale style={[styles.row, shadows.card]} onPress={() => router.push(`/word/${item.id}`)}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.arabic}>{display.wordArabic}</Text>
-                  <Text style={styles.meaning}>{item.englishMeaning}</Text>
-                </View>
-                <Text style={styles.star}>⭐</Text>
-              </PressableScale>
+              <Reveal delay={Math.min(index * 40, 320)}>
+                <PressableScale
+                  haptic
+                  style={[styles.row, shadows.card]}
+                  onPress={() => router.push(`/word/${item.id}`)}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.arabic}>{display.wordArabic}</Text>
+                    <Text style={styles.meaning}>{item.englishMeaning}</Text>
+                  </View>
+                  <Text style={styles.star}>⭐</Text>
+                </PressableScale>
+              </Reveal>
             );
           }}
         />

@@ -1,8 +1,10 @@
 import { router } from 'expo-router';
-import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
 
 import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
+import { PressableScale } from '@/components/ui/PressableScale';
+import { Reveal } from '@/components/ui/Reveal';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { colors, radii, spacing } from '@/constants/theme';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
@@ -42,16 +44,18 @@ export default function ProfileSwitcher() {
         data={profiles}
         keyExtractor={(p) => p.id}
         contentContainerStyle={{ gap: spacing.md, paddingVertical: spacing.lg }}
-        renderItem={({ item }) => (
-          <Pressable style={styles.card} onPress={() => choose(item)}>
-            <Text style={styles.avatar}>{item.track === 'kid' ? '🧒' : '🙋'}</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.name}>{item.name}</Text>
-              <Text style={styles.meta}>
-                Age {calculateAge(item.dateOfBirth)} · {item.track === 'kid' ? 'Kid track' : 'Adult/teen track'}
-              </Text>
-            </View>
-          </Pressable>
+        renderItem={({ item, index }) => (
+          <Reveal delay={index * 60}>
+            <PressableScale haptic style={styles.card} onPress={() => choose(item)}>
+              <Text style={styles.avatar}>{item.track === 'kid' ? '🧒' : '🙋'}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.name}>{item.name}</Text>
+                <Text style={styles.meta}>
+                  Age {calculateAge(item.dateOfBirth)} · {item.track === 'kid' ? 'Kid track' : 'Adult/teen track'}
+                </Text>
+              </View>
+            </PressableScale>
+          </Reveal>
         )}
       />
 

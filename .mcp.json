@@ -1,0 +1,22 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": ["@playwright/mcp@latest"]
+    },
+    "21st-magic": {
+      "url": "https://21st.dev/api/mcp",
+      "headers": { "x-api-key": "${API_KEY_21ST}" }
+    },
+    "nano-banana-2": {
+      "command": "npx",
+      "args": ["-y", "nano-banana-2-mcp"],
+      "env": { "GEMINI_API_KEY": "${GEMINI_API_KEY}" }
+    },
+    "stitch": {
+      "command": "npx",
+      "args": ["-y", "stitch-mcp"],
+      "env": { "GOOGLE_CLOUD_PROJECT": "${GOOGLE_CLOUD_PROJECT}" }
+    }
+  }
+}

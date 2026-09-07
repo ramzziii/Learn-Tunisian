@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { Animated, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { AnswerFeedback } from '@/components/exercises/shared/AnswerFeedback';
 import { VariantCallout } from '@/components/exercises/shared/VariantCallout';
 import { AudioPlayButton } from '@/components/ui/AudioPlayButton';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { adultTrackSizing, colors, radii, spacing } from '@/constants/theme';
+import { useAnswerFeedback } from '@/hooks/useAnswerFeedback';
+import { useShake } from '@/hooks/useShake';
 import { useWordAudioPlayer } from '@/hooks/useWordAudioPlayer';
 import { isAnyVariantTransliterationMatch } from '@/lib/wordVariants';
 import type { ExerciseItem } from '@/types/exercises';
@@ -21,10 +23,22 @@ interface TypingSpellingProps {
 /** Adult/teen track: hear a word and its meaning, type its transliteration. Any variant of the concept counts as correct. */
 export function TypingSpelling({ exercise, onComplete }: TypingSpellingProps) {
   const { play, hasAudio, isResolving, hasError, retry } = useWordAudioPlayer(exercise.promptVariant, { autoPlay: true });
+  const { playCorrect, playIncorrect } = useAnswerFeedback();
+  const { shake, shakeStyle } = useShake();
   const [input, setInput] = useState('');
   const [submitted, setSubmitted] = useState(false);
 
   const isCorrect = isAnyVariantTransliterationMatch(exercise.targetGroup, input);
+
+  const submit = () => {
+    setSubmitted(true);
+    if (isCorrect) {
+      playCorrect();
+    } else {
+      playIncorrect();
+      shake();
+    }
+  };
 
   useEffect(() => {
     if (!submitted) return;
@@ -48,21 +62,24 @@ export function TypingSpelling({ exercise, onComplete }: TypingSpellingProps) {
       <Text style={styles.instructions}>Type what you hear</Text>
       <VariantCallout group={exercise.targetGroup} />
 
-      <TextInput
-        value={input}
-        onChangeText={setInput}
-        editable={!submitted}
-        autoFocus
-        autoCapitalize="none"
-        autoCorrect={false}
-        placeholder="Type the transliteration"
-        placeholderTextColor={colors.textSecondary}
-        style={[styles.input, submitted && (isCorrect ? styles.inputCorrect : styles.inputIncorrect)]}
-        onSubmitEditing={() => input.trim().length > 0 && setSubmitted(true)}
-      />
+      <Animated.View style={[{ width: '100%' }, submitted && !isCorrect ? shakeStyle : undefined]}>
+        <TextInput
+          value={input}
+          onChangeText={setInput}
+          editable={!submitted}
+          autoFocus
+          autoCapitalize="none"
+          autoCorrect={false}
+          placeholder="Type the transliteration"
+          placeholderTextColor={colors.textSecondary}
+          style={[styles.input, submitted && (isCorrect ? styles.inputCorrect : styles.inputIncorrect)]}
+          onSubmitEditing={() => input.trim().length > 0 && submit()}
+        />
+      </Animated.View>
 
       <PressableScale
-        onPress={() => setSubmitted(true)}
+        haptic
+        onPress={submit}
         disabled={submitted || input.trim().length === 0}
         style={[styles.submitButton, (submitted || input.trim().length === 0) && styles.submitButtonDisabled]}
       >

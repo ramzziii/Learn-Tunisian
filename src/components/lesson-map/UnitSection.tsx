@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { LessonNode } from '@/components/lesson-map/LessonNode';
+import { Reveal } from '@/components/ui/Reveal';
 import { colors, spacing } from '@/constants/theme';
 import type { UnitWithLessons } from '@/data/content';
 import type { Track } from '@/types/models';
@@ -27,8 +28,10 @@ export function UnitSection({ unitWithLessons, track, onSelectLesson, onBrowseWo
         ) : null}
       </View>
       <View style={styles.lessonRow}>
-        {lessons.map((lesson) => (
-          <LessonNode key={lesson.id} lesson={lesson} track={track} onPress={() => onSelectLesson(lesson.id)} />
+        {lessons.map((lesson, index) => (
+          <Reveal key={lesson.id} delay={Math.min(index * 40, 400)}>
+            <LessonNode lesson={lesson} track={track} onPress={() => onSelectLesson(lesson.id)} />
+          </Reveal>
         ))}
       </View>
     </View>

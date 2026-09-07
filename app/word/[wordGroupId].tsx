@@ -10,6 +10,7 @@ import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { PressableScale } from '@/components/ui/PressableScale';
+import { Reveal } from '@/components/ui/Reveal';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { colors, radii, shadows, spacing } from '@/constants/theme';
 import { fetchWordGroupWithSiblings } from '@/data/content';
@@ -119,12 +120,12 @@ export default function WordDetail() {
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.headerRow}>
           <BackButton />
-          <PressableScale onPress={toggleFavorite} style={styles.favoriteButton}>
+          <PressableScale haptic onPress={toggleFavorite} style={styles.favoriteButton}>
             <Text style={styles.favoriteIcon}>{isFavorite ? '⭐' : '☆'}</Text>
           </PressableScale>
         </View>
 
-        <View style={styles.heroCard}>
+        <Reveal style={styles.heroCard}>
           <WordPicture group={group} size={100} />
           <Text style={[styles.arabic, { marginTop: spacing.md }]}>{displayVariant.wordArabic}</Text>
           <Text style={styles.transliteration}>{displayVariant.transliteration}</Text>
@@ -140,29 +141,33 @@ export default function WordDetail() {
           <Text style={[styles.verificationBadge, displayVariant.nativeVerified && styles.verificationBadgeVerified]}>
             {displayVariant.nativeVerified ? '✓ Native-speaker verified' : '⚠️ Draft — pending native review'}
           </Text>
-        </View>
+        </Reveal>
 
-        <VariantCallout group={group} />
+        <Reveal delay={60}>
+          <VariantCallout group={group} />
+        </Reveal>
 
-        <Text style={styles.sectionTitle}>Progress</Text>
-        <View style={[styles.progressCard, shadows.card]}>
-          <Text style={styles.progressStatus}>{PROGRESS_STATUS_LABEL[progress?.status ?? 'new']}</Text>
-          <Text style={styles.progressDetail}>
-            {progress ? `${progress.correctCount} correct · ${progress.incorrectCount} missed` : 'Not practiced yet'}
-          </Text>
-        </View>
+        <Reveal delay={120}>
+          <Text style={styles.sectionTitle}>Progress</Text>
+          <View style={[styles.progressCard, shadows.card]}>
+            <Text style={styles.progressStatus}>{PROGRESS_STATUS_LABEL[progress?.status ?? 'new']}</Text>
+            <Text style={styles.progressDetail}>
+              {progress ? `${progress.correctCount} correct · ${progress.incorrectCount} missed` : 'Not practiced yet'}
+            </Text>
+          </View>
 
-        {justPracticed ? <Text style={styles.practicedNote}>Nice — progress updated!</Text> : null}
+          {justPracticed ? <Text style={styles.practicedNote}>Nice — progress updated!</Text> : null}
 
-        <Button
-          label="Practice this word"
-          onPress={startPractice}
-          disabled={siblings.length < 3}
-          style={{ marginTop: spacing.lg }}
-        />
-        {siblings.length < 3 ? (
-          <Text style={styles.practiceUnavailable}>Need a few more words in this lesson to practice.</Text>
-        ) : null}
+          <Button
+            label="Practice this word"
+            onPress={startPractice}
+            disabled={siblings.length < 3}
+            style={{ marginTop: spacing.lg }}
+          />
+          {siblings.length < 3 ? (
+            <Text style={styles.practiceUnavailable}>Need a few more words in this lesson to practice.</Text>
+          ) : null}
+        </Reveal>
       </ScrollView>
     </ScreenContainer>
   );

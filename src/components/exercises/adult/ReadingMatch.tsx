@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Animated, StyleSheet, Text, View } from 'react-native';
 
 import { AnswerFeedback } from '@/components/exercises/shared/AnswerFeedback';
 import { VariantCallout } from '@/components/exercises/shared/VariantCallout';
 import { AudioPlayButton } from '@/components/ui/AudioPlayButton';
 import { PressableScale } from '@/components/ui/PressableScale';
+import { Reveal } from '@/components/ui/Reveal';
 import { adultTrackSizing, colors, radii, spacing } from '@/constants/theme';
+import { useAnswerFeedback } from '@/hooks/useAnswerFeedback';
+import { useShake } from '@/hooks/useShake';
 import { useWordAudioPlayer } from '@/hooks/useWordAudioPlayer';
 import type { ExerciseItem } from '@/types/exercises';
 
@@ -20,9 +23,22 @@ interface ReadingMatchProps {
 /** Adult/teen track: listen to a word, tap the matching written Arabic script. */
 export function ReadingMatch({ exercise, onComplete }: ReadingMatchProps) {
   const { play, hasAudio, isResolving, hasError, retry } = useWordAudioPlayer(exercise.promptVariant, { autoPlay: true });
+  const { playCorrect, playIncorrect } = useAnswerFeedback();
+  const { shake, shakeStyle } = useShake();
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
 
   const isCorrectSelection = selectedGroupId === exercise.targetGroup.id;
+
+  const selectOption = (groupId: string) => {
+    if (selectedGroupId) return;
+    setSelectedGroupId(groupId);
+    if (groupId === exercise.targetGroup.id) {
+      playCorrect();
+    } else {
+      playIncorrect();
+      shake();
+    }
+  };
 
   useEffect(() => {
     if (!selectedGroupId) return;
@@ -46,24 +62,27 @@ export function ReadingMatch({ exercise, onComplete }: ReadingMatchProps) {
       <VariantCallout group={exercise.targetGroup} />
 
       <View style={styles.list}>
-        {exercise.options.map((option) => {
+        {exercise.options.map((option, index) => {
           const isSelected = selectedGroupId === option.group.id;
           const revealCorrect = selectedGroupId !== null && option.group.id === exercise.targetGroup.id;
           return (
-            <PressableScale
-              key={option.group.id}
-              scaleTo={0.98}
-              onPress={() => !selectedGroupId && setSelectedGroupId(option.group.id)}
-              disabled={!!selectedGroupId}
-              style={[
-                styles.option,
-                isSelected && (isCorrectSelection ? styles.optionCorrect : styles.optionIncorrect),
-                revealCorrect && !isSelected && styles.optionCorrect,
-              ]}
-            >
-              <Text style={styles.arabicScript}>{option.variant.wordArabic}</Text>
-              <Text style={styles.transliteration}>{option.variant.transliteration}</Text>
-            </PressableScale>
+            <Reveal key={option.group.id} delay={index * 60}>
+              <Animated.View style={isSelected && !isCorrectSelection ? shakeStyle : undefined}>
+                <PressableScale
+                  scaleTo={0.98}
+                  onPress={() => selectOption(option.group.id)}
+                  disabled={!!selectedGroupId}
+                  style={[
+                    styles.option,
+                    isSelected && (isCorrectSelection ? styles.optionCorrect : styles.optionIncorrect),
+                    revealCorrect && !isSelected && styles.optionCorrect,
+                  ]}
+                >
+                  <Text style={styles.arabicScript}>{option.variant.wordArabic}</Text>
+                  <Text style={styles.transliteration}>{option.variant.transliteration}</Text>
+                </PressableScale>
+              </Animated.View>
+            </Reveal>
           );
         })}
       </View>

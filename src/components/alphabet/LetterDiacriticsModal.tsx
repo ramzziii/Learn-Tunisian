@@ -90,10 +90,11 @@ export function LetterDiacriticsModal({ letter, onClose }: LetterDiacriticsModal
               <Text style={styles.playIcon}>{activeKey === 'heading' ? '🔊' : '▶'}</Text>
             </PressableScale>
 
-            <Text style={styles.subtitle}>Tap a card to hear it</Text>
-
             <ScrollView showsVerticalScrollIndicator={false}>
-              <Text style={styles.sectionLabel}>Examples</Text>
+              <View style={styles.sectionRow}>
+                <Text style={styles.sectionLabel}>Examples</Text>
+                <Text style={styles.subtitle}>Tap a card to hear it</Text>
+              </View>
               {forms.map(({ diacritic, glyph, reading, example }, index) => {
                 const diacriticId = diacritic.id as DiacriticId;
                 const highlighted = letter ? splitAtLetter(example.arabic, letter) : null;
@@ -203,14 +204,15 @@ const styles = StyleSheet.create({
   },
   playButtonActive: { backgroundColor: colors.primaryDark },
   playIcon: { fontSize: 22, color: colors.textOnPrimary },
-  subtitle: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    marginTop: 2,
-    marginBottom: spacing.lg,
+  subtitle: { fontSize: 13, color: colors.textSecondary },
+  sectionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
   },
-  sectionLabel: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.sm },
+  sectionLabel: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
   card: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { ProgressBar } from '@/components/ui/ProgressBar';
+import { Reveal } from '@/components/ui/Reveal';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { colors, gradients, radii, shadows, spacing } from '@/constants/theme';
 import { fetchLessonMap, type UnitWithLessons } from '@/data/content';
@@ -136,11 +137,11 @@ function HomeHeader({
       </View>
       <View style={styles.headerActions}>
         {hasMultipleProfiles ? (
-          <PressableScale onPress={onSwitchProfile} style={styles.iconButton}>
+          <PressableScale haptic onPress={onSwitchProfile} style={styles.iconButton}>
             <Text style={styles.icon}>👥</Text>
           </PressableScale>
         ) : null}
-        <PressableScale onPress={onOpenSettings} style={styles.iconButton}>
+        <PressableScale haptic onPress={onOpenSettings} style={styles.iconButton}>
           <Text style={styles.icon}>⚙️</Text>
         </PressableScale>
       </View>
@@ -157,32 +158,47 @@ function AdultHomeContent({ data }: { data: HomeData }) {
 
   return (
     <>
-      <View style={[styles.goalCard, shadows.card]}>
-        <View style={styles.goalHeaderRow}>
-          <Text style={styles.goalLabel}>Today&apos;s goal</Text>
-          <Text style={styles.goalValue}>
-            {minutesToday} / {goalMinutes} min
-          </Text>
+      <Reveal delay={0}>
+        <View style={[styles.goalCard, shadows.card]}>
+          <View style={styles.goalHeaderRow}>
+            <Text style={styles.goalLabel}>Today&apos;s goal</Text>
+            <Text style={styles.goalValue}>
+              {minutesToday} / {goalMinutes} min
+            </Text>
+          </View>
+          <ProgressBar progress={goalProgress} gradientColors={goalReached ? gradients.success : gradients.primary} />
+          {continueLesson ? (
+            <Button
+              label="Continue Learning"
+              onPress={() => router.push(`/lesson/${continueLesson.id}`)}
+              style={{ marginTop: spacing.md }}
+            />
+          ) : null}
         </View>
-        <ProgressBar progress={goalProgress} gradientColors={goalReached ? gradients.success : gradients.primary} />
-        {continueLesson ? (
-          <Button
-            label="Continue Learning"
-            onPress={() => router.push(`/lesson/${continueLesson.id}`)}
-            style={{ marginTop: spacing.md }}
-          />
-        ) : null}
-      </View>
+      </Reveal>
 
-      {reviewDueCount > 0 ? <ReviewCard dueCount={reviewDueCount} /> : null}
+      {reviewDueCount > 0 ? (
+        <Reveal delay={60}>
+          <ReviewCard dueCount={reviewDueCount} />
+        </Reveal>
+      ) : null}
 
-      <TalkToATunisianCard />
-      <AlphabetPracticeCard />
+      <Reveal delay={120}>
+        <TalkToATunisianCard />
+      </Reveal>
+      <Reveal delay={180}>
+        <AlphabetPracticeCard />
+      </Reveal>
+      <Reveal delay={210}>
+        <CultureCornerCard />
+      </Reveal>
 
-      <View style={styles.progressTeaserRow}>
-        <ProgressTeaser value={progressSummary.wordsLearning} label="learning" />
-        <ProgressTeaser value={progressSummary.wordsMastered} label="mastered" />
-      </View>
+      <Reveal delay={270}>
+        <View style={styles.progressTeaserRow}>
+          <ProgressTeaser value={progressSummary.wordsLearning} label="learning" />
+          <ProgressTeaser value={progressSummary.wordsMastered} label="mastered" />
+        </View>
+      </Reveal>
 
       <LessonMap unitsWithLessons={unitsWithLessons} track="adult" />
     </>
@@ -197,30 +213,44 @@ function KidHomeContent({ data }: { data: HomeData }) {
   return (
     <>
       {continueLesson ? (
-        <PressableScale
-          onPress={() => router.push(`/lesson/${continueLesson.id}`)}
-          style={[styles.kidHeroCard, shadows.raised]}
-        >
-          <LinearGradient
-            colors={gradients.accent}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.kidHeroGradient}
+        <Reveal delay={0}>
+          <PressableScale
+            haptic
+            onPress={() => router.push(`/lesson/${continueLesson.id}`)}
+            style={[styles.kidHeroCard, shadows.raised]}
           >
-            <Text style={styles.kidHeroEmoji}>🚀</Text>
-            <Text style={styles.kidHeroLabel}>Let&apos;s learn!</Text>
-          </LinearGradient>
-        </PressableScale>
+            <LinearGradient
+              colors={gradients.accent}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.kidHeroGradient}
+            >
+              <Text style={styles.kidHeroEmoji}>🚀</Text>
+              <Text style={styles.kidHeroLabel}>Let&apos;s learn!</Text>
+            </LinearGradient>
+          </PressableScale>
+        </Reveal>
       ) : null}
 
       {reviewDueCount > 0 ? (
-        <PressableScale onPress={() => router.push('/review')} style={[styles.kidReviewCard, shadows.card]}>
-          <Text style={styles.kidReviewEmoji}>🔄</Text>
-          <Text style={styles.kidReviewLabel}>Review</Text>
-        </PressableScale>
+        <Reveal delay={60}>
+          <PressableScale
+            haptic
+            onPress={() => router.push('/review')}
+            style={[styles.kidReviewCard, shadows.card]}
+          >
+            <Text style={styles.kidReviewEmoji}>🔄</Text>
+            <Text style={styles.kidReviewLabel}>Review</Text>
+          </PressableScale>
+        </Reveal>
       ) : null}
 
-      <AlphabetPracticeCard />
+      <Reveal delay={120}>
+        <AlphabetPracticeCard />
+      </Reveal>
+      <Reveal delay={150}>
+        <CultureCornerCard />
+      </Reveal>
 
       <LessonMap unitsWithLessons={unitsWithLessons} track="kid" />
     </>
@@ -229,7 +259,7 @@ function KidHomeContent({ data }: { data: HomeData }) {
 
 function AlphabetPracticeCard() {
   return (
-    <PressableScale onPress={() => router.push('/alphabet')} style={[styles.alphabetCard, shadows.card]}>
+    <PressableScale haptic onPress={() => router.push('/alphabet')} style={[styles.alphabetCard, shadows.card]}>
       <Text style={styles.alphabetCardEmoji}>🅰️</Text>
       <View style={{ flex: 1 }}>
         <Text style={styles.alphabetCardTitle}>Alphabet practice</Text>
@@ -240,9 +270,22 @@ function AlphabetPracticeCard() {
   );
 }
 
+function CultureCornerCard() {
+  return (
+    <PressableScale haptic onPress={() => router.push('/culture')} style={[styles.alphabetCard, shadows.card]}>
+      <Text style={styles.alphabetCardEmoji}>📜</Text>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.alphabetCardTitle}>Culture Corner</Text>
+        <Text style={styles.alphabetCardSubtitle}>Real Tunisian proverbs & sayings</Text>
+      </View>
+      <Text style={styles.alphabetCardChevron}>›</Text>
+    </PressableScale>
+  );
+}
+
 function ReviewCard({ dueCount }: { dueCount: number }) {
   return (
-    <PressableScale onPress={() => router.push('/review')} style={[styles.reviewCard, shadows.card]}>
+    <PressableScale haptic onPress={() => router.push('/review')} style={[styles.reviewCard, shadows.card]}>
       <LinearGradient
         colors={gradients.accent}
         start={{ x: 0, y: 0 }}
@@ -264,7 +307,7 @@ function ReviewCard({ dueCount }: { dueCount: number }) {
 
 function TalkToATunisianCard() {
   return (
-    <PressableScale onPress={() => router.push('/talk')} style={[styles.reviewCard, shadows.card]}>
+    <PressableScale haptic onPress={() => router.push('/talk')} style={[styles.reviewCard, shadows.card]}>
       <LinearGradient
         colors={gradients.primary}
         start={{ x: 0, y: 0 }}

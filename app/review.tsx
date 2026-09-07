@@ -5,6 +5,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { SessionRunner } from '@/components/session/SessionRunner';
 import { Button } from '@/components/ui/Button';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
+import { Reveal } from '@/components/ui/Reveal';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { colors, spacing } from '@/constants/theme';
 import { fetchDailyGoalSettings } from '@/data/profiles';
@@ -45,12 +46,12 @@ export default function ReviewSession() {
   if (groups.length === 0) {
     return (
       <ScreenContainer>
-        <View style={styles.emptyContainer}>
+        <Reveal style={styles.emptyContainer}>
           <Text style={styles.emptyEmoji}>🌿</Text>
           <Text style={styles.emptyTitle}>All caught up</Text>
           <Text style={styles.emptyBody}>Nothing is due for review right now — nice work staying on top of it.</Text>
           <Button label="Back to home" variant="secondary" onPress={() => router.replace('/home')} />
-        </View>
+        </Reveal>
       </ScreenContainer>
     );
   }
