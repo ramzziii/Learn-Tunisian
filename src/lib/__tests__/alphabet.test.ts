@@ -33,7 +33,7 @@ describe('alphabet data', () => {
     expect(new Set(set).size).toBe(set.length);
   });
 
-  it('gives every letter position-dependent forms and two example words', () => {
+  it('gives every letter position-dependent forms and two example words (with a placeholder emoji each)', () => {
     for (const letter of ARABIC_LETTERS) {
       expect(letter.forms.isolated).toBe(letter.label);
       expect(letter.forms.initial).toContain(letter.label);
@@ -44,6 +44,7 @@ describe('alphabet data', () => {
         expect(example.arabic.length).toBeGreaterThan(0);
         expect(example.transliteration.length).toBeGreaterThan(0);
         expect(example.english.length).toBeGreaterThan(0);
+        expect(example.emoji?.length).toBeGreaterThan(0);
       }
     }
   });
@@ -132,6 +133,30 @@ describe('alphabet data', () => {
 
   it('returns null when the letter is not in the word', () => {
     expect(splitAtLetter('طاولة', getLetterById('baa')!)).toBeNull();
+  });
+
+  it('places each position example\'s target letter in the linguistically correct spot within the word', () => {
+    for (const letter of ARABIC_LETTERS) {
+      const { isolated, initial, medial, final } = letter.positionExamples;
+
+      expect(splitAtLetter(isolated.arabic, letter)).not.toBeNull();
+      expect(final.arabic.endsWith(letter.label)).toBe(true);
+
+      // The 6 non-connecting letters (dal/dhal/ra/zay/waw, plus alif which
+      // this app doesn't quiz) never take an initial or medial shape — they
+      // only connect from the letter before them, never to the one after —
+      // so those two slots are null rather than a fabricated example.
+      const nonConnecting = ['dal', 'dhaal', 'ra', 'zaay', 'waaw'];
+      if (nonConnecting.includes(letter.id)) {
+        expect(initial).toBeNull();
+        expect(medial).toBeNull();
+      } else {
+        expect(initial!.arabic.startsWith(letter.label)).toBe(true);
+        expect(medial!.arabic.startsWith(letter.label)).toBe(false);
+        expect(medial!.arabic.endsWith(letter.label)).toBe(false);
+        expect(medial!.arabic).toContain(letter.label);
+      }
+    }
   });
 
   it('prefers same-shape-group distractors, falling back to random ones for singleton groups', () => {

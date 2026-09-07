@@ -5,6 +5,7 @@ import {
   getPrimaryVariant,
   getPromptVariant,
   hasGenderPair,
+  isAnyVariantSpeechMatch,
   isAnyVariantTransliterationMatch,
 } from '@/lib/wordVariants';
 import type { VariantLabel, WordGroupWithVariants, WordVariant } from '@/types/models';
@@ -112,5 +113,41 @@ describe('isAnyVariantTransliterationMatch', () => {
     const genderGroup = group([variant('masculine', 'ena ji3an'), variant('feminine', 'ena ji3ana')]);
     expect(isAnyVariantTransliterationMatch(genderGroup, 'ena ji3an')).toBe(true);
     expect(isAnyVariantTransliterationMatch(genderGroup, 'ena ji3ana')).toBe(true);
+  });
+});
+
+describe('isAnyVariantSpeechMatch', () => {
+  const g = group([
+    variant('primary', 'yalla nemchiw', { wordArabic: 'يَلا نمشيو' }),
+    variant('also_heard', 'haya nemchiw', { wordArabic: 'هَيّا نمشيو' }),
+  ]);
+
+  it('matches after stripping diacritics an STT transcript would never include', () => {
+    expect(isAnyVariantSpeechMatch(g, 'يلا نمشيو')).toBe(true);
+  });
+
+  it('matches a non-primary (also_heard) variant just as validly', () => {
+    expect(isAnyVariantSpeechMatch(g, 'هيا نمشيو')).toBe(true);
+  });
+
+  it('normalizes hamza-on-alef and alef-maksura spelling variation', () => {
+    const aleph = group([variant('primary', 'ena', { wordArabic: 'أنا' })]);
+    expect(isAnyVariantSpeechMatch(aleph, 'انا')).toBe(true);
+
+    const maksura = group([variant('primary', 'ala', { wordArabic: 'على' })]);
+    expect(isAnyVariantSpeechMatch(maksura, 'علي')).toBe(true);
+  });
+
+  it('tolerates a single-character recognition slip', () => {
+    const slightlyOff = group([variant('primary', 'kalb', { wordArabic: 'كلب' })]);
+    expect(isAnyVariantSpeechMatch(slightlyOff, 'كلبة')).toBe(true);
+  });
+
+  it('rejects a genuinely different word', () => {
+    expect(isAnyVariantSpeechMatch(g, 'قطة')).toBe(false);
+  });
+
+  it('rejects an empty transcript rather than treating it as a match', () => {
+    expect(isAnyVariantSpeechMatch(g, '   ')).toBe(false);
   });
 });

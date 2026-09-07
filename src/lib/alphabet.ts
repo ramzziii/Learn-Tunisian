@@ -22,6 +22,26 @@ export type PhoneticCue = {
 
 export type DiacriticId = 'fatha' | 'damma' | 'kasra';
 
+export type LetterPosition = 'isolated' | 'initial' | 'medial' | 'final';
+
+/**
+ * One example word per position a letter can actually take within a word.
+ * initial/medial are null for the 6 non-connecting letters (dal, dhal, ra,
+ * zay, waw, and alif, which this app doesn't quiz as its own consonant) —
+ * they only ever connect from the letter before them, never to the one
+ * after, so those two shapes genuinely don't occur in real Arabic. isolated
+ * is a real single-letter word/prefix (و "and", ف "so", ب "with", ل "for",
+ * ك "as") for the handful of letters that have one; every other letter uses
+ * a "standing alone" placeholder, since true isolated-form usage as a
+ * complete word is otherwise rare to nonexistent.
+ */
+export type PositionExamples = {
+  isolated: LetterExample;
+  initial: LetterExample | null;
+  medial: LetterExample | null;
+  final: LetterExample;
+};
+
 export type ArabicLetter = {
   id: string;
   label: string;
@@ -35,6 +55,8 @@ export type ArabicLetter = {
   similarShapeGroup: string;
   /** One example word per short vowel, for the per-letter diacritics screen. */
   vowelExamples: Record<DiacriticId, LetterExample>;
+  /** One example word per connected-form position, for the Letter Forms/Examples section of the detail modal. */
+  positionExamples: PositionExamples;
 };
 
 export type Diacritic = {
@@ -141,221 +163,356 @@ export function splitAtLetter(word: string, letter: ArabicLetter): HighlightedWo
 // change shape in the initial/medial slots, which is the linguistically
 // correct behavior, not a bug.
 export const ARABIC_LETTERS: ArabicLetter[] = [
-  { id: 'baa', label: 'ب', name: 'Baa', transliteration: 'b', sound: 'b', forms: formsOf('ب'), similarShapeGroup: 'teeth', phoneticCue: { sound: 'Ba', exampleWord: 'Bank' }, vowelExamples: {
+  { id: 'baa', label: 'ب', name: 'Baa', transliteration: 'b', sound: 'b', forms: formsOf('ب'), similarShapeGroup: 'teeth', phoneticCue: { sound: 'Ba', exampleWord: 'Bank' }, positionExamples: {
+    isolated: { arabic: 'بِ', transliteration: 'bi', english: 'with, by', emoji: '🤝' },
+    initial: { arabic: 'بيت', transliteration: 'bayt', english: 'house', emoji: '🏠' },
+    medial: { arabic: 'كبير', transliteration: 'kabir', english: 'big', emoji: '🐘' },
+    final: { arabic: 'باب', transliteration: 'baab', english: 'door', emoji: '🚪' },
+  }, vowelExamples: {
     fatha: { arabic: 'بَطة', transliteration: 'batta', english: 'duck', emoji: '🦆' },
     damma: { arabic: 'بُرتقال', transliteration: 'burtuqal', english: 'orange', emoji: '🍊' },
     kasra: { arabic: 'بِنت', transliteration: 'bint', english: 'girl', emoji: '👧' },
   }, examples: [
-    { arabic: 'بيت', transliteration: 'bayt', english: 'house' },
-    { arabic: 'باب', transliteration: 'baab', english: 'door' },
+    { arabic: 'بيت', transliteration: 'bayt', english: 'house', emoji: '🏠' },
+    { arabic: 'باب', transliteration: 'baab', english: 'door', emoji: '🚪' },
   ] },
-  { id: 'taa', label: 'ت', name: 'Taa', transliteration: 't', sound: 't', forms: formsOf('ت'), similarShapeGroup: 'teeth', phoneticCue: { sound: 'Ta', exampleWord: 'Tank' }, vowelExamples: {
+  { id: 'taa', label: 'ت', name: 'Taa', transliteration: 't', sound: 't', forms: formsOf('ت'), similarShapeGroup: 'teeth', phoneticCue: { sound: 'Ta', exampleWord: 'Tank' }, positionExamples: {
+    isolated: { arabic: 'ت', transliteration: 't', english: 'standing alone' },
+    initial: { arabic: 'تفاح', transliteration: 'tuffah', english: 'apple', emoji: '🍎' },
+    medial: { arabic: 'كتاب', transliteration: 'kitab', english: 'book', emoji: '📖' },
+    final: { arabic: 'بيت', transliteration: 'bayt', english: 'house', emoji: '🏠' },
+  }, vowelExamples: {
     fatha: { arabic: 'تَفاح', transliteration: 'tuffah', english: 'apple', emoji: '🍎' },
     damma: { arabic: 'تُوت', transliteration: 'toot', english: 'berry', emoji: '🍓' },
     kasra: { arabic: 'تِمساح', transliteration: 'timsah', english: 'crocodile', emoji: '🐊' },
   }, examples: [
-    { arabic: 'تفاح', transliteration: 'tuffah', english: 'apple' },
-    { arabic: 'تمر', transliteration: 'tamr', english: 'dates' },
+    { arabic: 'تفاح', transliteration: 'tuffah', english: 'apple', emoji: '🍎' },
+    { arabic: 'تمر', transliteration: 'tamr', english: 'dates', emoji: '🌴' },
   ] },
-  { id: 'thaa', label: 'ث', name: 'Thaa', transliteration: 'th', sound: 'th', forms: formsOf('ث'), similarShapeGroup: 'teeth', phoneticCue: { sound: 'Tha', exampleWord: 'Thanks' }, vowelExamples: {
+  { id: 'thaa', label: 'ث', name: 'Thaa', transliteration: 'th', sound: 'th', forms: formsOf('ث'), similarShapeGroup: 'teeth', phoneticCue: { sound: 'Tha', exampleWord: 'Thanks' }, positionExamples: {
+    isolated: { arabic: 'ث', transliteration: 'th', english: 'standing alone' },
+    initial: { arabic: 'ثعلب', transliteration: "tha'lab", english: 'fox', emoji: '🦊' },
+    medial: { arabic: 'مثل', transliteration: 'mithl', english: 'like, such as', emoji: '🔗' },
+    final: { arabic: 'حديث', transliteration: 'hadeeth', english: 'modern, talk', emoji: '💬' },
+  }, vowelExamples: {
     fatha: { arabic: 'ثَعلب', transliteration: "tha'lab", english: 'fox', emoji: '🦊' },
     damma: { arabic: 'ثُعبان', transliteration: "thu'ban", english: 'snake', emoji: '🐍' },
     kasra: { arabic: 'ثِمار', transliteration: 'thimar', english: 'fruits', emoji: '🍇' },
   }, examples: [
-    { arabic: 'ثعلب', transliteration: "tha'lab", english: 'fox' },
-    { arabic: 'ثلج', transliteration: 'thalj', english: 'snow' },
+    { arabic: 'ثعلب', transliteration: "tha'lab", english: 'fox', emoji: '🦊' },
+    { arabic: 'ثلج', transliteration: 'thalj', english: 'snow', emoji: '❄️' },
   ] },
-  { id: 'jeem', label: 'ج', name: 'Jeem', transliteration: 'j', sound: 'j', forms: formsOf('ج'), similarShapeGroup: 'hook', phoneticCue: { sound: 'Ja', exampleWord: 'Jar' }, vowelExamples: {
+  { id: 'jeem', label: 'ج', name: 'Jeem', transliteration: 'j', sound: 'j', forms: formsOf('ج'), similarShapeGroup: 'hook', phoneticCue: { sound: 'Ja', exampleWord: 'Jar' }, positionExamples: {
+    isolated: { arabic: 'ج', transliteration: 'j', english: 'standing alone' },
+    initial: { arabic: 'جمل', transliteration: 'jamal', english: 'camel', emoji: '🐫' },
+    medial: { arabic: 'رجل', transliteration: 'rajul', english: 'man', emoji: '👨' },
+    final: { arabic: 'برج', transliteration: 'burj', english: 'tower', emoji: '🗼' },
+  }, vowelExamples: {
     fatha: { arabic: 'جَمل', transliteration: 'jamal', english: 'camel', emoji: '🐫' },
     damma: { arabic: 'جُبن', transliteration: 'jubn', english: 'cheese', emoji: '🧀' },
     kasra: { arabic: 'جِسم', transliteration: 'jism', english: 'body', emoji: '🧍' },
   }, examples: [
-    { arabic: 'جمل', transliteration: 'jamal', english: 'camel' },
-    { arabic: 'جبل', transliteration: 'jabal', english: 'mountain' },
+    { arabic: 'جمل', transliteration: 'jamal', english: 'camel', emoji: '🐫' },
+    { arabic: 'جبل', transliteration: 'jabal', english: 'mountain', emoji: '⛰️' },
   ] },
-  { id: 'haa', label: 'ح', name: 'Haa', transliteration: 'h', sound: 'h', forms: formsOf('ح'), similarShapeGroup: 'hook', phoneticCue: { sound: 'Ha', exampleWord: 'Hat' }, vowelExamples: {
+  { id: 'haa', label: 'ح', name: 'Haa', transliteration: 'h', sound: 'h', forms: formsOf('ح'), similarShapeGroup: 'hook', phoneticCue: { sound: 'Ha', exampleWord: 'Hat' }, positionExamples: {
+    isolated: { arabic: 'ح', transliteration: 'h', english: 'standing alone' },
+    initial: { arabic: 'حصان', transliteration: 'hisan', english: 'horse', emoji: '🐎' },
+    medial: { arabic: 'صحراء', transliteration: "sahra'", english: 'desert', emoji: '🏜️' },
+    final: { arabic: 'صباح', transliteration: 'sabah', english: 'morning', emoji: '🌅' },
+  }, vowelExamples: {
     fatha: { arabic: 'حَليب', transliteration: 'haleeb', english: 'milk', emoji: '🥛' },
     damma: { arabic: 'حُوت', transliteration: 'hoot', english: 'whale', emoji: '🐋' },
     kasra: { arabic: 'حِصان', transliteration: 'hisan', english: 'horse', emoji: '🐎' },
   }, examples: [
-    { arabic: 'حصان', transliteration: 'hisan', english: 'horse' },
-    { arabic: 'حليب', transliteration: 'haleeb', english: 'milk' },
+    { arabic: 'حصان', transliteration: 'hisan', english: 'horse', emoji: '🐎' },
+    { arabic: 'حليب', transliteration: 'haleeb', english: 'milk', emoji: '🥛' },
   ] },
-  { id: 'khaa', label: 'خ', name: 'Khaa', transliteration: 'kh', sound: 'kh', forms: formsOf('خ'), similarShapeGroup: 'hook', phoneticCue: { sound: 'Kha', exampleWord: 'Khaki' }, vowelExamples: {
+  { id: 'khaa', label: 'خ', name: 'Khaa', transliteration: 'kh', sound: 'kh', forms: formsOf('خ'), similarShapeGroup: 'hook', phoneticCue: { sound: 'Kha', exampleWord: 'Khaki' }, positionExamples: {
+    isolated: { arabic: 'خ', transliteration: 'kh', english: 'standing alone' },
+    initial: { arabic: 'خبز', transliteration: 'khubz', english: 'bread', emoji: '🍞' },
+    medial: { arabic: 'فخر', transliteration: 'fakhr', english: 'pride', emoji: '🏆' },
+    final: { arabic: 'مطبخ', transliteration: 'matbakh', english: 'kitchen', emoji: '🍳' },
+  }, vowelExamples: {
     fatha: { arabic: 'خَروف', transliteration: 'kharoof', english: 'sheep', emoji: '🐑' },
     damma: { arabic: 'خُبز', transliteration: 'khubz', english: 'bread', emoji: '🍞' },
     kasra: { arabic: 'خِيار', transliteration: 'khiyar', english: 'cucumber', emoji: '🥒' },
   }, examples: [
-    { arabic: 'خبز', transliteration: 'khubz', english: 'bread' },
-    { arabic: 'خروف', transliteration: 'kharoof', english: 'sheep' },
+    { arabic: 'خبز', transliteration: 'khubz', english: 'bread', emoji: '🍞' },
+    { arabic: 'خروف', transliteration: 'kharoof', english: 'sheep', emoji: '🐑' },
   ] },
-  { id: 'dal', label: 'د', name: 'Dal', transliteration: 'd', sound: 'd', forms: formsOf('د'), similarShapeGroup: 'dal', phoneticCue: { sound: 'Da', exampleWord: 'Dad' }, vowelExamples: {
+  { id: 'dal', label: 'د', name: 'Dal', transliteration: 'd', sound: 'd', forms: formsOf('د'), similarShapeGroup: 'dal', phoneticCue: { sound: 'Da', exampleWord: 'Dad' }, positionExamples: {
+    isolated: { arabic: 'د', transliteration: 'd', english: 'standing alone' },
+    initial: null,
+    medial: null,
+    final: { arabic: 'ولد', transliteration: 'walad', english: 'boy', emoji: '👦' },
+  }, vowelExamples: {
     fatha: { arabic: 'دَجاجة', transliteration: 'dajaja', english: 'chicken', emoji: '🐔' },
     damma: { arabic: 'دُب', transliteration: 'dubb', english: 'bear', emoji: '🐻' },
     kasra: { arabic: 'ديك', transliteration: 'deek', english: 'rooster', emoji: '🐓' },
   }, examples: [
-    { arabic: 'دار', transliteration: 'daar', english: 'house' },
-    { arabic: 'ديك', transliteration: 'deek', english: 'rooster' },
+    { arabic: 'دار', transliteration: 'daar', english: 'house', emoji: '🏠' },
+    { arabic: 'ديك', transliteration: 'deek', english: 'rooster', emoji: '🐓' },
   ] },
-  { id: 'dhaal', label: 'ذ', name: 'Dhal', transliteration: 'dh', sound: 'dh', forms: formsOf('ذ'), similarShapeGroup: 'dal', phoneticCue: { sound: 'Dha', exampleWord: 'That' }, vowelExamples: {
+  { id: 'dhaal', label: 'ذ', name: 'Dhal', transliteration: 'dh', sound: 'dh', forms: formsOf('ذ'), similarShapeGroup: 'dal', phoneticCue: { sound: 'Dha', exampleWord: 'That' }, positionExamples: {
+    isolated: { arabic: 'ذ', transliteration: 'dh', english: 'standing alone' },
+    initial: null,
+    medial: null,
+    final: { arabic: 'لذيذ', transliteration: 'latheedh', english: 'delicious', emoji: '😋' },
+  }, vowelExamples: {
     fatha: { arabic: 'ذَهب', transliteration: 'dhahab', english: 'gold', emoji: '🪙' },
     damma: { arabic: 'ذُباب', transliteration: 'dhubab', english: 'fly', emoji: '🪰' },
     kasra: { arabic: 'ذِئب', transliteration: "dhi'b", english: 'wolf', emoji: '🐺' },
   }, examples: [
-    { arabic: 'ذيل', transliteration: 'dhayl', english: 'tail' },
-    { arabic: 'ذهب', transliteration: 'dhahab', english: 'gold' },
+    { arabic: 'ذيل', transliteration: 'dhayl', english: 'tail', emoji: '🦎' },
+    { arabic: 'ذهب', transliteration: 'dhahab', english: 'gold', emoji: '🪙' },
   ] },
-  { id: 'ra', label: 'ر', name: 'Raa', transliteration: 'r', sound: 'r', forms: formsOf('ر'), similarShapeGroup: 'raa', phoneticCue: { sound: 'Ra', exampleWord: 'Rat' }, vowelExamples: {
+  { id: 'ra', label: 'ر', name: 'Raa', transliteration: 'r', sound: 'r', forms: formsOf('ر'), similarShapeGroup: 'raa', phoneticCue: { sound: 'Ra', exampleWord: 'Rat' }, positionExamples: {
+    isolated: { arabic: 'ر', transliteration: 'r', english: 'standing alone' },
+    initial: null,
+    medial: null,
+    final: { arabic: 'قمر', transliteration: 'qamar', english: 'moon', emoji: '🌙' },
+  }, vowelExamples: {
     fatha: { arabic: 'رَمل', transliteration: 'raml', english: 'sand', emoji: '🏖️' },
     damma: { arabic: 'رُمان', transliteration: 'rumman', english: 'pomegranate', emoji: '🍈' },
     kasra: { arabic: 'رِجل', transliteration: 'rijl', english: 'leg', emoji: '🦵' },
   }, examples: [
-    { arabic: 'رمل', transliteration: 'raml', english: 'sand' },
-    { arabic: 'ريح', transliteration: 'reeh', english: 'wind' },
+    { arabic: 'رمل', transliteration: 'raml', english: 'sand', emoji: '🏖️' },
+    { arabic: 'ريح', transliteration: 'reeh', english: 'wind', emoji: '💨' },
   ] },
-  { id: 'zaay', label: 'ز', name: 'Zay', transliteration: 'z', sound: 'z', forms: formsOf('ز'), similarShapeGroup: 'raa', phoneticCue: { sound: 'Za', exampleWord: 'Zap' }, vowelExamples: {
+  { id: 'zaay', label: 'ز', name: 'Zay', transliteration: 'z', sound: 'z', forms: formsOf('ز'), similarShapeGroup: 'raa', phoneticCue: { sound: 'Za', exampleWord: 'Zap' }, positionExamples: {
+    isolated: { arabic: 'ز', transliteration: 'z', english: 'standing alone' },
+    initial: null,
+    medial: null,
+    final: { arabic: 'خبز', transliteration: 'khubz', english: 'bread', emoji: '🍞' },
+  }, vowelExamples: {
     fatha: { arabic: 'زَهرة', transliteration: 'zahra', english: 'flower', emoji: '🌸' },
     damma: { arabic: 'زُبدة', transliteration: 'zubda', english: 'butter', emoji: '🧈' },
     kasra: { arabic: 'زِينة', transliteration: 'zeena', english: 'decoration', emoji: '🎀' },
   }, examples: [
-    { arabic: 'زيت', transliteration: 'zayt', english: 'oil' },
-    { arabic: 'زهرة', transliteration: 'zahra', english: 'flower' },
+    { arabic: 'زيت', transliteration: 'zayt', english: 'oil', emoji: '🫒' },
+    { arabic: 'زهرة', transliteration: 'zahra', english: 'flower', emoji: '🌸' },
   ] },
-  { id: 'seen', label: 'س', name: 'Seen', transliteration: 's', sound: 's', forms: formsOf('س'), similarShapeGroup: 'seen', phoneticCue: { sound: 'Sa', exampleWord: 'Sad' }, vowelExamples: {
+  { id: 'seen', label: 'س', name: 'Seen', transliteration: 's', sound: 's', forms: formsOf('س'), similarShapeGroup: 'seen', phoneticCue: { sound: 'Sa', exampleWord: 'Sad' }, positionExamples: {
+    isolated: { arabic: 'س', transliteration: 's', english: 'standing alone' },
+    initial: { arabic: 'سمك', transliteration: 'samak', english: 'fish', emoji: '🐟' },
+    medial: { arabic: 'مسجد', transliteration: 'masjid', english: 'mosque', emoji: '🕌' },
+    final: { arabic: 'شمس', transliteration: 'shams', english: 'sun', emoji: '☀️' },
+  }, vowelExamples: {
     fatha: { arabic: 'سَمك', transliteration: 'samak', english: 'fish', emoji: '🐟' },
     damma: { arabic: 'سُكر', transliteration: 'sukkar', english: 'sugar', emoji: '🍬' },
     kasra: { arabic: 'سِكين', transliteration: 'sikkeen', english: 'knife', emoji: '🔪' },
   }, examples: [
-    { arabic: 'سمك', transliteration: 'samak', english: 'fish' },
-    { arabic: 'سيارة', transliteration: 'sayyara', english: 'car' },
+    { arabic: 'سمك', transliteration: 'samak', english: 'fish', emoji: '🐟' },
+    { arabic: 'سيارة', transliteration: 'sayyara', english: 'car', emoji: '🚗' },
   ] },
-  { id: 'sheen', label: 'ش', name: 'Sheen', transliteration: 'sh', sound: 'sh', forms: formsOf('ش'), similarShapeGroup: 'seen', phoneticCue: { sound: 'Sha', exampleWord: 'Shark' }, vowelExamples: {
+  { id: 'sheen', label: 'ش', name: 'Sheen', transliteration: 'sh', sound: 'sh', forms: formsOf('ش'), similarShapeGroup: 'seen', phoneticCue: { sound: 'Sha', exampleWord: 'Shark' }, positionExamples: {
+    isolated: { arabic: 'ش', transliteration: 'sh', english: 'standing alone' },
+    initial: { arabic: 'شمس', transliteration: 'shams', english: 'sun', emoji: '☀️' },
+    medial: { arabic: 'عشرة', transliteration: 'ashara', english: 'ten', emoji: '🔟' },
+    final: { arabic: 'ريش', transliteration: 'reesh', english: 'feathers', emoji: '🪶' },
+  }, vowelExamples: {
     fatha: { arabic: 'شَمس', transliteration: 'shams', english: 'sun', emoji: '☀️' },
     damma: { arabic: 'شُجاع', transliteration: "shuja'", english: 'brave', emoji: '🦁' },
     kasra: { arabic: 'شِتاء', transliteration: "shita'", english: 'winter', emoji: '❄️' },
   }, examples: [
-    { arabic: 'شمس', transliteration: 'shams', english: 'sun' },
-    { arabic: 'شجرة', transliteration: 'shajara', english: 'tree' },
+    { arabic: 'شمس', transliteration: 'shams', english: 'sun', emoji: '☀️' },
+    { arabic: 'شجرة', transliteration: 'shajara', english: 'tree', emoji: '🌳' },
   ] },
-  { id: 'saad', label: 'ص', name: 'Saad', transliteration: 's', sound: 's', forms: formsOf('ص'), similarShapeGroup: 'saad', phoneticCue: { sound: 'Sa', exampleWord: 'Sun' }, vowelExamples: {
+  { id: 'saad', label: 'ص', name: 'Saad', transliteration: 's', sound: 's', forms: formsOf('ص'), similarShapeGroup: 'saad', phoneticCue: { sound: 'Sa', exampleWord: 'Sun' }, positionExamples: {
+    isolated: { arabic: 'ص', transliteration: 's', english: 'standing alone' },
+    initial: { arabic: 'صقر', transliteration: 'saqr', english: 'falcon', emoji: '🦅' },
+    medial: { arabic: 'بصل', transliteration: 'basal', english: 'onion', emoji: '🧅' },
+    final: { arabic: 'قميص', transliteration: 'qamees', english: 'shirt', emoji: '👕' },
+  }, vowelExamples: {
     fatha: { arabic: 'صَقر', transliteration: 'saqr', english: 'falcon', emoji: '🦅' },
     damma: { arabic: 'صُورة', transliteration: 'soora', english: 'picture', emoji: '🖼️' },
     kasra: { arabic: 'صِغير', transliteration: 'sagheer', english: 'small', emoji: '🤏' },
   }, examples: [
-    { arabic: 'صقر', transliteration: 'saqr', english: 'falcon' },
-    { arabic: 'صورة', transliteration: "soora", english: 'picture' },
+    { arabic: 'صقر', transliteration: 'saqr', english: 'falcon', emoji: '🦅' },
+    { arabic: 'صورة', transliteration: "soora", english: 'picture', emoji: '🖼️' },
   ] },
-  { id: 'daad', label: 'ض', name: 'Dhad', transliteration: 'dh', sound: 'dh', forms: formsOf('ض'), similarShapeGroup: 'saad', phoneticCue: { sound: 'Da', exampleWord: 'Dot' }, vowelExamples: {
+  { id: 'daad', label: 'ض', name: 'Dhad', transliteration: 'dh', sound: 'dh', forms: formsOf('ض'), similarShapeGroup: 'saad', phoneticCue: { sound: 'Da', exampleWord: 'Dot' }, positionExamples: {
+    isolated: { arabic: 'ض', transliteration: 'dh', english: 'standing alone' },
+    initial: { arabic: 'ضفدع', transliteration: "difda'", english: 'frog', emoji: '🐸' },
+    medial: { arabic: 'بيضة', transliteration: 'bayda', english: 'egg', emoji: '🥚' },
+    final: { arabic: 'بعض', transliteration: "ba'd", english: 'some', emoji: '🤏' },
+  }, vowelExamples: {
     fatha: { arabic: 'ضَوء', transliteration: "daw'", english: 'light', emoji: '💡' },
     damma: { arabic: 'ضُحى', transliteration: 'duha', english: 'morning', emoji: '🌄' },
     kasra: { arabic: 'ضِفدع', transliteration: "difda'", english: 'frog', emoji: '🐸' },
   }, examples: [
-    { arabic: 'ضفدع', transliteration: "difda'", english: 'frog' },
-    { arabic: 'ضوء', transliteration: "daw'", english: 'light' },
+    { arabic: 'ضفدع', transliteration: "difda'", english: 'frog', emoji: '🐸' },
+    { arabic: 'ضوء', transliteration: "daw'", english: 'light', emoji: '💡' },
   ] },
-  { id: 'taa2', label: 'ط', name: 'Taa', transliteration: 't', sound: 't', forms: formsOf('ط'), similarShapeGroup: 'taa2', phoneticCue: { sound: 'Ta', exampleWord: 'Top' }, vowelExamples: {
+  { id: 'taa2', label: 'ط', name: 'Taa', transliteration: 't', sound: 't', forms: formsOf('ط'), similarShapeGroup: 'taa2', phoneticCue: { sound: 'Ta', exampleWord: 'Top' }, positionExamples: {
+    isolated: { arabic: 'ط', transliteration: 't', english: 'standing alone' },
+    initial: { arabic: 'طاولة', transliteration: 'tawila', english: 'table', emoji: '🍽️' },
+    medial: { arabic: 'مطر', transliteration: 'matar', english: 'rain', emoji: '🌧️' },
+    final: { arabic: 'خط', transliteration: 'khatt', english: 'line', emoji: '✏️' },
+  }, vowelExamples: {
     fatha: { arabic: 'طاولة', transliteration: 'tawila', english: 'table', emoji: '🍽️' },
     damma: { arabic: 'طُول', transliteration: 'tool', english: 'height', emoji: '📏' },
     kasra: { arabic: 'طِفل', transliteration: 'tifl', english: 'child', emoji: '👶' },
   }, examples: [
-    { arabic: 'طائرة', transliteration: "ta'ira", english: 'airplane' },
-    { arabic: 'طاولة', transliteration: 'tawila', english: 'table' },
+    { arabic: 'طائرة', transliteration: "ta'ira", english: 'airplane', emoji: '✈️' },
+    { arabic: 'طاولة', transliteration: 'tawila', english: 'table', emoji: '🍽️' },
   ] },
-  { id: 'dhaa', label: 'ظ', name: 'Dhaa', transliteration: 'dh', sound: 'dh', forms: formsOf('ظ'), similarShapeGroup: 'taa2', phoneticCue: { sound: 'Dha', exampleWord: 'Then' }, vowelExamples: {
+  { id: 'dhaa', label: 'ظ', name: 'Dhaa', transliteration: 'dh', sound: 'dh', forms: formsOf('ظ'), similarShapeGroup: 'taa2', phoneticCue: { sound: 'Dha', exampleWord: 'Then' }, positionExamples: {
+    isolated: { arabic: 'ظ', transliteration: 'dh', english: 'standing alone' },
+    initial: { arabic: 'ظبي', transliteration: 'dhabee', english: 'deer', emoji: '🦌' },
+    medial: { arabic: 'نظارة', transliteration: 'nadhdhara', english: 'glasses', emoji: '👓' },
+    final: { arabic: 'حفظ', transliteration: 'hifdh', english: 'memorization', emoji: '🧠' },
+  }, vowelExamples: {
     fatha: { arabic: 'ظَبي', transliteration: 'dhabee', english: 'deer', emoji: '🦌' },
     damma: { arabic: 'ظُهر', transliteration: 'dhuhr', english: 'noon', emoji: '🕛' },
     kasra: { arabic: 'ظِل', transliteration: 'dhill', english: 'shadow', emoji: '🌑' },
   }, examples: [
-    { arabic: 'ظل', transliteration: 'dhill', english: 'shadow' },
-    { arabic: 'ظرف', transliteration: 'dharf', english: 'envelope' },
+    { arabic: 'ظل', transliteration: 'dhill', english: 'shadow', emoji: '🌑' },
+    { arabic: 'ظرف', transliteration: 'dharf', english: 'envelope', emoji: '✉️' },
   ] },
-  { id: 'ain', label: 'ع', name: 'Ayn', transliteration: 'a', sound: 'a', forms: formsOf('ع'), similarShapeGroup: 'ain', phoneticCue: { sound: 'A', exampleWord: 'Arm' }, vowelExamples: {
+  { id: 'ain', label: 'ع', name: 'Ayn', transliteration: 'a', sound: 'a', forms: formsOf('ع'), similarShapeGroup: 'ain', phoneticCue: { sound: 'A', exampleWord: 'Arm' }, positionExamples: {
+    isolated: { arabic: 'ع', transliteration: 'a', english: 'standing alone' },
+    initial: { arabic: 'عين', transliteration: 'ayn', english: 'eye', emoji: '👁️' },
+    medial: { arabic: 'شعر', transliteration: "sha'r", english: 'hair', emoji: '💇' },
+    final: { arabic: 'جمع', transliteration: "jam'", english: 'gathering', emoji: '👥' },
+  }, vowelExamples: {
     fatha: { arabic: 'عَين', transliteration: 'ayn', english: 'eye', emoji: '👁️' },
     damma: { arabic: 'عُصفور', transliteration: 'asfoor', english: 'bird', emoji: '🐦' },
     kasra: { arabic: 'عِلم', transliteration: 'ilm', english: 'knowledge', emoji: '📚' },
   }, examples: [
-    { arabic: 'عين', transliteration: 'ayn', english: 'eye' },
-    { arabic: 'عصفور', transliteration: 'asfoor', english: 'bird' },
+    { arabic: 'عين', transliteration: 'ayn', english: 'eye', emoji: '👁️' },
+    { arabic: 'عصفور', transliteration: 'asfoor', english: 'bird', emoji: '🐦' },
   ] },
-  { id: 'ghayn', label: 'غ', name: 'Ghayn', transliteration: 'gh', sound: 'gh', forms: formsOf('غ'), similarShapeGroup: 'ain', phoneticCue: { sound: 'Gha', exampleWord: 'Guard' }, vowelExamples: {
+  { id: 'ghayn', label: 'غ', name: 'Ghayn', transliteration: 'gh', sound: 'gh', forms: formsOf('غ'), similarShapeGroup: 'ain', phoneticCue: { sound: 'Gha', exampleWord: 'Guard' }, positionExamples: {
+    isolated: { arabic: 'غ', transliteration: 'gh', english: 'standing alone' },
+    initial: { arabic: 'غزال', transliteration: 'ghazal', english: 'gazelle', emoji: '🦌' },
+    medial: { arabic: 'صغير', transliteration: 'sagheer', english: 'small', emoji: '🤏' },
+    final: { arabic: 'فراغ', transliteration: 'faragh', english: 'empty space', emoji: '🕳️' },
+  }, vowelExamples: {
     fatha: { arabic: 'غَزال', transliteration: 'ghazal', english: 'gazelle', emoji: '🦌' },
     damma: { arabic: 'غُراب', transliteration: 'ghurab', english: 'crow', emoji: '🐦‍⬛' },
     kasra: { arabic: 'غِطاء', transliteration: "ghita'", english: 'cover', emoji: '🫙' },
   }, examples: [
-    { arabic: 'غزال', transliteration: 'ghazal', english: 'gazelle' },
-    { arabic: 'غيمة', transliteration: 'ghayma', english: 'cloud' },
+    { arabic: 'غزال', transliteration: 'ghazal', english: 'gazelle', emoji: '🦌' },
+    { arabic: 'غيمة', transliteration: 'ghayma', english: 'cloud', emoji: '☁️' },
   ] },
-  { id: 'faa', label: 'ف', name: 'Faa', transliteration: 'f', sound: 'f', forms: formsOf('ف'), similarShapeGroup: 'faa', phoneticCue: { sound: 'Fa', exampleWord: 'Fan' }, vowelExamples: {
+  { id: 'faa', label: 'ف', name: 'Faa', transliteration: 'f', sound: 'f', forms: formsOf('ف'), similarShapeGroup: 'faa', phoneticCue: { sound: 'Fa', exampleWord: 'Fan' }, positionExamples: {
+    isolated: { arabic: 'فَ', transliteration: 'fa', english: 'so, then', emoji: '➡️' },
+    initial: { arabic: 'فيل', transliteration: 'feel', english: 'elephant', emoji: '🐘' },
+    medial: { arabic: 'سفينة', transliteration: 'safeena', english: 'ship', emoji: '🚢' },
+    final: { arabic: 'أنف', transliteration: 'anf', english: 'nose', emoji: '👃' },
+  }, vowelExamples: {
     fatha: { arabic: 'فَراشة', transliteration: 'farasha', english: 'butterfly', emoji: '🦋' },
     damma: { arabic: 'فُستان', transliteration: 'fustan', english: 'dress', emoji: '👗' },
     kasra: { arabic: 'فيل', transliteration: 'feel', english: 'elephant', emoji: '🐘' },
   }, examples: [
-    { arabic: 'فيل', transliteration: 'feel', english: 'elephant' },
-    { arabic: 'فراشة', transliteration: 'farasha', english: 'butterfly' },
+    { arabic: 'فيل', transliteration: 'feel', english: 'elephant', emoji: '🐘' },
+    { arabic: 'فراشة', transliteration: 'farasha', english: 'butterfly', emoji: '🦋' },
   ] },
-  { id: 'qaaf', label: 'ق', name: 'Qaaf', transliteration: 'q', sound: 'q', forms: formsOf('ق'), similarShapeGroup: 'faa', phoneticCue: { sound: 'Qa', exampleWord: 'Cup' }, vowelExamples: {
+  { id: 'qaaf', label: 'ق', name: 'Qaaf', transliteration: 'q', sound: 'q', forms: formsOf('ق'), similarShapeGroup: 'faa', phoneticCue: { sound: 'Qa', exampleWord: 'Cup' }, positionExamples: {
+    isolated: { arabic: 'ق', transliteration: 'q', english: 'standing alone' },
+    initial: { arabic: 'قمر', transliteration: 'qamar', english: 'moon', emoji: '🌙' },
+    medial: { arabic: 'رقم', transliteration: 'raqam', english: 'number', emoji: '🔢' },
+    final: { arabic: 'طريق', transliteration: 'tareeq', english: 'road, path', emoji: '🛣️' },
+  }, vowelExamples: {
     fatha: { arabic: 'قَمر', transliteration: 'qamar', english: 'moon', emoji: '🌙' },
     damma: { arabic: 'قُطن', transliteration: 'qutn', english: 'cotton', emoji: '☁️' },
     kasra: { arabic: 'قِطة', transliteration: 'qitta', english: 'cat', emoji: '🐱' },
   }, examples: [
-    { arabic: 'قمر', transliteration: 'qamar', english: 'moon' },
-    { arabic: 'قطة', transliteration: 'qitta', english: 'cat' },
+    { arabic: 'قمر', transliteration: 'qamar', english: 'moon', emoji: '🌙' },
+    { arabic: 'قطة', transliteration: 'qitta', english: 'cat', emoji: '🐱' },
   ] },
-  { id: 'kaaf', label: 'ك', name: 'Kaaf', transliteration: 'k', sound: 'k', forms: formsOf('ك'), similarShapeGroup: 'kaaf', phoneticCue: { sound: 'Ka', exampleWord: 'Cat' }, vowelExamples: {
+  { id: 'kaaf', label: 'ك', name: 'Kaaf', transliteration: 'k', sound: 'k', forms: formsOf('ك'), similarShapeGroup: 'kaaf', phoneticCue: { sound: 'Ka', exampleWord: 'Cat' }, positionExamples: {
+    isolated: { arabic: 'كَ', transliteration: 'ka', english: 'like, as', emoji: '🪞' },
+    initial: { arabic: 'كتاب', transliteration: 'kitab', english: 'book', emoji: '📖' },
+    medial: { arabic: 'سكر', transliteration: 'sukkar', english: 'sugar', emoji: '🍬' },
+    final: { arabic: 'سمك', transliteration: 'samak', english: 'fish', emoji: '🐟' },
+  }, vowelExamples: {
     fatha: { arabic: 'كَلب', transliteration: 'kalb', english: 'dog', emoji: '🐶' },
     damma: { arabic: 'كُرة', transliteration: 'kura', english: 'ball', emoji: '⚽' },
     kasra: { arabic: 'كتاب', transliteration: 'kitab', english: 'book', emoji: '📖' },
   }, examples: [
-    { arabic: 'كتاب', transliteration: 'kitab', english: 'book' },
-    { arabic: 'كلب', transliteration: 'kalb', english: 'dog' },
+    { arabic: 'كتاب', transliteration: 'kitab', english: 'book', emoji: '📖' },
+    { arabic: 'كلب', transliteration: 'kalb', english: 'dog', emoji: '🐶' },
   ] },
-  { id: 'laam', label: 'ل', name: 'Laam', transliteration: 'l', sound: 'l', forms: formsOf('ل'), similarShapeGroup: 'laam', phoneticCue: { sound: 'La', exampleWord: 'Lamp' }, vowelExamples: {
+  { id: 'laam', label: 'ل', name: 'Laam', transliteration: 'l', sound: 'l', forms: formsOf('ل'), similarShapeGroup: 'laam', phoneticCue: { sound: 'La', exampleWord: 'Lamp' }, positionExamples: {
+    isolated: { arabic: 'لِ', transliteration: 'li', english: 'for, to', emoji: '👉' },
+    initial: { arabic: 'ليمون', transliteration: 'laymoon', english: 'lemon', emoji: '🍋' },
+    medial: { arabic: 'قلب', transliteration: 'qalb', english: 'heart', emoji: '❤️' },
+    final: { arabic: 'جمل', transliteration: 'jamal', english: 'camel', emoji: '🐫' },
+  }, vowelExamples: {
     fatha: { arabic: 'ليمون', transliteration: 'laymoon', english: 'lemon', emoji: '🍋' },
     damma: { arabic: 'لعبة', transliteration: "lu'ba", english: 'toy', emoji: '🧸' },
     kasra: { arabic: 'لِسان', transliteration: 'lisan', english: 'tongue', emoji: '👅' },
   }, examples: [
-    { arabic: 'ليمون', transliteration: 'laymoon', english: 'lemon' },
-    { arabic: 'لعبة', transliteration: "lu'ba", english: 'toy' },
+    { arabic: 'ليمون', transliteration: 'laymoon', english: 'lemon', emoji: '🍋' },
+    { arabic: 'لعبة', transliteration: "lu'ba", english: 'toy', emoji: '🧸' },
   ] },
-  { id: 'meem', label: 'م', name: 'Meem', transliteration: 'm', sound: 'm', forms: formsOf('م'), similarShapeGroup: 'meem', phoneticCue: { sound: 'Ma', exampleWord: 'Map' }, vowelExamples: {
+  { id: 'meem', label: 'م', name: 'Meem', transliteration: 'm', sound: 'm', forms: formsOf('م'), similarShapeGroup: 'meem', phoneticCue: { sound: 'Ma', exampleWord: 'Map' }, positionExamples: {
+    isolated: { arabic: 'م', transliteration: 'm', english: 'standing alone' },
+    initial: { arabic: 'موز', transliteration: 'mawz', english: 'banana', emoji: '🍌' },
+    medial: { arabic: 'قمر', transliteration: 'qamar', english: 'moon', emoji: '🌙' },
+    final: { arabic: 'قلم', transliteration: 'qalam', english: 'pen', emoji: '🖊️' },
+  }, vowelExamples: {
     fatha: { arabic: 'موز', transliteration: 'mawz', english: 'banana', emoji: '🍌' },
     damma: { arabic: 'مُمتاز', transliteration: 'mumtaz', english: 'excellent', emoji: '🌟' },
     kasra: { arabic: 'مفتاح', transliteration: 'miftah', english: 'key', emoji: '🔑' },
   }, examples: [
-    { arabic: 'موز', transliteration: 'mawz', english: 'banana' },
-    { arabic: 'مفتاح', transliteration: 'miftah', english: 'key' },
+    { arabic: 'موز', transliteration: 'mawz', english: 'banana', emoji: '🍌' },
+    { arabic: 'مفتاح', transliteration: 'miftah', english: 'key', emoji: '🔑' },
   ] },
-  { id: 'noon', label: 'ن', name: 'Noon', transliteration: 'n', sound: 'n', forms: formsOf('ن'), similarShapeGroup: 'teeth', phoneticCue: { sound: 'Na', exampleWord: 'Nap' }, vowelExamples: {
+  { id: 'noon', label: 'ن', name: 'Noon', transliteration: 'n', sound: 'n', forms: formsOf('ن'), similarShapeGroup: 'teeth', phoneticCue: { sound: 'Na', exampleWord: 'Nap' }, positionExamples: {
+    isolated: { arabic: 'ن', transliteration: 'n', english: 'standing alone' },
+    initial: { arabic: 'نجمة', transliteration: 'najma', english: 'star', emoji: '⭐' },
+    medial: { arabic: 'بنت', transliteration: 'bint', english: 'girl', emoji: '👧' },
+    final: { arabic: 'لبن', transliteration: 'laban', english: 'milk, yogurt', emoji: '🥛' },
+  }, vowelExamples: {
     fatha: { arabic: 'نجمة', transliteration: 'najma', english: 'star', emoji: '⭐' },
     damma: { arabic: 'نُور', transliteration: 'noor', english: 'light', emoji: '💡' },
     kasra: { arabic: 'نمر', transliteration: 'nimr', english: 'tiger', emoji: '🐯' },
   }, examples: [
-    { arabic: 'نجمة', transliteration: 'najma', english: 'star' },
-    { arabic: 'نمر', transliteration: 'nimr', english: 'tiger' },
+    { arabic: 'نجمة', transliteration: 'najma', english: 'star', emoji: '⭐' },
+    { arabic: 'نمر', transliteration: 'nimr', english: 'tiger', emoji: '🐯' },
   ] },
-  { id: 'heh', label: 'ه', name: 'Ha', transliteration: 'h', sound: 'h', forms: formsOf('ه'), similarShapeGroup: 'heh', phoneticCue: { sound: 'Ha', exampleWord: 'Home' }, vowelExamples: {
+  { id: 'heh', label: 'ه', name: 'Ha', transliteration: 'h', sound: 'h', forms: formsOf('ه'), similarShapeGroup: 'heh', phoneticCue: { sound: 'Ha', exampleWord: 'Home' }, positionExamples: {
+    isolated: { arabic: 'ه', transliteration: 'h', english: 'standing alone' },
+    initial: { arabic: 'هدية', transliteration: 'hadiya', english: 'gift', emoji: '🎁' },
+    medial: { arabic: 'فهد', transliteration: 'fahd', english: 'cheetah', emoji: '🐆' },
+    final: { arabic: 'وجه', transliteration: 'wajh', english: 'face', emoji: '🙂' },
+  }, vowelExamples: {
     fatha: { arabic: 'هدية', transliteration: 'hadiya', english: 'gift', emoji: '🎁' },
     damma: { arabic: 'هُدهد', transliteration: 'hudhud', english: 'hoopoe bird', emoji: '🐦' },
     kasra: { arabic: 'هلال', transliteration: 'hilal', english: 'crescent', emoji: '🌙' },
   }, examples: [
-    { arabic: 'هدية', transliteration: 'hadiya', english: 'gift' },
-    { arabic: 'هلال', transliteration: 'hilal', english: 'crescent' },
+    { arabic: 'هدية', transliteration: 'hadiya', english: 'gift', emoji: '🎁' },
+    { arabic: 'هلال', transliteration: 'hilal', english: 'crescent', emoji: '🌙' },
   ] },
-  { id: 'waaw', label: 'و', name: 'Waw', transliteration: 'w', sound: 'w', forms: formsOf('و'), similarShapeGroup: 'waaw', phoneticCue: { sound: 'Wa', exampleWord: 'Water' }, vowelExamples: {
+  { id: 'waaw', label: 'و', name: 'Waw', transliteration: 'w', sound: 'w', forms: formsOf('و'), similarShapeGroup: 'waaw', phoneticCue: { sound: 'Wa', exampleWord: 'Water' }, positionExamples: {
+    isolated: { arabic: 'وَ', transliteration: 'wa', english: 'and', emoji: '➕' },
+    initial: null,
+    medial: null,
+    final: { arabic: 'حلو', transliteration: 'hilw', english: 'sweet', emoji: '🍯' },
+  }, vowelExamples: {
     fatha: { arabic: 'وردة', transliteration: 'warda', english: 'rose', emoji: '🌹' },
     damma: { arabic: 'وُرود', transliteration: 'wurood', english: 'roses', emoji: '💐' },
     kasra: { arabic: 'وِسادة', transliteration: 'wisada', english: 'pillow', emoji: '🛏️' },
   }, examples: [
-    { arabic: 'وردة', transliteration: 'warda', english: 'rose' },
-    { arabic: 'ولد', transliteration: 'walad', english: 'boy' },
+    { arabic: 'وردة', transliteration: 'warda', english: 'rose', emoji: '🌹' },
+    { arabic: 'ولد', transliteration: 'walad', english: 'boy', emoji: '👦' },
   ] },
-  { id: 'yaa', label: 'ي', name: 'Yaa', transliteration: 'y', sound: 'y', forms: formsOf('ي'), similarShapeGroup: 'teeth', phoneticCue: { sound: 'Ya', exampleWord: 'Yard' }, vowelExamples: {
+  { id: 'yaa', label: 'ي', name: 'Yaa', transliteration: 'y', sound: 'y', forms: formsOf('ي'), similarShapeGroup: 'teeth', phoneticCue: { sound: 'Ya', exampleWord: 'Yard' }, positionExamples: {
+    isolated: { arabic: 'ي', transliteration: 'y', english: 'standing alone' },
+    initial: { arabic: 'يد', transliteration: 'yad', english: 'hand', emoji: '✋' },
+    medial: { arabic: 'بيت', transliteration: 'bayt', english: 'house', emoji: '🏠' },
+    final: { arabic: 'كرسي', transliteration: 'kursi', english: 'chair', emoji: '🪑' },
+  }, vowelExamples: {
     fatha: { arabic: 'يَد', transliteration: 'yad', english: 'hand', emoji: '✋' },
     damma: { arabic: 'يُوسف', transliteration: 'yousef', english: 'Joseph (name)', emoji: '👦' },
     kasra: { arabic: 'يِفهم', transliteration: 'yifhem', english: 'he understands', emoji: '🤔' },
   }, examples: [
-    { arabic: 'يد', transliteration: 'yad', english: 'hand' },
-    { arabic: 'يوم', transliteration: 'yawm', english: 'day' },
+    { arabic: 'يد', transliteration: 'yad', english: 'hand', emoji: '✋' },
+    { arabic: 'يوم', transliteration: 'yawm', english: 'day', emoji: '📅' },
   ] },
 ];
 
