@@ -8,6 +8,7 @@ import {
   useAudioRecorder,
   useAudioRecorderState,
 } from 'expo-audio';
+import { File } from 'expo-file-system';
 import { useEffect, useState } from 'react';
 import { Text, View, StyleSheet } from 'react-native';
 
@@ -16,11 +17,20 @@ import { AudioPlayButton } from '@/components/ui/AudioPlayButton';
 import { Button } from '@/components/ui/Button';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { adultTrackSizing, colors, radii, spacing } from '@/constants/theme';
+import { isUsingMockAiProvider } from '@/lib/ai';
+import { transcribeAudio } from '@/lib/ai/functionsClient';
+import { isAnyVariantSpeechMatch } from '@/lib/wordVariants';
 import { useWordAudioPlayer } from '@/hooks/useWordAudioPlayer';
 import type { ExerciseItem } from '@/types/exercises';
 
 type PermissionStage = 'checking' | 'needs-explanation' | 'requesting' | 'denied' | 'ready';
 type RecordingStage = 'idle' | 'recording' | 'recorded';
+// 'scoring' is only ever reached when a live AI provider is configured
+// (isUsingMockAiProvider is false) — see the module doc comment below for
+// why mock mode never attempts this.
+type CheckStage = 'idle' | 'checking' | 'correct' | 'incorrect' | 'exhausted' | 'check-failed';
+
+const MAX_ATTEMPTS = 3;
 
 interface SpeakingPracticeProps {
   exercise: ExerciseItem;
@@ -29,9 +39,20 @@ interface SpeakingPracticeProps {
 
 /**
  * Adult/teen track: hear the native word, record yourself saying it, play
- * your recording back to compare. No automated pronunciation scoring — this
- * is self-comparison only, so completing it (with or without a recording)
- * always counts as correct.
+ * your recording back to compare.
+ *
+ * Automated pronunciation scoring only runs when a live AI provider is
+ * configured (EXPO_PUBLIC_TALK_AI_MODE=live) — the same gate the "Talk to a
+ * Tunisian" voice input uses. Whisper (the model behind this app's STT) has
+ * no dedicated Tunisian Derja mode, so its accuracy here is genuinely
+ * unproven; in mock mode (the default, no AI provider configured) this falls
+ * back to the original self-comparison-only behavior, so the exercise still
+ * works out of the box. When scoring is active: up to 3 attempts, matched
+ * against any variant in the word group (not just the one played, mirroring
+ * how every other exercise type checks answers); a technical failure to
+ * reach the STT service never blocks progress, and running out of attempts
+ * still counts as correct — this is spoken self-practice, not a gate, so a
+ * likely recognition miss shouldn't cost mastery/spaced-repetition standing.
  */
 export function SpeakingPractice({ exercise, onComplete }: SpeakingPracticeProps) {
   const {
@@ -43,6 +64,8 @@ export function SpeakingPractice({ exercise, onComplete }: SpeakingPracticeProps
   } = useWordAudioPlayer(exercise.promptVariant, { autoPlay: true });
   const [permissionStage, setPermissionStage] = useState<PermissionStage>('checking');
   const [recordingStage, setRecordingStage] = useState<RecordingStage>('idle');
+  const [checkStage, setCheckStage] = useState<CheckStage>('idle');
+  const [attemptCount, setAttemptCount] = useState(0);
   const [isBusy, setIsBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -96,6 +119,7 @@ export function SpeakingPractice({ exercise, onComplete }: SpeakingPracticeProps
       }
       recordingPlayer.replace({ uri: recorder.uri });
       setRecordingStage('recorded');
+      setCheckStage('idle');
     } catch {
       setErrorMessage("Couldn't finish recording. Give it another try.");
       setRecordingStage('idle');
@@ -106,6 +130,7 @@ export function SpeakingPractice({ exercise, onComplete }: SpeakingPracticeProps
 
   const tryAgain = () => {
     setErrorMessage(null);
+    setCheckStage('idle');
     setRecordingStage('idle');
   };
 
@@ -114,6 +139,37 @@ export function SpeakingPractice({ exercise, onComplete }: SpeakingPracticeProps
       recordingPlayer.seekTo(0).then(() => recordingPlayer.play());
     } catch {
       setErrorMessage("Couldn't play that back — try recording again.");
+    }
+  };
+
+  const checkPronunciation = async () => {
+    if (!recorder.uri || isBusy) return;
+    setIsBusy(true);
+    setErrorMessage(null);
+    setCheckStage('checking');
+    try {
+      const file = new File(recorder.uri);
+      const bytes = await file.bytes();
+      const result = await transcribeAudio(bytes, 'audio/m4a');
+      if (!result.ok) {
+        setCheckStage('check-failed');
+        return;
+      }
+
+      const nextAttemptCount = attemptCount + 1;
+      setAttemptCount(nextAttemptCount);
+
+      if (isAnyVariantSpeechMatch(exercise.targetGroup, result.text)) {
+        setCheckStage('correct');
+      } else if (nextAttemptCount >= MAX_ATTEMPTS) {
+        setCheckStage('exhausted');
+      } else {
+        setCheckStage('incorrect');
+      }
+    } catch {
+      setCheckStage('check-failed');
+    } finally {
+      setIsBusy(false);
     }
   };
 
@@ -160,6 +216,9 @@ export function SpeakingPractice({ exercise, onComplete }: SpeakingPracticeProps
       </View>
     );
   }
+
+  const scoringActive = !isUsingMockAiProvider;
+  const isChecking = checkStage === 'checking';
 
   return (
     <View style={styles.container}>
@@ -209,10 +268,56 @@ export function SpeakingPractice({ exercise, onComplete }: SpeakingPracticeProps
         </View>
       ) : null}
 
+      {recordingStage === 'recorded' && scoringActive && checkStage === 'incorrect' ? (
+        <View style={styles.feedbackBanner}>
+          <Text style={styles.feedbackText}>Not quite — give it another try.</Text>
+          <Text style={styles.attemptText}>
+            Attempt {attemptCount} of {MAX_ATTEMPTS}
+          </Text>
+        </View>
+      ) : null}
+
+      {recordingStage === 'recorded' && scoringActive && checkStage === 'correct' ? (
+        <View style={[styles.feedbackBanner, styles.feedbackBannerCorrect]}>
+          <Text style={[styles.feedbackText, styles.feedbackTextCorrect]}>Nice! That sounds right.</Text>
+        </View>
+      ) : null}
+
+      {recordingStage === 'recorded' && scoringActive && checkStage === 'exhausted' ? (
+        <View style={styles.feedbackBanner}>
+          <Text style={styles.feedbackText}>No worries — here&apos;s how it&apos;s said.</Text>
+        </View>
+      ) : null}
+
+      {recordingStage === 'recorded' && scoringActive && checkStage === 'check-failed' ? (
+        <View style={styles.feedbackBanner}>
+          <Text style={styles.feedbackText}>Couldn&apos;t check that this time — you can keep going.</Text>
+        </View>
+      ) : null}
+
       {recordingStage === 'recorded' ? (
         <View style={styles.actionsRow}>
-          <Button label="Try again" variant="secondary" onPress={tryAgain} style={{ flex: 1 }} />
-          <Button label="Continue" onPress={() => onComplete(true)} style={{ flex: 1 }} />
+          {!scoringActive ? (
+            <>
+              <Button label="Try again" variant="secondary" onPress={tryAgain} style={{ flex: 1 }} />
+              <Button label="Continue" onPress={() => onComplete(true)} style={{ flex: 1 }} />
+            </>
+          ) : checkStage === 'idle' || checkStage === 'checking' ? (
+            <>
+              <Button label="Try again" variant="secondary" onPress={tryAgain} disabled={isChecking} style={{ flex: 1 }} />
+              <Button
+                label="Check pronunciation"
+                onPress={checkPronunciation}
+                loading={isChecking}
+                style={{ flex: 1 }}
+              />
+            </>
+          ) : checkStage === 'incorrect' ? (
+            <Button label="Record again" onPress={tryAgain} style={{ flex: 1 }} />
+          ) : (
+            // 'correct' | 'exhausted' | 'check-failed'
+            <Button label="Continue" onPress={() => onComplete(true)} style={{ flex: 1 }} />
+          )}
         </View>
       ) : null}
     </View>
@@ -269,5 +374,17 @@ const styles = StyleSheet.create({
   },
   playbackIcon: { fontSize: 20 },
   playbackLabel: { fontSize: 16, fontWeight: '600', color: colors.primary },
+  feedbackBanner: {
+    marginTop: spacing.lg,
+    width: '100%',
+    padding: spacing.md,
+    borderRadius: radii.md,
+    backgroundColor: '#FBEAE6',
+    alignItems: 'center',
+  },
+  feedbackBannerCorrect: { backgroundColor: '#E3F5EA' },
+  feedbackText: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
+  feedbackTextCorrect: { color: '#2E9F68' },
+  attemptText: { fontSize: 12, color: colors.textSecondary, marginTop: spacing.xs },
   actionsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xl, width: '100%' },
 });

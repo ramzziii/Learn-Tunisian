@@ -1,3 +1,4 @@
+import * as Haptics from 'expo-haptics';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -9,7 +10,7 @@ import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { colors, radii, shadows, spacing } from '@/constants/theme';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
 import { ARABIC_LETTERS, type ArabicLetter } from '@/lib/alphabet';
-import { getAlphabetProgress } from '@/lib/alphabetProgress';
+import { getAlphabetProgress, markLetterViewed } from '@/lib/alphabetProgress';
 import { useColumnWidth } from '@/hooks/useColumnWidth';
 
 const GRID_COLUMNS = 3;
@@ -18,6 +19,7 @@ export default function AlphabetScreen() {
   const { activeProfile } = useActiveProfile();
   const cardWidth = useColumnWidth(GRID_COLUMNS, spacing.lg, spacing.sm);
   const [practicedLetterIds, setPracticedLetterIds] = useState<string[]>([]);
+  const [viewedLetterIds, setViewedLetterIds] = useState<string[]>([]);
   const [selectedLetter, setSelectedLetter] = useState<ArabicLetter | null>(null);
 
   // Re-read local progress every time this screen regains focus (e.g. after
@@ -30,6 +32,7 @@ export default function AlphabetScreen() {
       getAlphabetProgress(activeProfile.id).then((data) => {
         if (cancelled) return;
         setPracticedLetterIds(data.practicedLetterIds);
+        setViewedLetterIds(data.viewedLetterIds);
       });
       return () => {
         cancelled = true;
@@ -37,8 +40,23 @@ export default function AlphabetScreen() {
     }, [activeProfile])
   );
 
+  // A letter counts as "accessed" for the grid's coloring if it's either
+  // been practiced through an exercise or just opened in the detail view —
+  // same "visited" idea the Diacritics screen's own letter picker uses.
+  // Kept separate from practicedLetterIds itself so completing a real
+  // exercise still means something distinct, but the grid and its counter
+  // reflect the broader signal a viewer actually sees colored in.
+  const accessedLetterIds = Array.from(new Set([...practicedLetterIds, ...viewedLetterIds]));
   const progressPercent =
-    ARABIC_LETTERS.length > 0 ? Math.round((practicedLetterIds.length / ARABIC_LETTERS.length) * 100) : 0;
+    ARABIC_LETTERS.length > 0 ? Math.round((accessedLetterIds.length / ARABIC_LETTERS.length) * 100) : 0;
+
+  const selectLetter = (letter: ArabicLetter) => {
+    Haptics.selectionAsync();
+    setSelectedLetter(letter);
+    if (!activeProfile || viewedLetterIds.includes(letter.id)) return;
+    setViewedLetterIds((prev) => [...prev, letter.id]);
+    markLetterViewed(activeProfile.id, letter.id);
+  };
 
   return (
     <ScreenContainer style={styles.screen}>
@@ -85,26 +103,25 @@ export default function AlphabetScreen() {
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionTitle}>Letters</Text>
           <Text style={styles.sectionCount}>
-            {practicedLetterIds.length}/{ARABIC_LETTERS.length}
+            {accessedLetterIds.length}/{ARABIC_LETTERS.length}
           </Text>
         </View>
 
         <View style={styles.grid}>
-          {ARABIC_LETTERS.map((letter) => (
-            <PressableScale
-              key={letter.id}
-              onPress={() => setSelectedLetter(letter)}
-              style={[
-                styles.letterCard,
-                { width: cardWidth },
-                practicedLetterIds.includes(letter.id) && styles.letterCardPracticed,
-              ]}
-            >
-              <Text style={styles.letter}>{letter.label}</Text>
-              <Text style={styles.letterName}>{letter.name}</Text>
-              <View style={[styles.underline, practicedLetterIds.includes(letter.id) && styles.underlineDone]} />
-            </PressableScale>
-          ))}
+          {ARABIC_LETTERS.map((letter) => {
+            const isAccessed = accessedLetterIds.includes(letter.id);
+            return (
+              <PressableScale
+                key={letter.id}
+                onPress={() => selectLetter(letter)}
+                style={[styles.letterCard, { width: cardWidth }, isAccessed && styles.letterCardPracticed]}
+              >
+                <Text style={styles.letter}>{letter.label}</Text>
+                <Text style={styles.letterName}>{letter.name}</Text>
+                <View style={[styles.underline, isAccessed && styles.underlineDone]} />
+              </PressableScale>
+            );
+          })}
         </View>
 
         <Button label="Learn the letters" onPress={() => router.push('/alphabet-practice')} style={styles.cta} />

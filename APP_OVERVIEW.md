@@ -183,11 +183,26 @@ Track is derived automatically from date of birth at profile-creation time
   - **Typing/spelling** — hear a word and its English meaning, type the
     transliteration.
   - **Speaking practice** — hear the native word, record yourself saying
-    it, play the recording back to compare. No automated pronunciation
-    scoring, by design. Microphone permission is requested only the first
-    time this exercise type is reached (with an explanation screen first),
-    and a denial is handled gracefully — the learner can still hear the
-    word and continue.
+    it, play the recording back to compare. Microphone permission is
+    requested only the first time this exercise type is reached (with an
+    explanation screen first), and a denial is handled gracefully — the
+    learner can still hear the word and continue.
+    Automated pronunciation scoring (via the same `talk-stt`
+    Whisper-backed function "Talk to a Tunisian" uses) only runs when a
+    live AI provider is configured (`EXPO_PUBLIC_TALK_AI_MODE=live`); in
+    mock mode — the default with no AI provider configured — this falls
+    back to the original self-comparison-only behavior, so the exercise
+    still works out of the box. Whisper has no dedicated Tunisian Derja
+    mode, so its accuracy on spoken Derja specifically is unproven; when
+    scoring is active the matching is deliberately lenient (fuzzy, and
+    accepting any variant in the word group — also_heard, either gender
+    form — same rule every other exercise type's answer-checking already
+    follows) precisely to reduce false "wrong" results from that
+    uncertainty. Up to 3 attempts; running out still counts as correct
+    rather than penalizing mastery/spaced-repetition, since this is spoken
+    self-practice, not a gate, and a miss here is as likely to be a
+    recognition quirk as an actual mispronunciation. A technical failure to
+    reach the STT service never blocks progress either.
 
 Both tracks pull from the same underlying `word_groups`/`word_variants`
 data — the adult track just unlocks more exercise *types* against the same
@@ -233,10 +248,21 @@ auto-hides when there's nowhere meaningful to go back to.
   (Flashcards, Speed Match, Diacritics), a grid of every letter (tapping one
   opens a detail modal), and a "Learn the letters" entry point.
 - Letter detail modal: audio (on-device TTS, no Supabase content needed for
-  this), the letter's four contextual forms (isolated/initial/medial/final,
-  derived by padding with U+0640 tatweel so the platform's own Arabic text
-  shaper draws the correct connected glyphs instead of hardcoded
-  presentation-form codepoints), and two example words with audio.
+  this); the letter's four contextual forms (shown Final/Medial/Initial/
+  Isolated, non-interactive — derived by padding with U+0640 tatweel so the
+  platform's own Arabic text shaper draws the correct connected glyphs
+  instead of hardcoded presentation-form codepoints); and, in the same
+  order, one real example word *per position* (`ArabicLetter.positionExamples`)
+  showing the letter actually occurring there — e.g. for ب: بيت (initial),
+  كبير (medial), باب (final), plus بِ ("with/by") for isolated. initial/medial
+  are `null` for the 6 non-connecting letters (dal/dhal/ra/zay/waw, and alif
+  which isn't quizzed here) since they only ever connect from the letter
+  before them, never to the one after, so those two shapes don't occur in
+  real Arabic — the UI skips those rows rather than fabricating an example.
+  isolated uses a genuine single-letter word/prefix (و "and", ف "so", ب
+  "with", ل "for", ك "as") for the letters that have one, and a "standing
+  alone" placeholder otherwise. Every position example is verified by a unit
+  test to actually start/end/contain the target letter as claimed.
 - `/alphabet-diacritics` — pick any letter from a grid of all 27, then see
   it vocalized with each of the three short vowels (e.g. ب → "Baa"/"Boo"/
   "Bee"), each tappable to hear it, alongside one example word per vowel.

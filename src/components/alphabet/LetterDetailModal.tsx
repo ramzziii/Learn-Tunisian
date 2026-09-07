@@ -1,9 +1,10 @@
-import { useEffect, useRef } from 'react';
+import * as Haptics from 'expo-haptics';
+import { useEffect, useRef, useState } from 'react';
 import { Animated, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { PressableScale } from '@/components/ui/PressableScale';
 import { colors, radii, shadows, spacing } from '@/constants/theme';
-import type { ArabicLetter } from '@/lib/alphabet';
+import { splitAtLetter, type ArabicLetter, type LetterPosition } from '@/lib/alphabet';
 import { useLetterSpeech } from '@/hooks/useLetterSpeech';
 
 interface LetterDetailModalProps {
@@ -11,9 +12,13 @@ interface LetterDetailModalProps {
   onClose: () => void;
 }
 
+const FORM_LABELS = ['Final', 'Medial', 'Initial', 'Isolated'] as const;
+
 export function LetterDetailModal({ letter, onClose }: LetterDetailModalProps) {
   const { speak, isSpeaking } = useLetterSpeech();
   const backdropAnim = useRef(new Animated.Value(0)).current;
+  const contentAnim = useRef(new Animated.Value(0)).current;
+  const [activeKey, setActiveKey] = useState<string | null>(null);
   const isVisible = letter !== null;
 
   useEffect(() => {
@@ -22,6 +27,22 @@ export function LetterDetailModal({ letter, onClose }: LetterDetailModalProps) {
     // in instantly behind the sliding sheet.
     Animated.timing(backdropAnim, { toValue: isVisible ? 1 : 0, duration: 200, useNativeDriver: true }).start();
   }, [isVisible, backdropAnim]);
+
+  useEffect(() => {
+    if (!isVisible) return;
+    contentAnim.setValue(0);
+    Animated.spring(contentAnim, { toValue: 1, useNativeDriver: true, speed: 16, bounciness: 8 }).start();
+  }, [letter?.id, isVisible, contentAnim]);
+
+  useEffect(() => {
+    if (!isSpeaking) setActiveKey(null);
+  }, [isSpeaking]);
+
+  const play = (key: string, text: string) => {
+    Haptics.selectionAsync();
+    setActiveKey(key);
+    speak(text);
+  };
 
   return (
     <Modal visible={isVisible} transparent animationType="slide" onRequestClose={onClose}>
@@ -34,38 +55,75 @@ export function LetterDetailModal({ letter, onClose }: LetterDetailModalProps) {
             </Pressable>
 
             <ScrollView showsVerticalScrollIndicator={false}>
-              <Text style={styles.bigLetter}>{letter.label}</Text>
-              <Text style={styles.letterName}>{letter.name}</Text>
-
-              <PressableScale
-                onPress={() => speak(letter.label)}
-                style={[styles.playButton, isSpeaking && styles.playButtonActive]}
+              <Animated.View
+                style={{
+                  opacity: contentAnim,
+                  transform: [{ scale: contentAnim.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1] }) }],
+                }}
               >
-                <Text style={styles.playIcon}>{isSpeaking ? '🔊' : '▶'}</Text>
-              </PressableScale>
+                <Text style={styles.bigLetter}>{letter.label}</Text>
+                <Text style={styles.letterName}>{letter.name}</Text>
+
+                <PressableScale
+                  onPress={() => play('letter', letter.label)}
+                  style={[styles.playButton, activeKey === 'letter' && styles.playButtonActive]}
+                >
+                  <Text style={styles.playIcon}>{activeKey === 'letter' ? '🔊' : '▶'}</Text>
+                </PressableScale>
+              </Animated.View>
 
               <Text style={styles.sectionLabel}>Letter Forms</Text>
               <View style={styles.formsRow}>
-                <FormBox label="Isolated" value={letter.forms.isolated} />
-                <FormBox label="Initial" value={letter.forms.initial} />
-                <FormBox label="Medial" value={letter.forms.medial} />
-                <FormBox label="Final" value={letter.forms.final} />
+                {FORM_LABELS.map((label) => {
+                  const value = letter.forms[label.toLowerCase() as 'isolated' | 'initial' | 'medial' | 'final'];
+                  return <FormBox key={label} label={label} value={value} />;
+                })}
               </View>
 
               <Text style={styles.sectionLabel}>Examples</Text>
-              {letter.examples.map((example) => (
-                <View key={example.arabic} style={styles.exampleRow}>
-                  <View style={styles.exampleText}>
-                    <Text style={styles.exampleArabic}>{example.arabic}</Text>
-                    <Text style={styles.exampleTransliteration}>
-                      {example.transliteration} · {example.english}
-                    </Text>
+              {FORM_LABELS.map((label) => {
+                const position = label.toLowerCase() as LetterPosition;
+                const example = letter.positionExamples[position];
+                // null for the 6 non-connecting letters' initial/medial slots
+                // — they only ever connect from the letter before them, never
+                // to the one after, so those two shapes don't occur in real
+                // Arabic and there's no example to fabricate.
+                if (!example) return null;
+
+                const key = `example-${position}`;
+                const isActive = activeKey === key;
+                const highlighted = splitAtLetter(example.arabic, letter);
+                return (
+                  <View key={position}>
+                    <Text style={styles.examplePositionLabel}>{label}</Text>
+                    <PressableScale
+                      onPress={() => play(key, example.arabic)}
+                      style={[styles.exampleRow, isActive && styles.exampleRowActive]}
+                    >
+                      <View style={styles.exampleEmojiBox}>
+                        <Text style={styles.exampleEmoji}>{example.emoji ?? '🔤'}</Text>
+                      </View>
+                      <View style={styles.exampleText}>
+                        <Text style={styles.exampleArabic}>
+                          {highlighted ? (
+                            <>
+                              {highlighted.before}
+                              <Text style={styles.exampleArabicHighlight}>{highlighted.match}</Text>
+                              {highlighted.after}
+                            </>
+                          ) : (
+                            example.arabic
+                          )}
+                        </Text>
+                        <Text style={styles.exampleTransliteration}>
+                          {example.transliteration} · {example.english}
+                        </Text>
+                      </View>
+                      <Text style={styles.exampleAudioIcon}>{isActive ? '🔊' : '🔈'}</Text>
+                    </PressableScale>
                   </View>
-                  <PressableScale onPress={() => speak(example.arabic)} style={styles.exampleAudioButton}>
-                    <Text style={styles.exampleAudioIcon}>🔊</Text>
-                  </PressableScale>
-                </View>
-              ))}
+                );
+              })}
             </ScrollView>
           </View>
         ) : null}
@@ -75,10 +133,14 @@ export function LetterDetailModal({ letter, onClose }: LetterDetailModalProps) {
 }
 
 function FormBox({ label, value }: { label: string; value: string }) {
+  // A plain View, not PressableScale — these are informational only (no tap,
+  // no sound), so no press feedback or active-state styling applies here.
   return (
-    <View style={styles.formBox}>
-      <Text style={styles.formValue}>{value}</Text>
-      <Text style={styles.formLabel}>{label}</Text>
+    <View style={styles.formBoxWrapper}>
+      <View style={styles.formBox}>
+        <Text style={styles.formValue}>{value}</Text>
+        <Text style={styles.formLabel}>{label}</Text>
+      </View>
     </View>
   );
 }
@@ -114,39 +176,58 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: spacing.md,
     marginBottom: spacing.lg,
+    ...shadows.card,
   },
   playButtonActive: { backgroundColor: colors.primaryDark },
   playIcon: { fontSize: 22, color: colors.textOnPrimary },
   sectionLabel: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.sm },
-  formsRow: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm, marginBottom: spacing.lg },
+  formsRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
+  formBoxWrapper: { flex: 1 },
   formBox: {
-    flex: 1,
-    borderRadius: radii.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderRadius: radii.md,
+    backgroundColor: colors.background,
     alignItems: 'center',
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.md,
   },
-  formValue: { fontSize: 22, color: colors.textPrimary },
-  formLabel: { fontSize: 10, color: colors.textSecondary, marginTop: spacing.xs },
+  formValue: { fontSize: 26, color: colors.textPrimary },
+  formLabel: { fontSize: 11, fontWeight: '600', color: colors.textSecondary, marginTop: spacing.xs },
+  examplePositionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
+    marginLeft: spacing.xs,
+  },
   exampleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    gap: spacing.sm,
+    backgroundColor: colors.background,
+    borderRadius: radii.md,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    padding: spacing.sm,
+    marginBottom: spacing.sm,
   },
-  exampleText: { flex: 1 },
-  exampleArabic: { fontSize: 20, color: colors.textPrimary },
-  exampleTransliteration: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
-  exampleAudioButton: {
+  exampleRowActive: { borderColor: colors.primary },
+  exampleEmojiBox: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.background,
+    borderRadius: radii.md,
+    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
+    ...shadows.card,
   },
+  exampleEmoji: { fontSize: 20 },
+  exampleText: { flex: 1 },
+  exampleArabic: { fontSize: 20, color: colors.textPrimary },
+  // No bold weight — a heavier weight renders visibly larger for this Arabic
+  // glyph shape even at an identical fontSize, which reads as "bigger" rather
+  // than just "different color" (same fix as the Flashcards screen).
+  exampleArabicHighlight: { fontSize: 20, color: colors.error, fontWeight: '400' },
+  exampleTransliteration: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
   exampleAudioIcon: { fontSize: 16 },
 });
