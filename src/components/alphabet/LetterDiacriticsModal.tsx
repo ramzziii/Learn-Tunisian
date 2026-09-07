@@ -252,7 +252,11 @@ const styles = StyleSheet.create({
   pictureEmoji: { fontSize: 24 },
   pictureTextColumn: { flexShrink: 1, minWidth: 0 },
   pictureCaption: { fontSize: 18, color: colors.textPrimary },
-  pictureCaptionHighlight: { fontWeight: '800' },
+  // No bold weight, explicit matching fontSize — a heavier weight renders
+  // visibly larger for this Arabic glyph shape even at an identical
+  // fontSize, which reads as "bigger" rather than just "different color"
+  // (same fix already applied on the Flashcards screen and Letters modal).
+  pictureCaptionHighlight: { fontSize: 18, fontWeight: '400' },
   meaningText: { fontSize: 12, color: colors.textSecondary, textTransform: 'capitalize', marginTop: 1 },
   pictureAudioHint: { fontSize: 13, marginLeft: 'auto', opacity: 0.6 },
 });
