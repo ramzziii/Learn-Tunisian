@@ -5,6 +5,7 @@ import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { BackButton } from '@/components/ui/BackButton';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { PressableScale } from '@/components/ui/PressableScale';
+import { Reveal } from '@/components/ui/Reveal';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { colors, radii, shadows, spacing } from '@/constants/theme';
 import { fetchWordGroupsForLesson } from '@/data/content';
@@ -41,20 +42,19 @@ export default function LessonWordList() {
         data={groups}
         keyExtractor={(g) => g.id}
         contentContainerStyle={{ gap: spacing.sm, paddingVertical: spacing.lg }}
-        renderItem={({ item }) => {
+        renderItem={({ item, index }) => {
           const display = getPrimaryVariant(item) ?? getMasculineVariant(item) ?? item.variants[0];
           return (
-            <PressableScale
-              style={[styles.row, shadows.card]}
-              onPress={() => router.push(`/word/${item.id}`)}
-            >
-              <View style={{ flex: 1 }}>
-                <Text style={styles.arabic}>{display?.wordArabic}</Text>
-                <Text style={styles.meaning}>{item.englishMeaning}</Text>
-              </View>
-              {favoriteIds.has(item.id) ? <Text style={styles.star}>⭐</Text> : null}
-              <Text style={styles.chevron}>›</Text>
-            </PressableScale>
+            <Reveal delay={Math.min(index * 40, 320)}>
+              <PressableScale haptic style={[styles.row, shadows.card]} onPress={() => router.push(`/word/${item.id}`)}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.arabic}>{display?.wordArabic}</Text>
+                  <Text style={styles.meaning}>{item.englishMeaning}</Text>
+                </View>
+                {favoriteIds.has(item.id) ? <Text style={styles.star}>⭐</Text> : null}
+                <Text style={styles.chevron}>›</Text>
+              </PressableScale>
+            </Reveal>
           );
         }}
       />

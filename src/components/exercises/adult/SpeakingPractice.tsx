@@ -9,14 +9,16 @@ import {
   useAudioRecorderState,
 } from 'expo-audio';
 import { File } from 'expo-file-system';
-import { useEffect, useState } from 'react';
-import { Text, View, StyleSheet } from 'react-native';
+import * as Haptics from 'expo-haptics';
+import { useEffect, useRef, useState } from 'react';
+import { Animated, Text, View, StyleSheet } from 'react-native';
 
 import { VariantCallout } from '@/components/exercises/shared/VariantCallout';
 import { AudioPlayButton } from '@/components/ui/AudioPlayButton';
 import { Button } from '@/components/ui/Button';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { adultTrackSizing, colors, radii, spacing } from '@/constants/theme';
+import { useAnswerFeedback } from '@/hooks/useAnswerFeedback';
 import { isUsingMockAiProvider } from '@/lib/ai';
 import { transcribeAudio } from '@/lib/ai/functionsClient';
 import { isAnyVariantSpeechMatch } from '@/lib/wordVariants';
@@ -73,6 +75,22 @@ export function SpeakingPractice({ exercise, onComplete }: SpeakingPracticeProps
   const recorderState = useAudioRecorderState(recorder, 100);
   const recordingPlayer = useAudioPlayer(null);
   const recordingPlayerStatus = useAudioPlayerStatus(recordingPlayer);
+  const { playCorrect, playIncorrect } = useAnswerFeedback();
+
+  // A slow breathing pulse on the record button while it's actively
+  // recording, so "live" is obvious at a glance rather than just a red dot.
+  const recordPulse = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (recordingStage !== 'recording') return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(recordPulse, { toValue: 1, duration: 700, useNativeDriver: true }),
+        Animated.timing(recordPulse, { toValue: 0, duration: 700, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [recordingStage, recordPulse]);
 
   useEffect(() => {
     getRecordingPermissionsAsync().then(({ status }) => {
@@ -99,6 +117,7 @@ export function SpeakingPractice({ exercise, onComplete }: SpeakingPracticeProps
       await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
       await recorder.prepareToRecordAsync();
       recorder.record();
+      Haptics.selectionAsync();
       setRecordingStage('recording');
     } catch {
       setErrorMessage("Couldn't start recording. Give it another try.");
@@ -118,6 +137,7 @@ export function SpeakingPractice({ exercise, onComplete }: SpeakingPracticeProps
         return;
       }
       recordingPlayer.replace({ uri: recorder.uri });
+      Haptics.selectionAsync();
       setRecordingStage('recorded');
       setCheckStage('idle');
     } catch {
@@ -160,10 +180,12 @@ export function SpeakingPractice({ exercise, onComplete }: SpeakingPracticeProps
       setAttemptCount(nextAttemptCount);
 
       if (isAnyVariantSpeechMatch(exercise.targetGroup, result.text)) {
+        playCorrect();
         setCheckStage('correct');
       } else if (nextAttemptCount >= MAX_ATTEMPTS) {
         setCheckStage('exhausted');
       } else {
+        playIncorrect();
         setCheckStage('incorrect');
       }
     } catch {
@@ -246,14 +268,18 @@ export function SpeakingPractice({ exercise, onComplete }: SpeakingPracticeProps
       ) : null}
 
       {recordingStage === 'recording' ? (
-        <PressableScale
-          onPress={stopRecording}
-          disabled={isBusy}
-          style={[styles.recordButton, styles.recordButtonActive]}
-          accessibilityLabel="Stop recording"
+        <Animated.View
+          style={{ transform: [{ scale: recordPulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] }) }] }}
         >
-          <View style={styles.stopSquare} />
-        </PressableScale>
+          <PressableScale
+            onPress={stopRecording}
+            disabled={isBusy}
+            style={[styles.recordButton, styles.recordButtonActive]}
+            accessibilityLabel="Stop recording"
+          >
+            <View style={styles.stopSquare} />
+          </PressableScale>
+        </Animated.View>
       ) : null}
       {recordingStage === 'recording' ? (
         <Text style={styles.recordingTime}>{(recorderState.durationMillis / 1000).toFixed(1)}s</Text>

@@ -6,6 +6,7 @@ import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { PressableScale } from '@/components/ui/PressableScale';
+import { Reveal } from '@/components/ui/Reveal';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { TALK_SCENARIOS } from '@/constants/talkScenarios';
 import { colors, radii, shadows, spacing } from '@/constants/theme';
@@ -81,32 +82,34 @@ export default function TalkScenarioPicker() {
         <Text style={styles.title}>Talk to a Tunisian 🇹🇳</Text>
         <Text style={styles.subtitle}>Choose a situation to practice a real conversation.</Text>
 
-        <View style={styles.levelBadge}>
+        <Reveal style={styles.levelBadge}>
           <Text style={styles.levelBadgeText}>
             {LEVEL_EMOJI[level]} Your level: {LEVEL_LABEL[level]}
           </Text>
-        </View>
+        </Reveal>
 
         <View style={styles.scenarioList}>
-          {TALK_SCENARIOS.map((scenario) => {
+          {TALK_SCENARIOS.map((scenario, index) => {
             const unlocked = meetsTalkLevel(level, scenario.minLevel);
             return (
-              <PressableScale
-                key={scenario.id}
-                disabled={!unlocked}
-                style={[styles.scenarioRow, shadows.card, !unlocked && styles.scenarioRowLocked]}
-                onPress={() => router.push(`/talk/${scenario.id}`)}
-              >
-                <Text style={styles.scenarioEmoji}>{unlocked ? scenario.emoji : '🔒'}</Text>
-                <View style={styles.scenarioTextColumn}>
-                  <Text style={styles.scenarioTitle} numberOfLines={1} maxFontSizeMultiplier={1.3}>
-                    {scenario.title}
-                  </Text>
-                  <Text style={styles.scenarioDescription} numberOfLines={2} maxFontSizeMultiplier={1.3}>
-                    {unlocked ? scenario.description : `Unlocks at ${LEVEL_LABEL[scenario.minLevel]} level`}
-                  </Text>
-                </View>
-              </PressableScale>
+              <Reveal key={scenario.id} delay={60 + Math.min(index * 40, 320)}>
+                <PressableScale
+                  haptic={unlocked}
+                  disabled={!unlocked}
+                  style={[styles.scenarioRow, shadows.card, !unlocked && styles.scenarioRowLocked]}
+                  onPress={() => router.push(`/talk/${scenario.id}`)}
+                >
+                  <Text style={styles.scenarioEmoji}>{unlocked ? scenario.emoji : '🔒'}</Text>
+                  <View style={styles.scenarioTextColumn}>
+                    <Text style={styles.scenarioTitle} numberOfLines={1} maxFontSizeMultiplier={1.3}>
+                      {scenario.title}
+                    </Text>
+                    <Text style={styles.scenarioDescription} numberOfLines={2} maxFontSizeMultiplier={1.3}>
+                      {unlocked ? scenario.description : `Unlocks at ${LEVEL_LABEL[scenario.minLevel]} level`}
+                    </Text>
+                  </View>
+                </PressableScale>
+              </Reveal>
             );
           })}
         </View>

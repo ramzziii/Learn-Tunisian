@@ -1,14 +1,27 @@
+import * as Haptics from 'expo-haptics';
 import { useRef } from 'react';
 import { Animated, Pressable, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
 
 interface PressableScaleProps extends Omit<PressableProps, 'style'> {
   style?: StyleProp<ViewStyle>;
   scaleTo?: number;
+  /** Fires a light selection haptic on press-in. Opt-in (not the default) so
+   * it doesn't double up with buttons that already fire their own semantic
+   * haptic (e.g. correct/incorrect answer feedback). */
+  haptic?: boolean;
   children: React.ReactNode;
 }
 
 /** A Pressable that gives tactile feedback — scales down slightly on press instead of just an opacity flicker. */
-export function PressableScale({ style, scaleTo = 0.96, children, onPressIn, onPressOut, ...props }: PressableScaleProps) {
+export function PressableScale({
+  style,
+  scaleTo = 0.96,
+  haptic = false,
+  children,
+  onPressIn,
+  onPressOut,
+  ...props
+}: PressableScaleProps) {
   const scale = useRef(new Animated.Value(1)).current;
 
   const animateTo = (value: number) =>
@@ -18,6 +31,7 @@ export function PressableScale({ style, scaleTo = 0.96, children, onPressIn, onP
     <Pressable
       onPressIn={(e) => {
         animateTo(scaleTo);
+        if (haptic) Haptics.selectionAsync();
         onPressIn?.(e);
       }}
       onPressOut={(e) => {

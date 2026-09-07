@@ -13,6 +13,24 @@ interface LetterDetailModalProps {
 }
 
 const FORM_LABELS = ['Final', 'Medial', 'Initial', 'Isolated'] as const;
+// Isolated is dropped from Examples (kept in Letter Forms above) — the other
+// three positions already show the letter connected within a real word.
+const EXAMPLE_LABELS = ['Final', 'Medial', 'Initial'] as const;
+
+// Same three-accent palette as LetterDiacriticsModal's ACCENT_BY_DIACRITIC,
+// so the two cards read as the same component family.
+const ACCENT_BY_POSITION: Record<LetterPosition, string> = {
+  final: colors.primary,
+  medial: colors.accent,
+  initial: colors.success,
+  isolated: colors.primary,
+};
+
+// Matches LetterDiacriticsModal's CARD_ROW_HEIGHT so the glyph box and the
+// example box line up — explicit height rather than flex-stretch, since
+// PressableScale applies its style to an inner Animated.View, not the
+// Pressable it renders, so a stretch on that style never reaches the row.
+const CARD_ROW_HEIGHT = 84;
 
 export function LetterDetailModal({ letter, onClose }: LetterDetailModalProps) {
   const { speak, isSpeaking } = useLetterSpeech();
@@ -81,7 +99,7 @@ export function LetterDetailModal({ letter, onClose }: LetterDetailModalProps) {
               </View>
 
               <Text style={styles.sectionLabel}>Examples</Text>
-              {FORM_LABELS.map((label) => {
+              {EXAMPLE_LABELS.map((label) => {
                 const position = label.toLowerCase() as LetterPosition;
                 const example = letter.positionExamples[position];
                 // null for the 6 non-connecting letters' initial/medial slots
@@ -93,34 +111,47 @@ export function LetterDetailModal({ letter, onClose }: LetterDetailModalProps) {
                 const key = `example-${position}`;
                 const isActive = activeKey === key;
                 const highlighted = splitAtLetter(example.arabic, letter);
+                const accent = ACCENT_BY_POSITION[position];
                 return (
-                  <View key={position}>
-                    <Text style={styles.examplePositionLabel}>{label}</Text>
-                    <PressableScale
-                      onPress={() => play(key, example.arabic)}
-                      style={[styles.exampleRow, isActive && styles.exampleRowActive]}
-                    >
-                      <View style={styles.exampleEmojiBox}>
-                        <Text style={styles.exampleEmoji}>{example.emoji ?? '🔤'}</Text>
-                      </View>
-                      <View style={styles.exampleText}>
-                        <Text style={styles.exampleArabic}>
-                          {highlighted ? (
-                            <>
-                              {highlighted.before}
-                              <Text style={styles.exampleArabicHighlight}>{highlighted.match}</Text>
-                              {highlighted.after}
-                            </>
-                          ) : (
-                            example.arabic
-                          )}
-                        </Text>
-                        <Text style={styles.exampleTransliteration}>
-                          {example.transliteration} · {example.english}
-                        </Text>
-                      </View>
-                      <Text style={styles.exampleAudioIcon}>{isActive ? '🔊' : '🔈'}</Text>
-                    </PressableScale>
+                  <View key={position} style={[styles.card, { borderLeftColor: accent }]}>
+                    <View style={styles.formGlyphBox}>
+                      <Text style={[styles.formGlyphText, { color: accent }]}>{letter.forms[position]}</Text>
+                      <Text style={styles.formGlyphLabel}>{label}</Text>
+                    </View>
+
+                    {/* A plain View here (not another PressableScale) so flex:1 actually
+                        expands within `card` — PressableScale applies the style it's given
+                        to an inner Animated.View two levels below the Pressable it renders,
+                        so a flex:1 passed to it never reaches the true flex child of the row. */}
+                    <View style={styles.contentBlock}>
+                      <PressableScale
+                        onPress={() => play(key, example.arabic)}
+                        style={[styles.exampleRow, isActive && { borderColor: accent }]}
+                      >
+                        <View style={styles.exampleEmojiBox}>
+                          <Text style={styles.exampleEmoji}>{example.emoji ?? '🔤'}</Text>
+                        </View>
+                        <View style={styles.exampleText}>
+                          <Text style={styles.exampleArabic} numberOfLines={1}>
+                            {highlighted ? (
+                              <>
+                                {highlighted.before}
+                                <Text style={[styles.exampleArabicHighlight, { color: accent }]}>
+                                  {highlighted.match}
+                                </Text>
+                                {highlighted.after}
+                              </>
+                            ) : (
+                              example.arabic
+                            )}
+                          </Text>
+                          <Text style={styles.exampleTransliteration} numberOfLines={1}>
+                            {example.transliteration} · {example.english}
+                          </Text>
+                        </View>
+                        <Text style={styles.exampleAudioIcon}>{isActive ? '🔊' : '🔈'}</Text>
+                      </PressableScale>
+                    </View>
                   </View>
                 );
               })}
@@ -191,43 +222,58 @@ const styles = StyleSheet.create({
   },
   formValue: { fontSize: 26, color: colors.textPrimary },
   formLabel: { fontSize: 11, fontWeight: '600', color: colors.textSecondary, marginTop: spacing.xs },
-  examplePositionLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    color: colors.textSecondary,
-    marginBottom: spacing.xs,
-    marginLeft: spacing.xs,
-  },
-  exampleRow: {
+  // Mirrors LetterDiacriticsModal's card row exactly (same box sizes, gaps,
+  // and font sizes as glyphButton/pictureRow) so the two modals' cards read
+  // as the same component family.
+  card: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
     backgroundColor: colors.background,
     borderRadius: radii.md,
-    borderWidth: 2,
-    borderColor: 'transparent',
+    borderLeftWidth: 4,
     padding: spacing.sm,
     marginBottom: spacing.sm,
   },
-  exampleRowActive: { borderColor: colors.primary },
-  exampleEmojiBox: {
-    width: 40,
-    height: 40,
-    borderRadius: radii.md,
-    backgroundColor: colors.surface,
+  formGlyphBox: {
+    width: 76,
+    height: CARD_ROW_HEIGHT,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    borderWidth: 2,
+    borderColor: 'transparent',
     ...shadows.card,
   },
-  exampleEmoji: { fontSize: 20 },
-  exampleText: { flex: 1 },
-  exampleArabic: { fontSize: 20, color: colors.textPrimary },
-  // No bold weight — a heavier weight renders visibly larger for this Arabic
-  // glyph shape even at an identical fontSize, which reads as "bigger" rather
-  // than just "different color" (same fix as the Flashcards screen).
-  exampleArabicHighlight: { fontSize: 20, color: colors.error, fontWeight: '400' },
-  exampleTransliteration: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
-  exampleAudioIcon: { fontSize: 16 },
+  formGlyphText: { fontSize: 30 },
+  formGlyphLabel: { fontSize: 10, color: colors.textSecondary, marginTop: 1 },
+  contentBlock: { flex: 1, minWidth: 0 },
+  exampleRow: {
+    height: CARD_ROW_HEIGHT,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    paddingHorizontal: spacing.sm,
+    ...shadows.card,
+  },
+  exampleEmojiBox: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
+  exampleEmoji: { fontSize: 24 },
+  exampleText: { flexShrink: 1, minWidth: 0 },
+  exampleArabic: { fontSize: 18, color: colors.textPrimary },
+  // No bold weight, explicit matching fontSize — a heavier weight renders
+  // visibly larger for this Arabic glyph shape even at an identical
+  // fontSize (same fix already applied on the Flashcards screen and Diacritics modal).
+  exampleArabicHighlight: { fontSize: 18, fontWeight: '400' },
+  exampleTransliteration: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    textTransform: 'capitalize',
+    marginTop: 1,
+  },
+  exampleAudioIcon: { fontSize: 13, marginLeft: 'auto', opacity: 0.6 },
 });

@@ -54,6 +54,7 @@ export function Button({ label, onPress, variant = 'primary', disabled, loading,
 
   return (
     <PressableScale
+      haptic
       accessibilityRole="button"
       accessibilityState={{ disabled: isDisabled }}
       onPress={onPress}

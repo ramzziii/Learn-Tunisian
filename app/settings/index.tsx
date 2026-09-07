@@ -6,6 +6,7 @@ import { TimeWheelPicker } from '@/components/onboarding/TimeWheelPicker';
 import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
+import { Reveal } from '@/components/ui/Reveal';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { SelectableCard } from '@/components/ui/SelectableCard';
 import { colors, radii, shadows, spacing } from '@/constants/theme';
@@ -137,13 +138,13 @@ export default function ProfileSettings() {
         <Text style={styles.title}>{activeProfile.name}&apos;s settings</Text>
 
         <Text style={styles.sectionTitle}>What they&apos;ve learned</Text>
-        <View style={styles.progressGrid}>
+        <Reveal style={styles.progressGrid}>
           <ProgressStat label="Learning" value={progressStats.wordsLearning} emoji="🌱" />
           <ProgressStat label="Mastered" value={progressStats.wordsMastered} emoji="⭐" />
           <ProgressStat label="Reviewed" value={progressStats.wordsReviewed} emoji="🔄" />
           <ProgressStat label="Words seen" value={progressStats.totalWordsSeen} emoji="👀" />
           <ProgressStat label="Lessons done" value={progressStats.lessonsCompleted} emoji="🏁" />
-        </View>
+        </Reveal>
 
         <Text style={styles.sectionTitle}>Vocabulary</Text>
         <Button label="View favorites" variant="secondary" onPress={() => router.push('/favorites')} />

@@ -1,4 +1,5 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { Animated, StyleSheet, Text, View } from 'react-native';
 
 import { PressableScale } from '@/components/ui/PressableScale';
 import { colors, radii, spacing } from '@/constants/theme';
@@ -19,16 +20,36 @@ export function AnswerFeedback({
   correctMeaning,
   onListenAgain,
 }: AnswerFeedbackProps) {
+  // This banner mounts fresh on every single answer in every lesson — by far
+  // the most-repeated moment in the app — so it gets a real spring entrance
+  // and a bouncy icon rather than just popping into place.
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const iconAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.spring(slideAnim, { toValue: 1, useNativeDriver: true, speed: 16, bounciness: 10 }).start();
+    Animated.spring(iconAnim, { toValue: 1, useNativeDriver: true, speed: 14, bounciness: 16, delay: 80 }).start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const bannerStyle = {
+    opacity: slideAnim,
+    transform: [{ translateY: slideAnim.interpolate({ inputRange: [0, 1], outputRange: [40, 0] }) }],
+  };
+  const iconStyle = { transform: [{ scale: iconAnim }] };
+
   if (isCorrect) {
     return (
-      <View style={[styles.banner, styles.correct]}>
+      <Animated.View style={[styles.banner, styles.correct, bannerStyle]}>
+        <Animated.Text style={[styles.icon, iconStyle]}>✅</Animated.Text>
         <Text style={styles.correctText}>Nice! That&apos;s correct.</Text>
-      </View>
+      </Animated.View>
     );
   }
 
   return (
-    <View style={[styles.banner, styles.incorrect]}>
+    <Animated.View style={[styles.banner, styles.incorrect, bannerStyle]}>
+      <Animated.Text style={[styles.icon, iconStyle]}>❌</Animated.Text>
       <Text style={styles.notQuiteText}>Not quite.</Text>
       {correctWordArabic ? (
         <View style={styles.wordRow}>
@@ -38,11 +59,11 @@ export function AnswerFeedback({
         </View>
       ) : null}
       {onListenAgain ? (
-        <PressableScale onPress={onListenAgain} style={styles.listenAgainButton}>
+        <PressableScale haptic onPress={onListenAgain} style={styles.listenAgainButton}>
           <Text style={styles.listenAgainText}>🔊 Listen again</Text>
         </PressableScale>
       ) : null}
-    </View>
+    </Animated.View>
   );
 }
 
@@ -59,6 +80,7 @@ const styles = StyleSheet.create({
   },
   correct: { backgroundColor: '#E3F5EA' },
   incorrect: { backgroundColor: '#FBEAE6' },
+  icon: { fontSize: 28, marginBottom: spacing.xs },
   correctText: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
   notQuiteText: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
   wordRow: { alignItems: 'center', marginTop: spacing.sm },
