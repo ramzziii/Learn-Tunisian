@@ -13,9 +13,20 @@ import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { colors, gradients, radii, shadows, spacing } from '@/constants/theme';
 import { fetchLessonMap, type UnitWithLessons } from '@/data/content';
 import { fetchDailyGoalSettings } from '@/data/profiles';
-import { fetchProgressSummary, fetchReviewDueCount, type ProfileProgressSummary } from '@/data/progress';
-import { fetchMinutesLearnedToday } from '@/data/sessionLogs';
+import {
+  fetchProgressSummary,
+  fetchReviewDueCount,
+  fetchTodayPracticeSummary,
+  type ProfileProgressSummary,
+  type TodayPracticeSummary,
+} from '@/data/progress';
+import { fetchMinutesLearnedToday, fetchRecentActivityDates } from '@/data/sessionLogs';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
+import { buildDailyChallenges, type DailyChallenge } from '@/lib/dailyChallenges';
+import { getTodayChallengeFlags } from '@/lib/dailyChallengeProgress';
+import { recommendNextStep } from '@/lib/nextStepRecommendation';
+import { buildProgressInsights, type ProgressInsights } from '@/lib/progressInsights';
+import { calculateStreak } from '@/lib/streak';
 import type { DailyGoalMinutes, LessonWithState } from '@/types/models';
 
 interface HomeData {
@@ -24,7 +35,12 @@ interface HomeData {
   minutesToday: number;
   goalMinutes: DailyGoalMinutes;
   progressSummary: ProfileProgressSummary;
+  todayPractice: TodayPracticeSummary;
+  streakDays: number;
+  dailyChallenges: DailyChallenge[];
 }
+
+const EMPTY_TODAY_PRACTICE: TodayPracticeSummary = { wordsPracticedToday: 0, wordsMasteredToday: 0 };
 
 function findContinueLesson(unitsWithLessons: UnitWithLessons[]): LessonWithState | null {
   const allLessons = unitsWithLessons.flatMap((u) => u.lessons);
@@ -56,14 +72,18 @@ export default function Home() {
     // whole screen with a misleading "couldn't load your lessons" message
     // when the lessons themselves loaded fine. Each just falls back to a
     // sensible default instead.
-    const [reviewDueCount, minutesToday, goalSettings, progressSummary] = await Promise.all([
-      fetchReviewDueCount(activeProfile.id).catch(() => 0),
-      fetchMinutesLearnedToday(activeProfile.id).catch(() => 0),
-      fetchDailyGoalSettings(activeProfile.id).catch(() => null),
-      fetchProgressSummary(activeProfile.id).catch(
-        () => ({ wordsLearning: 0, wordsMastered: 0, wordsReviewed: 0, totalWordsSeen: 0 }) satisfies ProfileProgressSummary
-      ),
-    ]);
+    const [reviewDueCount, minutesToday, goalSettings, progressSummary, todayPractice, activityDates, challengeFlags] =
+      await Promise.all([
+        fetchReviewDueCount(activeProfile.id).catch(() => 0),
+        fetchMinutesLearnedToday(activeProfile.id).catch(() => 0),
+        fetchDailyGoalSettings(activeProfile.id).catch(() => null),
+        fetchProgressSummary(activeProfile.id).catch(
+          () => ({ wordsLearning: 0, wordsMastered: 0, wordsReviewed: 0, totalWordsSeen: 0 }) satisfies ProfileProgressSummary
+        ),
+        fetchTodayPracticeSummary(activeProfile.id).catch(() => EMPTY_TODAY_PRACTICE),
+        fetchRecentActivityDates(activeProfile.id).catch(() => [] as string[]),
+        getTodayChallengeFlags(activeProfile.id).catch(() => ({ reviewCompleted: false, speakingCompleted: false })),
+      ]);
 
     setData({
       unitsWithLessons,
@@ -71,6 +91,14 @@ export default function Home() {
       minutesToday,
       goalMinutes: goalSettings?.dailyGoalMinutes ?? 5,
       progressSummary,
+      todayPractice,
+      streakDays: calculateStreak(activityDates),
+      dailyChallenges: buildDailyChallenges({
+        minutesToday,
+        wordsPracticedToday: todayPractice.wordsPracticedToday,
+        reviewCompletedToday: challengeFlags.reviewCompleted,
+        speakingCompletedToday: challengeFlags.speakingCompleted,
+      }),
     });
   }, [activeProfile]);
 
@@ -149,10 +177,30 @@ function HomeHeader({
   );
 }
 
-/** Adult/teen: goal progress, a primary "Continue Learning" action, review, a light progress teaser, then the full map. */
+/** Adult/teen: goal progress + streak, a "Learned today" recap, a weak-spot-aware
+ * "Continue Learning" action, review, a light progress teaser, then the full map. */
 function AdultHomeContent({ data }: { data: HomeData }) {
-  const { unitsWithLessons, reviewDueCount, minutesToday, goalMinutes, progressSummary } = data;
-  const continueLesson = findContinueLesson(unitsWithLessons);
+  const {
+    unitsWithLessons,
+    reviewDueCount,
+    minutesToday,
+    goalMinutes,
+    progressSummary,
+    todayPractice,
+    streakDays,
+    dailyChallenges,
+  } = data;
+
+  // The lesson recommendation is deliberately computed with reviewDueCount
+  // forced to 0 here — review already has its own dedicated card below, so
+  // this specifically picks which *lesson* to point "Continue Learning" at
+  // (the weakest unlocked one) rather than re-deciding review vs. lesson.
+  const allLessons = unitsWithLessons.flatMap((u) => u.lessons);
+  const progressInsights = buildProgressInsights(allLessons);
+  const recommendation = recommendNextStep(allLessons, 0);
+  const continueLesson = recommendation?.type === 'lesson' ? recommendation.lesson : findContinueLesson(unitsWithLessons);
+  const isWeakSpotPick = recommendation?.type === 'lesson' && recommendation.reason === 'weak_spot';
+
   const goalProgress = goalMinutes > 0 ? minutesToday / goalMinutes : 0;
   const goalReached = minutesToday >= goalMinutes;
 
@@ -162,19 +210,46 @@ function AdultHomeContent({ data }: { data: HomeData }) {
         <View style={[styles.goalCard, shadows.card]}>
           <View style={styles.goalHeaderRow}>
             <Text style={styles.goalLabel}>Today&apos;s goal</Text>
-            <Text style={styles.goalValue}>
-              {minutesToday} / {goalMinutes} min
-            </Text>
+            <View style={styles.goalHeaderRight}>
+              {streakDays > 0 ? (
+                <View style={styles.streakBadge}>
+                  <Text style={styles.streakBadgeText}>🔥 {streakDays}</Text>
+                </View>
+              ) : null}
+              <Text style={styles.goalValue}>
+                {minutesToday} / {goalMinutes} min
+              </Text>
+            </View>
           </View>
           <ProgressBar progress={goalProgress} gradientColors={goalReached ? gradients.success : gradients.primary} />
+          {goalReached ? (
+            <View style={styles.goalReachedBanner}>
+              <Text style={styles.goalReachedText}>🎉 Goal reached — nice work today!</Text>
+            </View>
+          ) : null}
           {continueLesson ? (
-            <Button
-              label="Continue Learning"
-              onPress={() => router.push(`/lesson/${continueLesson.id}`)}
-              style={{ marginTop: spacing.md }}
-            />
+            <>
+              <Button
+                label="Continue Learning"
+                onPress={() => router.push(`/lesson/${continueLesson.id}`)}
+                style={{ marginTop: spacing.md }}
+              />
+              {isWeakSpotPick ? (
+                <Text style={styles.recommendReason}>
+                  📍 Recommended — keep building up {continueLesson.title ?? continueLesson.unitName}
+                </Text>
+              ) : null}
+            </>
           ) : null}
         </View>
+      </Reveal>
+
+      <Reveal delay={30}>
+        <TodayRecapCard minutesToday={minutesToday} todayPractice={todayPractice} />
+      </Reveal>
+
+      <Reveal delay={45}>
+        <DailyChallengesCard challenges={dailyChallenges} />
       </Reveal>
 
       {reviewDueCount > 0 ? (
@@ -185,6 +260,9 @@ function AdultHomeContent({ data }: { data: HomeData }) {
 
       <Reveal delay={120}>
         <TalkToATunisianCard />
+      </Reveal>
+      <Reveal delay={150}>
+        <SpeakingPracticeCard />
       </Reveal>
       <Reveal delay={180}>
         <AlphabetPracticeCard />
@@ -199,6 +277,12 @@ function AdultHomeContent({ data }: { data: HomeData }) {
           <ProgressTeaser value={progressSummary.wordsMastered} label="mastered" />
         </View>
       </Reveal>
+
+      {progressInsights.focusArea || progressInsights.strongArea ? (
+        <Reveal delay={300}>
+          <ProgressInsightsCard insights={progressInsights} />
+        </Reveal>
+      ) : null}
 
       <LessonMap unitsWithLessons={unitsWithLessons} track="adult" />
     </>
@@ -270,6 +354,81 @@ function AlphabetPracticeCard() {
   );
 }
 
+function SpeakingPracticeCard() {
+  return (
+    <PressableScale haptic onPress={() => router.push('/speaking-practice')} style={[styles.alphabetCard, shadows.card]}>
+      <Text style={styles.alphabetCardEmoji}>🎙️</Text>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.alphabetCardTitle}>Speaking practice</Text>
+        <Text style={styles.alphabetCardSubtitle}>Say 5 phrases out loud</Text>
+      </View>
+      <Text style={styles.alphabetCardChevron}>›</Text>
+    </PressableScale>
+  );
+}
+
+/** A compact, always-4-item checklist of the day's micro-challenges — done
+ * items get a check and a strikethrough rather than disappearing, so
+ * progress stays visible through the whole day instead of the list
+ * shrinking as you go. */
+function DailyChallengesCard({ challenges }: { challenges: DailyChallenge[] }) {
+  const completedCount = challenges.filter((c) => c.isComplete).length;
+  const allComplete = completedCount === challenges.length;
+
+  return (
+    <View style={[styles.recapCard, shadows.card]}>
+      <View style={styles.challengesHeaderRow}>
+        <Text style={styles.recapTitle}>Today&apos;s challenges</Text>
+        <Text style={styles.challengesCount}>
+          {completedCount}/{challenges.length}
+        </Text>
+      </View>
+      {allComplete ? (
+        <Text style={styles.challengesAllDone}>🎉 All done for today — amazing!</Text>
+      ) : (
+        <View style={styles.challengesList}>
+          {challenges.map((challenge) => (
+            <View key={challenge.id} style={styles.challengeRow}>
+              <Text style={styles.challengeCheck}>{challenge.isComplete ? '✅' : challenge.emoji}</Text>
+              <Text style={[styles.challengeLabel, challenge.isComplete && styles.challengeLabelDone]}>
+                {challenge.label}
+              </Text>
+            </View>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
+/** Compact "which unit needs attention vs. which is going well" summary —
+ * omitted entirely by the caller when there's nothing yet to say (a
+ * brand-new profile with no started units), rather than rendering an empty
+ * or placeholder card. */
+function ProgressInsightsCard({ insights }: { insights: ProgressInsights }) {
+  return (
+    <View style={[styles.recapCard, shadows.card]}>
+      <Text style={styles.recapTitle}>Strengths &amp; gaps</Text>
+      {insights.focusArea ? (
+        <View style={styles.insightRow}>
+          <Text style={styles.insightEmoji}>🎯</Text>
+          <Text style={styles.insightText}>
+            Focus area: <Text style={styles.insightUnit}>{insights.focusArea.unitName}</Text> could use more practice
+          </Text>
+        </View>
+      ) : null}
+      {insights.strongArea ? (
+        <View style={styles.insightRow}>
+          <Text style={styles.insightEmoji}>💪</Text>
+          <Text style={styles.insightText}>
+            Going strong in <Text style={styles.insightUnit}>{insights.strongArea.unitName}</Text>
+          </Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 function CultureCornerCard() {
   return (
     <PressableScale haptic onPress={() => router.push('/culture')} style={[styles.alphabetCard, shadows.card]}>
@@ -280,6 +439,43 @@ function CultureCornerCard() {
       </View>
       <Text style={styles.alphabetCardChevron}>›</Text>
     </PressableScale>
+  );
+}
+
+/** Lightweight, always-visible "what you've learned today" recap — adapts
+ * its copy to whether anything's happened yet so it never reads as a nag. */
+function TodayRecapCard({
+  minutesToday,
+  todayPractice,
+}: {
+  minutesToday: number;
+  todayPractice: TodayPracticeSummary;
+}) {
+  const hasActivity = minutesToday > 0 || todayPractice.wordsPracticedToday > 0;
+
+  return (
+    <View style={[styles.recapCard, shadows.card]}>
+      <Text style={styles.recapTitle}>{hasActivity ? "Learned today" : 'Ready when you are'}</Text>
+      <Text style={styles.recapSubtitle}>
+        {hasActivity
+          ? "Nice work — here's what you've picked up today."
+          : "Your daily recap shows up here once you start a session."}
+      </Text>
+      <View style={styles.recapStatsRow}>
+        <RecapStat value={minutesToday} label={minutesToday === 1 ? 'minute' : 'minutes'} />
+        <RecapStat value={todayPractice.wordsPracticedToday} label="practiced" />
+        <RecapStat value={todayPractice.wordsMasteredToday} label="mastered" />
+      </View>
+    </View>
+  );
+}
+
+function RecapStat({ value, label }: { value: number; label: string }) {
+  return (
+    <View style={styles.recapStat}>
+      <Text style={styles.recapStatValue}>{value}</Text>
+      <Text style={styles.recapStatLabel}>{label}</Text>
+    </View>
   );
 }
 
@@ -396,7 +592,39 @@ const styles = StyleSheet.create({
   goalCard: { backgroundColor: colors.surface, borderRadius: radii.lg, padding: spacing.md, marginBottom: spacing.lg },
   goalHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
   goalLabel: { fontSize: 14, fontWeight: '700', color: colors.textSecondary },
+  goalHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  streakBadge: { backgroundColor: '#FFF1E0', borderRadius: radii.pill, paddingVertical: 2, paddingHorizontal: spacing.xs },
+  streakBadgeText: { fontSize: 13, fontWeight: '700', color: colors.accent },
   goalValue: { fontSize: 14, fontWeight: '700', color: colors.primaryDark },
+  goalReachedBanner: {
+    backgroundColor: '#EAF6EF',
+    borderRadius: radii.md,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    marginTop: spacing.sm,
+    alignItems: 'center',
+  },
+  goalReachedText: { fontSize: 13, fontWeight: '700', color: colors.success },
+  recommendReason: { fontSize: 12, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.sm },
+  recapCard: { backgroundColor: colors.surface, borderRadius: radii.lg, padding: spacing.md, marginBottom: spacing.lg },
+  recapTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
+  recapSubtitle: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
+  recapStatsRow: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.md },
+  recapStat: { alignItems: 'center', flex: 1 },
+  recapStatValue: { fontSize: 20, fontWeight: '800', color: colors.primaryDark },
+  recapStatLabel: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  challengesHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  challengesCount: { fontSize: 13, fontWeight: '700', color: colors.textSecondary },
+  challengesAllDone: { fontSize: 14, fontWeight: '700', color: colors.success, marginTop: spacing.sm },
+  challengesList: { marginTop: spacing.sm, gap: spacing.xs },
+  challengeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  challengeCheck: { fontSize: 16, width: 22, textAlign: 'center' },
+  challengeLabel: { fontSize: 14, color: colors.textPrimary, flex: 1 },
+  challengeLabelDone: { color: colors.textSecondary, textDecorationLine: 'line-through' },
+  insightRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginTop: spacing.sm },
+  insightEmoji: { fontSize: 16 },
+  insightText: { fontSize: 13, color: colors.textSecondary, flex: 1, lineHeight: 18 },
+  insightUnit: { fontWeight: '700', color: colors.textPrimary },
   progressTeaserRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.xl },
   progressTeaser: {
     flex: 1,

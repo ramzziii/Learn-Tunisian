@@ -1,5 +1,5 @@
 import { router, type Href } from 'expo-router';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Animated, StyleSheet, Text, View } from 'react-native';
 
 import { ExerciseRenderer } from '@/components/exercises/shared/ExerciseRenderer';
@@ -8,13 +8,21 @@ import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
-import { colors, spacing } from '@/constants/theme';
+import { colors, radii, spacing } from '@/constants/theme';
 import { recordWordGroupResult } from '@/data/progress';
 import { recordSessionLog } from '@/data/sessionLogs';
 import { useExerciseQueue } from '@/hooks/useExerciseQueue';
 import { useFadeInOnChange } from '@/hooks/useFadeInOnChange';
 import { useSessionTimer } from '@/hooks/useSessionTimer';
+import { masteryLabel, type MasteryLabel } from '@/lib/masteryStatus';
 import type { DailyGoalMinutes, SessionType, Track, WordGroupWithVariants } from '@/types/models';
+
+const MASTERY_BADGE_COLOR: Record<MasteryLabel, string> = {
+  New: colors.textSecondary,
+  Learning: colors.accent,
+  'Almost there': colors.primaryDark,
+  Mastered: colors.success,
+};
 
 interface SessionRunnerProps {
   groups: WordGroupWithVariants[];
@@ -26,6 +34,9 @@ interface SessionRunnerProps {
   emptyMessage: string;
   /** Where "Close" on the completion card and the exit button return to. Defaults to /home. */
   exitHref?: Href;
+  /** Fires once, the moment the session's time goal is reached (before the
+   * user necessarily taps Close) — e.g. for marking a daily challenge done. */
+  onComplete?: () => void;
 }
 
 /**
@@ -42,15 +53,40 @@ export function SessionRunner({
   sessionType,
   emptyMessage,
   exitHref,
+  onComplete,
 }: SessionRunnerProps) {
   const timer = useSessionTimer(goalMinutes);
   const { currentExercise, next } = useExerciseQueue(groups, track);
+
+  useEffect(() => {
+    if (timer.isComplete) onComplete?.();
+    // Deliberately fires only on the isComplete transition, not on every
+    // onComplete identity change — a fresh inline callback each render
+    // shouldn't re-trigger this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timer.isComplete]);
   const destination = exitHref ?? '/home';
   const fadeAnim = useFadeInOnChange(currentExercise?.key);
 
   const [stats, setStats] = useState({ correct: 0, incorrect: 0 });
   const practicedGroupIds = useRef(new Set<string>());
   const hasLoggedRef = useRef(false);
+
+  const [masteryBadge, setMasteryBadge] = useState<MasteryLabel | null>(null);
+  const badgeAnim = useRef(new Animated.Value(0)).current;
+
+  const showMasteryBadge = useCallback(
+    (label: MasteryLabel) => {
+      setMasteryBadge(label);
+      badgeAnim.setValue(0);
+      Animated.sequence([
+        Animated.timing(badgeAnim, { toValue: 1, duration: 180, useNativeDriver: true }),
+        Animated.delay(1100),
+        Animated.timing(badgeAnim, { toValue: 0, duration: 250, useNativeDriver: true }),
+      ]).start();
+    },
+    [badgeAnim]
+  );
 
   const handleAnswer = (wasCorrect: boolean) => {
     if (!currentExercise) return;
@@ -59,21 +95,26 @@ export function SessionRunner({
       correct: prev.correct + (wasCorrect ? 1 : 0),
       incorrect: prev.incorrect + (wasCorrect ? 0 : 1),
     }));
-    recordWordGroupResult(profileId, currentExercise.targetGroup.id, wasCorrect).catch(() => {
-      // Progress is best-effort in v1; a failed write shouldn't block the session.
-    });
+    recordWordGroupResult(profileId, currentExercise.targetGroup.id, wasCorrect)
+      .then((result) => showMasteryBadge(masteryLabel(result.correctCount)))
+      .catch(() => {
+        // Progress is best-effort in v1; a failed write shouldn't block the session.
+      });
     next();
   };
 
-  const logAndExit = useCallback(() => {
-    if (!hasLoggedRef.current && timer.elapsedSeconds > 0) {
-      hasLoggedRef.current = true;
-      recordSessionLog(profileId, sessionType, timer.elapsedSeconds).catch(() => {
-        // Best-effort — a failed log shouldn't block navigation.
-      });
-    }
-    router.replace(destination);
-  }, [destination, profileId, sessionType, timer.elapsedSeconds]);
+  const logAndExit = useCallback(
+    (to: Href = destination) => {
+      if (!hasLoggedRef.current && timer.elapsedSeconds > 0) {
+        hasLoggedRef.current = true;
+        recordSessionLog(profileId, sessionType, timer.elapsedSeconds).catch(() => {
+          // Best-effort — a failed log shouldn't block navigation.
+        });
+      }
+      router.replace(to);
+    },
+    [destination, profileId, sessionType, timer.elapsedSeconds]
+  );
 
   const handleExitPress = () => {
     if (timer.isComplete) {
@@ -82,7 +123,7 @@ export function SessionRunner({
     }
     Alert.alert('Leave this session?', "Your progress so far is saved, but you'll need to start a new session.", [
       { text: 'Keep going', style: 'cancel' },
-      { text: 'Leave', style: 'destructive', onPress: logAndExit },
+      { text: 'Leave', style: 'destructive', onPress: () => logAndExit() },
     ]);
   };
 
@@ -105,6 +146,26 @@ export function SessionRunner({
         </View>
       </View>
 
+      {/* Absolutely positioned so it never shifts the exercise below it —
+          a quick, subtle confirmation of that word's mastery, not a
+          blocking interruption. */}
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.masteryBadgeWrap,
+          {
+            opacity: badgeAnim,
+            transform: [{ translateY: badgeAnim.interpolate({ inputRange: [0, 1], outputRange: [-6, 0] }) }],
+          },
+        ]}
+      >
+        {masteryBadge ? (
+          <View style={[styles.masteryBadge, { backgroundColor: MASTERY_BADGE_COLOR[masteryBadge] }]}>
+            <Text style={styles.masteryBadgeText}>{masteryBadge}</Text>
+          </View>
+        ) : null}
+      </Animated.View>
+
       {currentExercise ? (
         <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
           <ExerciseRenderer exercise={currentExercise} onComplete={handleAnswer} />
@@ -120,8 +181,11 @@ export function SessionRunner({
           correctCount={stats.correct}
           incorrectCount={stats.incorrect}
           sessionType={sessionType}
-          onClose={logAndExit}
+          onClose={() => logAndExit()}
           onAddMore={(minutes) => timer.addMinutes(minutes)}
+          onReviewWeakWords={
+            sessionType !== 'review' && stats.incorrect > 0 ? () => logAndExit('/review') : undefined
+          }
         />
       ) : null}
     </ScreenContainer>
@@ -141,5 +205,8 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   closeIcon: { fontSize: 16, color: colors.textSecondary },
+  masteryBadgeWrap: { position: 'absolute', top: 56, right: spacing.lg, zIndex: 1 },
+  masteryBadge: { borderRadius: radii.pill, paddingVertical: 4, paddingHorizontal: spacing.sm },
+  masteryBadgeText: { fontSize: 11, fontWeight: '700', color: colors.textOnPrimary },
   emptyText: { fontSize: 16, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.xxl },
 });

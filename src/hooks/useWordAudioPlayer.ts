@@ -53,6 +53,12 @@ export function useWordAudioPlayer(
           setHasAudio(true);
           if (autoPlay) {
             await player.seekTo(0);
+            // Re-check after the await — if the effect's cleanup already ran
+            // (unmounted, or `variant`/`retryCount` changed again) while this
+            // was in flight, `player` has been released and calling .play()
+            // on it throws. cancelled being false here means we're still
+            // current.
+            if (cancelled) return;
             player.play();
           }
         } else if (variant.audioPath) {
@@ -72,7 +78,13 @@ export function useWordAudioPlayer(
 
   const play = useCallback(() => {
     if (!hasAudio) return;
-    player.seekTo(0).then(() => player.play());
+    // Same class of race as the autoPlay path above: if the screen unmounts
+    // between the tap and seekTo resolving, `player` may already be
+    // released — swallow that instead of crashing on a fire-and-forget play.
+    player
+      .seekTo(0)
+      .then(() => player.play())
+      .catch(() => {});
   }, [player, hasAudio]);
 
   const retry = useCallback(() => setRetryCount((count) => count + 1), []);

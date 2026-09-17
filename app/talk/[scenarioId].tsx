@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { File } from 'expo-file-system';
 import { useEffect, useRef, useState } from 'react';
@@ -242,12 +243,13 @@ export default function TalkConversation() {
           >
             {VOICE_INPUT_AVAILABLE && voiceRecorder.permission !== 'denied' ? (
               <PressableScale
+                haptic
                 onPress={handleMicPress}
                 disabled={isBusy}
                 style={styles.micButton}
                 accessibilityLabel="Record your reply"
               >
-                <Text style={styles.micIcon}>🎤</Text>
+                <Ionicons name="mic" size={20} color={colors.textOnPrimary} />
               </PressableScale>
             ) : null}
             <TextInput
@@ -269,7 +271,13 @@ export default function TalkConversation() {
           </Animated.View>
 
           {VOICE_INPUT_AVAILABLE ? (
-            <ListeningBar visible={voiceRecorder.isRecording} progress={recordingAnim} onCancel={handleMicCancel} onConfirm={handleMicPress} />
+            <ListeningBar
+              visible={voiceRecorder.isRecording}
+              progress={recordingAnim}
+              durationMillis={voiceRecorder.durationMillis}
+              onCancel={handleMicCancel}
+              onConfirm={handleMicPress}
+            />
           ) : null}
         </View>
       ) : null}
@@ -391,32 +399,59 @@ const WAVEFORM_BAR_COUNT = 5;
 /** The full-width "Listening…" pill the composer morphs into while
  * recording — a cancel (✕), an animated waveform + label, and a confirm
  * (✓) that stops recording and sends it for transcription. */
+function formatSeconds(durationMillis: number): string {
+  const totalSeconds = Math.floor(durationMillis / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
 function ListeningBar({
   visible,
   progress,
+  durationMillis,
   onCancel,
   onConfirm,
 }: {
   visible: boolean;
   progress: Animated.Value;
+  durationMillis: number;
   onCancel: () => void;
   onConfirm: () => void;
 }) {
-  const barAnims = useRef([...Array(WAVEFORM_BAR_COUNT)].map(() => new Animated.Value(0.35))).current;
-
+  // Each bar hops to its own random height on its own random cadence
+  // (rather than one shared fixed oscillation), so the waveform reads as
+  // reacting to live audio instead of visibly looping.
+  const barAnims = useRef([...Array(WAVEFORM_BAR_COUNT)].map(() => new Animated.Value(0.3))).current;
   useEffect(() => {
     if (!visible) return;
-    const loops = barAnims.map((anim, index) =>
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(anim, { toValue: 1, duration: 320 + index * 70, useNativeDriver: true }),
-          Animated.timing(anim, { toValue: 0.35, duration: 320 + index * 70, useNativeDriver: true }),
-        ])
-      )
-    );
-    loops.forEach((loop) => loop.start());
-    return () => loops.forEach((loop) => loop.stop());
+    let cancelled = false;
+    const hop = (anim: Animated.Value) => {
+      if (cancelled) return;
+      const target = 0.25 + Math.random() * 0.75;
+      const duration = 180 + Math.random() * 220;
+      Animated.timing(anim, { toValue: target, duration, useNativeDriver: true }).start(({ finished }) => {
+        if (finished) hop(anim);
+      });
+    };
+    barAnims.forEach(hop);
+    return () => {
+      cancelled = true;
+    };
   }, [visible, barAnims]);
+
+  const recDotAnim = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    if (!visible) return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(recDotAnim, { toValue: 0.3, duration: 600, useNativeDriver: true }),
+        Animated.timing(recDotAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [visible, recDotAnim]);
 
   return (
     <Animated.View
@@ -429,21 +464,32 @@ function ListeningBar({
         },
       ]}
     >
-      <PressableScale onPress={onCancel} style={styles.listeningSideButton} accessibilityLabel="Cancel recording">
-        <Text style={styles.listeningCancelIcon}>✕</Text>
+      <PressableScale
+        haptic
+        onPress={onCancel}
+        style={styles.listeningSideButton}
+        accessibilityLabel="Cancel recording"
+      >
+        <Ionicons name="close" size={18} color="rgba(255,255,255,0.85)" />
       </PressableScale>
 
       <View style={styles.listeningCenter}>
+        <Animated.View style={[styles.recDot, { opacity: recDotAnim }]} />
         <View style={styles.waveform}>
           {barAnims.map((anim, index) => (
             <Animated.View key={index} style={[styles.waveformBar, { transform: [{ scaleY: anim }] }]} />
           ))}
         </View>
-        <Text style={styles.listeningText}>Listening…</Text>
+        <Text style={styles.listeningText}>Listening… {formatSeconds(durationMillis)}</Text>
       </View>
 
-      <PressableScale onPress={onConfirm} style={styles.listeningConfirmButton} accessibilityLabel="Stop and send">
-        <Text style={styles.listeningConfirmIcon}>✓</Text>
+      <PressableScale
+        haptic
+        onPress={onConfirm}
+        style={styles.listeningConfirmButton}
+        accessibilityLabel="Stop and send"
+      >
+        <Ionicons name="checkmark" size={20} color={colors.textOnPrimary} />
       </PressableScale>
     </Animated.View>
   );
@@ -533,7 +579,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  micIcon: { fontSize: 18 },
   input: {
     flex: 1,
     borderWidth: 1.5,
@@ -569,12 +614,19 @@ const styles = StyleSheet.create({
     paddingLeft: spacing.md,
     paddingRight: spacing.xs,
   },
-  listeningSideButton: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
-  listeningCancelIcon: { fontSize: 16, color: 'rgba(255,255,255,0.85)', fontWeight: '600' },
+  listeningSideButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   listeningCenter: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
+  recDot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: colors.error },
   waveform: { flexDirection: 'row', alignItems: 'center', gap: 3, height: 18 },
   waveformBar: { width: 3, height: 18, borderRadius: 2, backgroundColor: colors.accent },
-  listeningText: { fontSize: 15, fontWeight: '600', color: '#FFFFFF' },
+  listeningText: { fontSize: 15, fontWeight: '600', color: '#FFFFFF', fontVariant: ['tabular-nums'] },
   listeningConfirmButton: {
     width: 40,
     height: 40,
@@ -583,7 +635,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  listeningConfirmIcon: { fontSize: 17, fontWeight: '700', color: colors.textOnPrimary },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
   centeredEmoji: { fontSize: 48 },
   centeredTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },

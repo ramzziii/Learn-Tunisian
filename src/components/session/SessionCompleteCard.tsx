@@ -17,12 +17,16 @@ interface SessionCompleteCardProps {
   sessionType: SessionType;
   onClose: () => void;
   onAddMore: (minutes: DailyGoalMinutes) => void;
+  /** Only offered when there's something to review — a completed review
+   * session doesn't offer to review itself again. */
+  onReviewWeakWords?: () => void;
 }
 
 /**
  * Every session's natural stopping point: a positive completion message with
- * exactly two choices, "Close" or "Add more time" — never an auto-advance
- * into more content.
+ * a clear, bounded set of choices — "Close", "Review weak words" (only when
+ * there's something worth reviewing), or "Continue learning" — never an
+ * auto-advance into more content.
  */
 export function SessionCompleteCard({
   minutesLearned,
@@ -32,9 +36,14 @@ export function SessionCompleteCard({
   sessionType,
   onClose,
   onAddMore,
+  onReviewWeakWords,
 }: SessionCompleteCardProps) {
   const pop = useRef(new Animated.Value(0)).current;
   const isReview = sessionType === 'review';
+  const totalAnswered = correctCount + incorrectCount;
+  // A light, honest encouragement line — only shown when there's enough
+  // signal to say something true (more right than wrong), not on every card.
+  const showsImproving = totalAnswered >= 3 && correctCount > incorrectCount;
 
   useEffect(() => {
     Animated.spring(pop, { toValue: 1, useNativeDriver: true, speed: 14, bounciness: 10 }).start();
@@ -60,11 +69,12 @@ export function SessionCompleteCard({
         <Text style={styles.subtitle}>
           {isReview ? 'Nice work keeping your Tunisian fresh.' : "You completed your learning for today."}
         </Text>
+        {showsImproving ? <Text style={styles.improvingText}>You&apos;re improving in this topic 📈</Text> : null}
 
         <View style={styles.statsRow}>
           <Stat value={minutesLearned} label={minutesLearned === 1 ? 'minute' : 'minutes'} />
           <Stat value={wordsCount} label={isReview ? 'reviewed' : 'practiced'} />
-          <Stat value={correctCount} label="correct" />
+          <Stat value={totalAnswered > 0 ? `${correctCount}/${totalAnswered}` : correctCount} label="correct" />
         </View>
         {incorrectCount > 0 ? (
           <Text style={styles.needsPractice}>
@@ -73,11 +83,19 @@ export function SessionCompleteCard({
         ) : null}
 
         <Button label="Close" onPress={onClose} style={{ marginTop: spacing.xl, width: '100%' }} />
+        {onReviewWeakWords ? (
+          <Button
+            label="Review weak words"
+            variant="secondary"
+            onPress={onReviewWeakWords}
+            style={{ marginTop: spacing.sm, width: '100%' }}
+          />
+        ) : null}
 
         <Text style={styles.addMoreLabel}>Want to keep going?</Text>
         <View style={styles.addMoreRow}>
           {ADD_MORE_OPTIONS.map((minutes) => (
-            <PressableScale key={minutes} style={styles.addMoreButton} onPress={() => onAddMore(minutes)}>
+            <PressableScale key={minutes} haptic style={styles.addMoreButton} onPress={() => onAddMore(minutes)}>
               <Text style={styles.addMoreButtonText}>+{minutes} min</Text>
             </PressableScale>
           ))}
@@ -87,7 +105,7 @@ export function SessionCompleteCard({
   );
 }
 
-function Stat({ value, label }: { value: number; label: string }) {
+function Stat({ value, label }: { value: number | string; label: string }) {
   return (
     <View style={styles.stat}>
       <Text style={styles.statValue}>{value}</Text>
@@ -122,6 +140,7 @@ const styles = StyleSheet.create({
   emoji: { fontSize: 48 },
   title: { fontSize: 26, fontWeight: '800', color: colors.textPrimary, marginTop: spacing.sm },
   subtitle: { fontSize: 15, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.sm },
+  improvingText: { fontSize: 13, fontWeight: '600', color: colors.success, textAlign: 'center', marginTop: spacing.xs },
   statsRow: { flexDirection: 'row', gap: spacing.lg, marginTop: spacing.lg },
   stat: { alignItems: 'center', minWidth: 56 },
   statValue: { fontSize: 22, fontWeight: '800', color: colors.primaryDark },

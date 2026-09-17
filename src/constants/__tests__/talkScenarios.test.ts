@@ -1,4 +1,4 @@
-import { findTalkScenario, TALK_SCENARIOS } from '@/constants/talkScenarios';
+import { findTalkScenario, sortScenariosByGoal, TALK_SCENARIOS } from '@/constants/talkScenarios';
 
 describe('TALK_SCENARIOS', () => {
   it('has at least the 5 scenarios the product spec calls for', () => {
@@ -18,6 +18,7 @@ describe('TALK_SCENARIOS', () => {
       expect(scenario.systemInstructions.length).toBeGreaterThan(0);
       expect(Array.isArray(scenario.targetVocabulary)).toBe(true);
       expect(['beginner', 'intermediate', 'advanced']).toContain(scenario.minLevel);
+      expect(scenario.relevantGoals.length).toBeGreaterThan(0);
     }
   });
 
@@ -57,5 +58,25 @@ describe('findTalkScenario', () => {
 
   it('returns undefined for an unknown id rather than throwing', () => {
     expect(findTalkScenario('not-a-real-scenario')).toBeUndefined();
+  });
+});
+
+describe('sortScenariosByGoal', () => {
+  it('moves goal-relevant scenarios first without dropping any', () => {
+    const sorted = sortScenariosByGoal(TALK_SCENARIOS, 'family');
+    expect(sorted).toHaveLength(TALK_SCENARIOS.length);
+    expect(sorted[0].relevantGoals).toContain('family');
+    expect(new Set(sorted.map((s) => s.id))).toEqual(new Set(TALK_SCENARIOS.map((s) => s.id)));
+  });
+
+  it('keeps relative order stable within the same relevance bucket', () => {
+    const sorted = sortScenariosByGoal(TALK_SCENARIOS, 'travel');
+    const relevantIds = sorted.filter((s) => s.relevantGoals.includes('travel')).map((s) => s.id);
+    const originalRelevantIds = TALK_SCENARIOS.filter((s) => s.relevantGoals.includes('travel')).map((s) => s.id);
+    expect(relevantIds).toEqual(originalRelevantIds);
+  });
+
+  it('returns the original order unchanged when there is no goal set', () => {
+    expect(sortScenariosByGoal(TALK_SCENARIOS, null)).toEqual(TALK_SCENARIOS);
   });
 });

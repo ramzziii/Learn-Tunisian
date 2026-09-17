@@ -8,7 +8,7 @@ import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Reveal } from '@/components/ui/Reveal';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
-import { TALK_SCENARIOS } from '@/constants/talkScenarios';
+import { sortScenariosByGoal, TALK_SCENARIOS } from '@/constants/talkScenarios';
 import { colors, radii, shadows, spacing } from '@/constants/theme';
 import { fetchTalkLevel } from '@/data/talkContext';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
@@ -89,8 +89,10 @@ export default function TalkScenarioPicker() {
         </Reveal>
 
         <View style={styles.scenarioList}>
-          {TALK_SCENARIOS.map((scenario, index) => {
+          {sortScenariosByGoal(TALK_SCENARIOS, activeProfile.learningGoal).map((scenario, index) => {
             const unlocked = meetsTalkLevel(level, scenario.minLevel);
+            const isRecommended =
+              activeProfile.learningGoal !== null && scenario.relevantGoals.includes(activeProfile.learningGoal);
             return (
               <Reveal key={scenario.id} delay={60 + Math.min(index * 40, 320)}>
                 <PressableScale
@@ -101,9 +103,16 @@ export default function TalkScenarioPicker() {
                 >
                   <Text style={styles.scenarioEmoji}>{unlocked ? scenario.emoji : '🔒'}</Text>
                   <View style={styles.scenarioTextColumn}>
-                    <Text style={styles.scenarioTitle} numberOfLines={1} maxFontSizeMultiplier={1.3}>
-                      {scenario.title}
-                    </Text>
+                    <View style={styles.scenarioTitleRow}>
+                      <Text style={styles.scenarioTitle} numberOfLines={1} maxFontSizeMultiplier={1.3}>
+                        {scenario.title}
+                      </Text>
+                      {unlocked && isRecommended ? (
+                        <View style={styles.recommendedBadge}>
+                          <Text style={styles.recommendedBadgeText}>For you</Text>
+                        </View>
+                      ) : null}
+                    </View>
                     <Text style={styles.scenarioDescription} numberOfLines={2} maxFontSizeMultiplier={1.3}>
                       {unlocked ? scenario.description : `Unlocks at ${LEVEL_LABEL[scenario.minLevel]} level`}
                     </Text>
@@ -143,7 +152,15 @@ const styles = StyleSheet.create({
   scenarioRowLocked: { opacity: 0.55 },
   scenarioEmoji: { fontSize: 32 },
   scenarioTextColumn: { flex: 1 },
+  scenarioTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   scenarioTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
+  recommendedBadge: {
+    backgroundColor: '#EAF6EF',
+    borderRadius: radii.pill,
+    paddingVertical: 2,
+    paddingHorizontal: spacing.xs,
+  },
+  recommendedBadgeText: { fontSize: 10, fontWeight: '700', color: colors.success },
   scenarioDescription: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
   unavailableContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm, padding: spacing.lg },
   unavailableEmoji: { fontSize: 48, marginBottom: spacing.sm },
