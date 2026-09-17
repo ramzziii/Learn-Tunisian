@@ -47,3 +47,8 @@ yarn-error.*
 
 # Supabase CLI local state (project link, etc.)
 supabase/.temp/
+
+# Claude Code plugin/skill installs that landed inside app/ rather than the
+# user-level ~/.claude/ — tooling config, not part of this app.
+/app/.claude/
+/app/skills-lock.json

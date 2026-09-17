@@ -57,6 +57,13 @@ export default function SignIn() {
         error={error}
       />
 
+      <Link
+        href="/auth/forgot-password"
+        style={{ alignSelf: 'flex-end', marginTop: -spacing.sm, marginBottom: spacing.md, color: colors.primary }}
+      >
+        Forgot password?
+      </Link>
+
       <Button label="Sign in" onPress={handleSignIn} loading={isSubmitting} disabled={!email || !password} />
 
       <Link href="/auth/sign-up" style={{ marginTop: spacing.lg, textAlign: 'center', color: colors.primary }}>

@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { File } from 'expo-file-system';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Animated, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
@@ -52,6 +52,19 @@ export default function TalkConversation() {
   const tutorSpeech = useTutorSpeech();
   const voiceRecorder = useVoiceRecorder();
   const spokenMessageIds = useRef(new Set<string>());
+
+  // 0 = idle composer showing, 1 = listening bar showing — crossfades the two
+  // rather than an instant swap, so tapping the mic feels like the composer
+  // morphing into the listening bar instead of one view replacing another.
+  const recordingAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.spring(recordingAnim, {
+      toValue: voiceRecorder.isRecording ? 1 : 0,
+      useNativeDriver: true,
+      speed: 18,
+      bounciness: 4,
+    }).start();
+  }, [voiceRecorder.isRecording, recordingAnim]);
 
   // Auto-play each new tutor turn once, as soon as it arrives — this is a
   // spoken conversation first, with text kept alongside for reading support.
@@ -134,6 +147,11 @@ export default function TalkConversation() {
     }
   };
 
+  const handleMicCancel = async () => {
+    setMicError(null);
+    await voiceRecorder.stop(); // discards the recording — never transcribed/sent
+  };
+
   const lastTutorMessage = [...messages].reverse().find((m): m is Extract<ConversationMessage, { role: 'tutor' }> => m.role === 'tutor');
   const isBusy = status === 'sending' || status === 'loading' || isTranscribing;
 
@@ -211,33 +229,48 @@ export default function TalkConversation() {
       ) : null}
 
       {status !== 'finished' ? (
-        <View style={styles.composer}>
-          {VOICE_INPUT_AVAILABLE && voiceRecorder.permission !== 'denied' ? (
-            <PressableScale
-              onPress={handleMicPress}
-              disabled={isBusy && !voiceRecorder.isRecording}
-              style={[styles.micButton, voiceRecorder.isRecording && styles.micButtonRecording]}
-              accessibilityLabel={voiceRecorder.isRecording ? 'Stop recording' : 'Record your reply'}
-            >
-              <Text style={styles.micIcon}>{voiceRecorder.isRecording ? '⏹' : '🎤'}</Text>
-            </PressableScale>
-          ) : null}
-          <TextInput
-            value={input}
-            onChangeText={setInput}
-            placeholder={voiceRecorder.isRecording ? `Recording… ${(voiceRecorder.durationMillis / 1000).toFixed(0)}s` : 'Type your reply…'}
-            placeholderTextColor={colors.textSecondary}
-            style={styles.input}
-            editable={!isBusy && !voiceRecorder.isRecording}
-            onSubmitEditing={() => input.trim() && handleSend(input)}
-          />
-          <PressableScale
-            onPress={() => input.trim() && handleSend(input)}
-            disabled={isBusy || !input.trim()}
-            style={[styles.sendButton, (isBusy || !input.trim()) && styles.sendButtonDisabled]}
+        <View style={styles.composerWrap}>
+          <Animated.View
+            pointerEvents={voiceRecorder.isRecording ? 'none' : 'auto'}
+            style={[
+              styles.composer,
+              {
+                opacity: recordingAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }),
+                transform: [{ scale: recordingAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0.96] }) }],
+              },
+            ]}
           >
-            <Text style={styles.sendIcon}>➤</Text>
-          </PressableScale>
+            {VOICE_INPUT_AVAILABLE && voiceRecorder.permission !== 'denied' ? (
+              <PressableScale
+                onPress={handleMicPress}
+                disabled={isBusy}
+                style={styles.micButton}
+                accessibilityLabel="Record your reply"
+              >
+                <Text style={styles.micIcon}>🎤</Text>
+              </PressableScale>
+            ) : null}
+            <TextInput
+              value={input}
+              onChangeText={setInput}
+              placeholder="Type your reply…"
+              placeholderTextColor={colors.textSecondary}
+              style={styles.input}
+              editable={!isBusy}
+              onSubmitEditing={() => input.trim() && handleSend(input)}
+            />
+            <PressableScale
+              onPress={() => input.trim() && handleSend(input)}
+              disabled={isBusy || !input.trim()}
+              style={[styles.sendButton, (isBusy || !input.trim()) && styles.sendButtonDisabled]}
+            >
+              <Text style={styles.sendIcon}>➤</Text>
+            </PressableScale>
+          </Animated.View>
+
+          {VOICE_INPUT_AVAILABLE ? (
+            <ListeningBar visible={voiceRecorder.isRecording} progress={recordingAnim} onCancel={handleMicCancel} onConfirm={handleMicPress} />
+          ) : null}
         </View>
       ) : null}
     </ScreenContainer>
@@ -353,6 +386,69 @@ function SuggestedReplyChip({
   );
 }
 
+const WAVEFORM_BAR_COUNT = 5;
+
+/** The full-width "Listening…" pill the composer morphs into while
+ * recording — a cancel (✕), an animated waveform + label, and a confirm
+ * (✓) that stops recording and sends it for transcription. */
+function ListeningBar({
+  visible,
+  progress,
+  onCancel,
+  onConfirm,
+}: {
+  visible: boolean;
+  progress: Animated.Value;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const barAnims = useRef([...Array(WAVEFORM_BAR_COUNT)].map(() => new Animated.Value(0.35))).current;
+
+  useEffect(() => {
+    if (!visible) return;
+    const loops = barAnims.map((anim, index) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(anim, { toValue: 1, duration: 320 + index * 70, useNativeDriver: true }),
+          Animated.timing(anim, { toValue: 0.35, duration: 320 + index * 70, useNativeDriver: true }),
+        ])
+      )
+    );
+    loops.forEach((loop) => loop.start());
+    return () => loops.forEach((loop) => loop.stop());
+  }, [visible, barAnims]);
+
+  return (
+    <Animated.View
+      pointerEvents={visible ? 'auto' : 'none'}
+      style={[
+        styles.listeningBar,
+        {
+          opacity: progress,
+          transform: [{ scale: progress.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1] }) }],
+        },
+      ]}
+    >
+      <PressableScale onPress={onCancel} style={styles.listeningSideButton} accessibilityLabel="Cancel recording">
+        <Text style={styles.listeningCancelIcon}>✕</Text>
+      </PressableScale>
+
+      <View style={styles.listeningCenter}>
+        <View style={styles.waveform}>
+          {barAnims.map((anim, index) => (
+            <Animated.View key={index} style={[styles.waveformBar, { transform: [{ scaleY: anim }] }]} />
+          ))}
+        </View>
+        <Text style={styles.listeningText}>Listening…</Text>
+      </View>
+
+      <PressableScale onPress={onConfirm} style={styles.listeningConfirmButton} accessibilityLabel="Stop and send">
+        <Text style={styles.listeningConfirmIcon}>✓</Text>
+      </PressableScale>
+    </Animated.View>
+  );
+}
+
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
   headerTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md },
@@ -423,7 +519,12 @@ const styles = StyleSheet.create({
   chipTextButton: { paddingVertical: spacing.xs, paddingHorizontal: spacing.sm },
   chipTunisian: { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
   chipEnglish: { fontSize: 11, color: colors.textSecondary },
-  composer: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center', paddingTop: spacing.sm },
+  // Both the idle composer and the listening bar occupy this same box —
+  // whichever is visible sets the height (the other stays laid out but
+  // invisible/non-interactive), which is what lets them crossfade in place
+  // instead of the layout jumping.
+  composerWrap: { position: 'relative', paddingTop: spacing.sm },
+  composer: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center' },
   micButton: {
     width: 44,
     height: 44,
@@ -432,7 +533,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  micButtonRecording: { backgroundColor: colors.error },
   micIcon: { fontSize: 18 },
   input: {
     flex: 1,
@@ -455,6 +555,35 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: { opacity: 0.4 },
   sendIcon: { fontSize: 18, color: colors.textOnPrimary },
+  listeningBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: spacing.sm,
+    height: 52,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: '#1C1C1E',
+    borderRadius: radii.pill,
+    paddingLeft: spacing.md,
+    paddingRight: spacing.xs,
+  },
+  listeningSideButton: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  listeningCancelIcon: { fontSize: 16, color: 'rgba(255,255,255,0.85)', fontWeight: '600' },
+  listeningCenter: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
+  waveform: { flexDirection: 'row', alignItems: 'center', gap: 3, height: 18 },
+  waveformBar: { width: 3, height: 18, borderRadius: 2, backgroundColor: colors.accent },
+  listeningText: { fontSize: 15, fontWeight: '600', color: '#FFFFFF' },
+  listeningConfirmButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  listeningConfirmIcon: { fontSize: 17, fontWeight: '700', color: colors.textOnPrimary },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
   centeredEmoji: { fontSize: 48 },
   centeredTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
