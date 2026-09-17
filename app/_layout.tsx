@@ -18,7 +18,13 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <AuthProvider>
         <ActiveProfileProvider>
-          <Stack screenOptions={{ headerShown: false }} />
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              animation: 'fade',
+              animationDuration: 220,
+            }}
+          />
         </ActiveProfileProvider>
       </AuthProvider>
     </SafeAreaProvider>
