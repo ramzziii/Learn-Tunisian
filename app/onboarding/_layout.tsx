@@ -5,7 +5,13 @@ import { OnboardingProvider } from '@/lib/onboarding/OnboardingContext';
 export default function OnboardingLayout() {
   return (
     <OnboardingProvider>
-      <Stack screenOptions={{ headerShown: false }} />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          animation: 'fade',
+          animationDuration: 220,
+        }}
+      />
     </OnboardingProvider>
   );
 }
