@@ -11,6 +11,7 @@ import { colors, spacing } from '@/constants/theme';
 import { fetchDailyGoalSettings } from '@/data/profiles';
 import { fetchReviewQueue } from '@/data/progress';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
+import { markReviewCompletedToday } from '@/lib/dailyChallengeProgress';
 import { prefetchLessonAudio } from '@/lib/offline/audioCache';
 import type { DailyGoalMinutes, WordGroupWithVariants } from '@/types/models';
 
@@ -64,6 +65,7 @@ export default function ReviewSession() {
       track={activeProfile.track}
       sessionType="review"
       emptyMessage="Nothing is due for review right now."
+      onComplete={() => markReviewCompletedToday(activeProfile.id)}
     />
   );
 }

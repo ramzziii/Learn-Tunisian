@@ -1,4 +1,4 @@
-import { sortReviewCandidates, type ReviewCandidate } from '@/lib/reviewSelection';
+import { isStruggling, sortReviewCandidates, type ReviewCandidate } from '@/lib/reviewSelection';
 
 function candidate(overrides: Partial<ReviewCandidate>): ReviewCandidate {
   return {
@@ -59,5 +59,17 @@ describe('sortReviewCandidates', () => {
 
   it('returns an empty array unchanged', () => {
     expect(sortReviewCandidates([])).toEqual([]);
+  });
+});
+
+describe('isStruggling', () => {
+  it('is false for zero or one consecutive miss', () => {
+    expect(isStruggling({ consecutiveIncorrect: 0 })).toBe(false);
+    expect(isStruggling({ consecutiveIncorrect: 1 })).toBe(false);
+  });
+
+  it('is true at two or more consecutive misses', () => {
+    expect(isStruggling({ consecutiveIncorrect: 2 })).toBe(true);
+    expect(isStruggling({ consecutiveIncorrect: 5 })).toBe(true);
   });
 });

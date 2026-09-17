@@ -5,6 +5,17 @@ export interface ReviewCandidate {
   correctCount: number;
 }
 
+/** Missed twice in a row counts as "struggling" — worth surfacing for
+ * review even before its scheduled next_review_at, so a repeated mistake
+ * doesn't have to wait out its full spaced-repetition interval before the
+ * learner sees it again (see fetchReviewQueue in src/data/progress.ts,
+ * which pulls these into the queue ahead of schedule). */
+export const STRUGGLING_STREAK_THRESHOLD = 2;
+
+export function isStruggling(candidate: Pick<ReviewCandidate, 'consecutiveIncorrect'>): boolean {
+  return candidate.consecutiveIncorrect >= STRUGGLING_STREAK_THRESHOLD;
+}
+
 /**
  * Orders already-due review candidates by the product's stated priority:
  * most overdue first, then most-recently-struggled-with, then lowest

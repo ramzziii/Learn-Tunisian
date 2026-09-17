@@ -1,4 +1,4 @@
-import { calculateMasteryStatus } from '@/lib/masteryStatus';
+import { calculateMasteryStatus, masteryLabel } from '@/lib/masteryStatus';
 
 describe('calculateMasteryStatus', () => {
   it('is "new" for a word_group with zero correct answers', () => {
@@ -20,5 +20,24 @@ describe('calculateMasteryStatus', () => {
 
   it('treats a negative count the same as zero (defensive, should not occur in practice)', () => {
     expect(calculateMasteryStatus(-1)).toBe('new');
+  });
+});
+
+describe('masteryLabel', () => {
+  it('is "New" for zero correct answers', () => {
+    expect(masteryLabel(0)).toBe('New');
+  });
+
+  it('is "Learning" for the first correct answer', () => {
+    expect(masteryLabel(1)).toBe('Learning');
+  });
+
+  it('is "Almost there" one correct answer away from mastered', () => {
+    expect(masteryLabel(2)).toBe('Almost there');
+  });
+
+  it('is "Mastered" at and above the mastery threshold', () => {
+    expect(masteryLabel(3)).toBe('Mastered');
+    expect(masteryLabel(10)).toBe('Mastered');
   });
 });
