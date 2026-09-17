@@ -242,7 +242,7 @@ auto-hides when there's nowhere meaningful to go back to.
 **Alphabet practice** (`app/alphabet*.tsx`, `src/lib/alphabet.ts`,
 `src/components/alphabet/`)
 - A separate, bite-sized (count-based, not time-based) practice mode
-  alongside the main vocabulary engine, covering the 27-letter Arabic
+  alongside the main vocabulary engine, covering the 28-letter Arabic
   alphabet plus the three short vowel diacritics (fatha/damma/kasra).
 - `/alphabet` — the library hub: overall progress %, three quick-link cards
   (Flashcards, Speed Match, Diacritics), a grid of every letter (tapping one
@@ -255,20 +255,22 @@ auto-hides when there's nowhere meaningful to go back to.
   order, one real example word *per position* (`ArabicLetter.positionExamples`)
   showing the letter actually occurring there — e.g. for ب: بيت (initial),
   كبير (medial), باب (final), plus بِ ("with/by") for isolated. initial/medial
-  are `null` for the 6 non-connecting letters (dal/dhal/ra/zay/waw, and alif
-  which isn't quizzed here) since they only ever connect from the letter
-  before them, never to the one after, so those two shapes don't occur in
-  real Arabic — the UI skips those rows rather than fabricating an example.
-  isolated uses a genuine single-letter word/prefix (و "and", ف "so", ب
-  "with", ل "for", ك "as") for the letters that have one, and a "standing
-  alone" placeholder otherwise. Every position example is verified by a unit
-  test to actually start/end/contain the target letter as claimed.
-- `/alphabet-diacritics` — pick any letter from a grid of all 27, then see
+  are `null` for the 6 non-connecting letters (alif/dal/dhal/ra/zay/waw)
+  since they only ever connect from the letter before them, never to the one
+  after, so those two shapes don't occur in real Arabic — the UI skips those
+  rows rather than fabricating an example. isolated uses a genuine
+  single-letter word/prefix (و "and", ف "so", ب "with", ل "for", ك "as") for
+  the letters that have one, and a "standing alone" placeholder otherwise.
+  Every position example is verified by a unit test to actually start/end/
+  contain the target letter as claimed. Alif is represented as أ (hamza
+  above), the actual consonant taught as the alphabet's first letter, not
+  the bare vowel-carrying ا.
+- `/alphabet-diacritics` — pick any letter from a grid of all 28, then see
   it vocalized with each of the three short vowels (e.g. ب → "Baa"/"Boo"/
   "Bee"), each tappable to hear it, alongside one example word per vowel.
   The friendly phonetic reading is derived from the letter's own
   transliteration (`buildVocalizedReading`) rather than authored per letter,
-  so it stays consistent; only the 81 example words (27 letters × 3 vowels)
+  so it stays consistent; only the 84 example words (28 letters × 3 vowels)
   are hand-authored (`ArabicLetter.vowelExamples`).
 - `/alphabet-practice` — a fixed-length (8-question) round cycling four
   exercise kinds: true/false listening, listen-and-choose (pick the letter

@@ -14,12 +14,28 @@ import {
   withFatha,
 } from '@/lib/alphabet';
 
+// The full 28-letter Arabic alphabet, in standard dictionary order — every
+// letter must be present exactly once, so a future edit can't silently drop
+// or duplicate one the way "haa" (ح) once went missing, or alif (أ) itself
+// was missing before it was added here.
+const EXPECTED_LETTER_LABELS = [
+  'أ', 'ب', 'ت', 'ث', 'ج', 'ح', 'خ', 'د', 'ذ', 'ر', 'ز', 'س', 'ش', 'ص', 'ض',
+  'ط', 'ظ', 'ع', 'غ', 'ف', 'ق', 'ك', 'ل', 'م', 'ن', 'ه', 'و', 'ي',
+];
+
 describe('alphabet data', () => {
+  it('covers every letter of the Arabic alphabet, with none missing or duplicated', () => {
+    expect(ARABIC_LETTERS).toHaveLength(EXPECTED_LETTER_LABELS.length);
+    expect(ARABIC_LETTERS.map((letter) => letter.label)).toEqual(EXPECTED_LETTER_LABELS);
+    expect(new Set(ARABIC_LETTERS.map((letter) => letter.id)).size).toBe(ARABIC_LETTERS.length);
+  });
+
   it('builds the primary Arabic letters for the learning module', () => {
     const letters = buildAlphabetSet();
 
     expect(letters.length).toBeGreaterThanOrEqual(10);
-    expect(letters[0]).toMatchObject({ id: 'baa', label: 'ب', name: 'Baa' });
+    expect(letters[0]).toMatchObject({ id: 'alif', label: 'أ', name: 'Alif' });
+    expect(letters.some((letter) => letter.id === 'baa')).toBe(true);
     expect(letters.some((letter) => letter.id === 'taa')).toBe(true);
     expect(letters.some((letter) => letter.id === 'jeem')).toBe(true);
     expect(letters.some((letter) => letter.id === 'haa')).toBe(true);
@@ -93,8 +109,9 @@ describe('alphabet data', () => {
     expect(buildVocalizedReading(getLetterById('baa')!, 'fatha')).toBe('Baa');
     expect(buildVocalizedReading(getLetterById('baa')!, 'damma')).toBe('Boo');
     expect(buildVocalizedReading(getLetterById('baa')!, 'kasra')).toBe('Bee');
-    // Ayn's transliteration is itself a vowel ("a"), so the consonant is dropped to avoid "Aaa".
+    // Ayn's and Alif's transliteration is itself a vowel ("a"), so the consonant is dropped to avoid "Aaa".
     expect(buildVocalizedReading(getLetterById('ain')!, 'fatha')).toBe('Aa');
+    expect(buildVocalizedReading(getLetterById('alif')!, 'fatha')).toBe('Aa');
   });
 
   it('builds all three vocalized forms for a letter, in fatha/damma/kasra order', () => {
@@ -142,11 +159,10 @@ describe('alphabet data', () => {
       expect(splitAtLetter(isolated.arabic, letter)).not.toBeNull();
       expect(final.arabic.endsWith(letter.label)).toBe(true);
 
-      // The 6 non-connecting letters (dal/dhal/ra/zay/waw, plus alif which
-      // this app doesn't quiz) never take an initial or medial shape — they
-      // only connect from the letter before them, never to the one after —
-      // so those two slots are null rather than a fabricated example.
-      const nonConnecting = ['dal', 'dhaal', 'ra', 'zaay', 'waaw'];
+      // The 6 non-connecting letters never take an initial or medial shape —
+      // they only connect from the letter before them, never to the one
+      // after — so those two slots are null rather than a fabricated example.
+      const nonConnecting = ['alif', 'dal', 'dhaal', 'ra', 'zaay', 'waaw'];
       if (nonConnecting.includes(letter.id)) {
         expect(initial).toBeNull();
         expect(medial).toBeNull();

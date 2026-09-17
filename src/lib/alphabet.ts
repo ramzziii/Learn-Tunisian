@@ -26,14 +26,13 @@ export type LetterPosition = 'isolated' | 'initial' | 'medial' | 'final';
 
 /**
  * One example word per position a letter can actually take within a word.
- * initial/medial are null for the 6 non-connecting letters (dal, dhal, ra,
- * zay, waw, and alif, which this app doesn't quiz as its own consonant) —
- * they only ever connect from the letter before them, never to the one
- * after, so those two shapes genuinely don't occur in real Arabic. isolated
- * is a real single-letter word/prefix (و "and", ف "so", ب "with", ل "for",
- * ك "as") for the handful of letters that have one; every other letter uses
- * a "standing alone" placeholder, since true isolated-form usage as a
- * complete word is otherwise rare to nonexistent.
+ * initial/medial are null for the 6 non-connecting letters (alif, dal, dhal,
+ * ra, zay, waw) — they only ever connect from the letter before them, never
+ * to the one after, so those two shapes genuinely don't occur in real
+ * Arabic. isolated is a real single-letter word/prefix (و "and", ف "so", ب
+ * "with", ل "for", ك "as") for the handful of letters that have one; every
+ * other letter uses a "standing alone" placeholder, since true isolated-form
+ * usage as a complete word is otherwise rare to nonexistent.
  */
 export type PositionExamples = {
   isolated: LetterExample;
@@ -99,12 +98,13 @@ const VOWEL_SUFFIX: Record<DiacriticId, string> = { fatha: 'aa', damma: 'oo', ka
 /**
  * A friendly phonetic spelling of a letter vocalized with one short vowel —
  * e.g. baa/boo/bee for ب — built from its transliteration rather than
- * authored per letter, so it stays consistent across all 27 letters.
- * ع (Ayn) is the one special case: its transliteration is itself a vowel
- * ("a"), so the consonant is dropped to avoid a doubled-up "aaa"/"aoo".
+ * authored per letter, so it stays consistent across all 28 letters.
+ * أ (Alif) and ع (Ayn) are the special cases: their transliteration is
+ * itself a vowel ("a"), so the consonant is dropped to avoid a doubled-up
+ * "aaa"/"aoo".
  */
 export function buildVocalizedReading(letter: ArabicLetter, diacriticId: DiacriticId): string {
-  const base = letter.id === 'ain' ? '' : letter.transliteration;
+  const base = letter.id === 'ain' || letter.id === 'alif' ? '' : letter.transliteration;
   const reading = base + VOWEL_SUFFIX[diacriticId];
   return reading.charAt(0).toUpperCase() + reading.slice(1);
 }
@@ -157,12 +157,36 @@ export function splitAtLetter(word: string, letter: ArabicLetter): HighlightedWo
   return { before: word.slice(0, index), match: word.slice(index, end), after: word.slice(end) };
 }
 
-// Pedagogical order matches how the letters are taught: the 6 non-connecting
-// letters (dal/dhal/raa/zaay/waw + alif, which isn't quizzed as its own
-// consonant) fall out of formsOf() naturally — they simply won't visually
-// change shape in the initial/medial slots, which is the linguistically
-// correct behavior, not a bug.
+// Pedagogical order matches how the letters are taught: alif (أ) leads the
+// alphabet, as usual. The 6 non-connecting letters (alif/dal/dhal/raa/zaay/
+// waw) fall out of formsOf() naturally — they simply won't visually change
+// shape in the initial/medial slots, which is the linguistically correct
+// behavior, not a bug.
+//
+// alif is represented here as أ (hamza above alif) rather than the bare
+// vowel-carrying ا — the bare form has no consonant sound of its own, while
+// أ is the actual glottal-stop consonant taught as the alphabet's first
+// letter. One real orthographic wrinkle: when this letter carries a kasra
+// (short "i"), standard spelling moves the hamza below the alif (إ) instead
+// of above — a different Unicode letter entirely. Since splitAtLetter()
+// matches on the exact glyph أ, the kasra vowelExample below is a real word
+// containing أ rather than one spelled with إ, same simplification the
+// diacritics screen already makes everywhere (its vocalized glyphs are a
+// pronunciation drill, not a claim about standard spelling).
 export const ARABIC_LETTERS: ArabicLetter[] = [
+  { id: 'alif', label: 'أ', name: 'Alif', transliteration: 'a', sound: 'a', forms: formsOf('أ'), similarShapeGroup: 'alif', phoneticCue: { sound: 'A', exampleWord: 'Apple' }, positionExamples: {
+    isolated: { arabic: 'أ', transliteration: 'a', english: 'standing alone' },
+    initial: null,
+    medial: null,
+    final: { arabic: 'خطأ', transliteration: "khata'", english: 'mistake', emoji: '❌' },
+  }, vowelExamples: {
+    fatha: { arabic: 'أرنب', transliteration: 'arnab', english: 'rabbit', emoji: '🐰' },
+    damma: { arabic: 'أذن', transliteration: 'udhun', english: 'ear', emoji: '👂' },
+    kasra: { arabic: 'فأر', transliteration: "fa'r", english: 'mouse', emoji: '🐭' },
+  }, examples: [
+    { arabic: 'أرنب', transliteration: 'arnab', english: 'rabbit', emoji: '🐰' },
+    { arabic: 'أسد', transliteration: 'asad', english: 'lion', emoji: '🦁' },
+  ] },
   { id: 'baa', label: 'ب', name: 'Baa', transliteration: 'b', sound: 'b', forms: formsOf('ب'), similarShapeGroup: 'teeth', phoneticCue: { sound: 'Ba', exampleWord: 'Bank' }, positionExamples: {
     isolated: { arabic: 'بِ', transliteration: 'bi', english: 'with, by', emoji: '🤝' },
     initial: { arabic: 'بيت', transliteration: 'bayt', english: 'house', emoji: '🏠' },

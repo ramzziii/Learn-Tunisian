@@ -20,7 +20,21 @@ interface AuthContextValue {
   signUpWithEmail: (email: string, password: string) => Promise<SignUpResult>;
   signInWithEmail: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
+  /** Emails a password-recovery link to the given address. Always succeeds
+   * from the caller's perspective for an unknown email too — Supabase itself
+   * doesn't reveal whether an account exists, so neither does this app. */
+  sendPasswordReset: (email: string) => Promise<{ error: string | null }>;
+  /** Exchanges the tokens/code carried by the recovery deep link for a real
+   * session, so updatePassword has something to act on. See
+   * app/auth/reset-password.tsx for where the link's URL gets parsed. */
+  establishRecoverySession: (params: RecoveryLinkParams) => Promise<{ error: string | null }>;
+  updatePassword: (newPassword: string) => Promise<{ error: string | null }>;
 }
+
+/** Either shape a Supabase recovery redirect can carry, depending on the
+ * project's auth flow type (implicit vs. PKCE) — see the comment above
+ * parseRecoveryUrl in app/auth/reset-password.tsx. */
+export type RecoveryLinkParams = { accessToken: string; refreshToken: string } | { code: string };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
@@ -59,6 +73,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
       signOut: async () => {
         await supabase.auth.signOut();
+      },
+      sendPasswordReset: async (email) => {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: 'learntunisian://auth/reset-password',
+        });
+        return { error: error?.message ?? null };
+      },
+      establishRecoverySession: async (params) => {
+        const { error } =
+          'code' in params
+            ? await supabase.auth.exchangeCodeForSession(params.code)
+            : await supabase.auth.setSession({ access_token: params.accessToken, refresh_token: params.refreshToken });
+        return { error: error?.message ?? null };
+      },
+      updatePassword: async (newPassword) => {
+        const { error } = await supabase.auth.updateUser({ password: newPassword });
+        return { error: error?.message ?? null };
       },
     }),
     [session, isLoading]
