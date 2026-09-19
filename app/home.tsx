@@ -6,11 +6,13 @@ import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native
 import { UnitSection } from '@/components/lesson-map/UnitSection';
 import { Button } from '@/components/ui/Button';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
+import { ParentGateModal } from '@/components/ui/ParentGateModal';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Reveal } from '@/components/ui/Reveal';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { colors, gradients, radii, shadows, spacing } from '@/constants/theme';
+import { fetchBadgeStats } from '@/data/badgeStats';
 import { fetchLessonMap, type UnitWithLessons } from '@/data/content';
 import { fetchDailyGoalSettings } from '@/data/profiles';
 import {
@@ -22,9 +24,10 @@ import {
 } from '@/data/progress';
 import { fetchMinutesLearnedToday, fetchRecentActivityDates } from '@/data/sessionLogs';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
+import { evaluateBadges, type Badge } from '@/lib/badges';
 import { buildDailyChallenges, type DailyChallenge } from '@/lib/dailyChallenges';
 import { getTodayChallengeFlags } from '@/lib/dailyChallengeProgress';
-import { recommendNextStep } from '@/lib/nextStepRecommendation';
+import { recommendNextStep, type NextStepRecommendation } from '@/lib/nextStepRecommendation';
 import { buildProgressInsights, type ProgressInsights } from '@/lib/progressInsights';
 import { calculateStreak } from '@/lib/streak';
 import type { DailyGoalMinutes, LessonWithState } from '@/types/models';
@@ -38,6 +41,7 @@ interface HomeData {
   todayPractice: TodayPracticeSummary;
   streakDays: number;
   dailyChallenges: DailyChallenge[];
+  badges: Badge[];
 }
 
 const EMPTY_TODAY_PRACTICE: TodayPracticeSummary = { wordsPracticedToday: 0, wordsMasteredToday: 0 };
@@ -52,6 +56,7 @@ export default function Home() {
   const [data, setData] = useState<HomeData | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [loadError, setLoadError] = useState(false);
+  const [parentGateTarget, setParentGateTarget] = useState<'/profiles' | '/settings' | null>(null);
 
   const load = useCallback(async () => {
     if (!activeProfile) return;
@@ -72,18 +77,29 @@ export default function Home() {
     // whole screen with a misleading "couldn't load your lessons" message
     // when the lessons themselves loaded fine. Each just falls back to a
     // sensible default instead.
-    const [reviewDueCount, minutesToday, goalSettings, progressSummary, todayPractice, activityDates, challengeFlags] =
-      await Promise.all([
-        fetchReviewDueCount(activeProfile.id).catch(() => 0),
-        fetchMinutesLearnedToday(activeProfile.id).catch(() => 0),
-        fetchDailyGoalSettings(activeProfile.id).catch(() => null),
-        fetchProgressSummary(activeProfile.id).catch(
-          () => ({ wordsLearning: 0, wordsMastered: 0, wordsReviewed: 0, totalWordsSeen: 0 }) satisfies ProfileProgressSummary
-        ),
-        fetchTodayPracticeSummary(activeProfile.id).catch(() => EMPTY_TODAY_PRACTICE),
-        fetchRecentActivityDates(activeProfile.id).catch(() => [] as string[]),
-        getTodayChallengeFlags(activeProfile.id).catch(() => ({ reviewCompleted: false, speakingCompleted: false })),
-      ]);
+    const [
+      reviewDueCount,
+      minutesToday,
+      goalSettings,
+      progressSummary,
+      todayPractice,
+      activityDates,
+      challengeFlags,
+      badges,
+    ] = await Promise.all([
+      fetchReviewDueCount(activeProfile.id).catch(() => 0),
+      fetchMinutesLearnedToday(activeProfile.id).catch(() => 0),
+      fetchDailyGoalSettings(activeProfile.id).catch(() => null),
+      fetchProgressSummary(activeProfile.id).catch(
+        () => ({ wordsLearning: 0, wordsMastered: 0, wordsReviewed: 0, totalWordsSeen: 0 }) satisfies ProfileProgressSummary
+      ),
+      fetchTodayPracticeSummary(activeProfile.id).catch(() => EMPTY_TODAY_PRACTICE),
+      fetchRecentActivityDates(activeProfile.id).catch(() => [] as string[]),
+      getTodayChallengeFlags(activeProfile.id).catch(() => ({ reviewCompleted: false, speakingCompleted: false })),
+      fetchBadgeStats(activeProfile.id)
+        .then(evaluateBadges)
+        .catch(() => [] as Badge[]),
+    ]);
 
     setData({
       unitsWithLessons,
@@ -99,6 +115,7 @@ export default function Home() {
         reviewCompletedToday: challengeFlags.reviewCompleted,
         speakingCompletedToday: challengeFlags.speakingCompleted,
       }),
+      badges,
     });
   }, [activeProfile]);
 
@@ -115,14 +132,32 @@ export default function Home() {
 
   if (!activeProfile) return <LoadingScreen />;
 
+  // A kid profile shouldn't have unsupervised access to profile-switching or
+  // Settings (sign-out, adding profiles, etc.) — route through a quick
+  // parent-gate check first. Adult profiles go straight through, same as today.
+  const isKid = activeProfile.track === 'kid';
+  const goToProfiles = () => (isKid ? setParentGateTarget('/profiles') : router.push('/profiles'));
+  const goToSettings = () => (isKid ? setParentGateTarget('/settings') : router.push('/settings'));
+
   return (
     <ScreenContainer style={{ padding: 0 }}>
       <HomeHeader
         name={activeProfile.name}
         hasMultipleProfiles={profiles.length > 1}
-        onSwitchProfile={() => router.push('/profiles')}
-        onOpenSettings={() => router.push('/settings')}
+        onSwitchProfile={goToProfiles}
+        onOpenSettings={goToSettings}
       />
+
+      {parentGateTarget ? (
+        <ParentGateModal
+          onSuccess={() => {
+            const target = parentGateTarget;
+            setParentGateTarget(null);
+            router.push(target);
+          }}
+          onCancel={() => setParentGateTarget(null)}
+        />
+      ) : null}
 
       {data === null ? (
         loadError ? (
@@ -177,29 +212,19 @@ function HomeHeader({
   );
 }
 
-/** Adult/teen: goal progress + streak, a "Learned today" recap, a weak-spot-aware
- * "Continue Learning" action, review, a light progress teaser, then the full map. */
+/** Adult/teen: goal progress + streak, one unified "what's next" decision,
+ * a "Learned today" recap, then the practice extras and the full map. */
 function AdultHomeContent({ data }: { data: HomeData }) {
-  const {
-    unitsWithLessons,
-    reviewDueCount,
-    minutesToday,
-    goalMinutes,
-    progressSummary,
-    todayPractice,
-    streakDays,
-    dailyChallenges,
-  } = data;
+  const { unitsWithLessons, reviewDueCount, minutesToday, goalMinutes, progressSummary, todayPractice, streakDays, dailyChallenges } =
+    data;
 
-  // The lesson recommendation is deliberately computed with reviewDueCount
-  // forced to 0 here — review already has its own dedicated card below, so
-  // this specifically picks which *lesson* to point "Continue Learning" at
-  // (the weakest unlocked one) rather than re-deciding review vs. lesson.
+  // A single decision, not two parallel ones: review outranks a new/weak
+  // lesson (spaced repetition only works if reviews actually happen), so
+  // this is the one thing Home tells the user to do next — never a lesson
+  // CTA *and* a separate review card competing for the same tap.
   const allLessons = unitsWithLessons.flatMap((u) => u.lessons);
   const progressInsights = buildProgressInsights(allLessons);
-  const recommendation = recommendNextStep(allLessons, 0);
-  const continueLesson = recommendation?.type === 'lesson' ? recommendation.lesson : findContinueLesson(unitsWithLessons);
-  const isWeakSpotPick = recommendation?.type === 'lesson' && recommendation.reason === 'weak_spot';
+  const recommendation = recommendNextStep(allLessons, reviewDueCount);
 
   const goalProgress = goalMinutes > 0 ? minutesToday / goalMinutes : 0;
   const goalReached = minutesToday >= goalMinutes;
@@ -227,42 +252,27 @@ function AdultHomeContent({ data }: { data: HomeData }) {
               <Text style={styles.goalReachedText}>🎉 Goal reached — nice work today!</Text>
             </View>
           ) : null}
-          {continueLesson ? (
-            <>
-              <Button
-                label="Continue Learning"
-                onPress={() => router.push(`/lesson/${continueLesson.id}`)}
-                style={{ marginTop: spacing.md }}
-              />
-              {isWeakSpotPick ? (
-                <Text style={styles.recommendReason}>
-                  📍 Recommended — keep building up {continueLesson.title ?? continueLesson.unitName}
-                </Text>
-              ) : null}
-            </>
-          ) : null}
         </View>
       </Reveal>
 
       <Reveal delay={30}>
-        <TodayRecapCard minutesToday={minutesToday} todayPractice={todayPractice} />
+        <RecommendedNextCard recommendation={recommendation} />
       </Reveal>
 
-      <Reveal delay={45}>
+      <Reveal delay={60}>
+        <SpeakingPracticeCard />
+      </Reveal>
+
+      <Reveal delay={90}>
+        <TodayRecapCard todayPractice={todayPractice} />
+      </Reveal>
+
+      <Reveal delay={120}>
         <DailyChallengesCard challenges={dailyChallenges} />
       </Reveal>
 
-      {reviewDueCount > 0 ? (
-        <Reveal delay={60}>
-          <ReviewCard dueCount={reviewDueCount} />
-        </Reveal>
-      ) : null}
-
-      <Reveal delay={120}>
-        <TalkToATunisianCard />
-      </Reveal>
       <Reveal delay={150}>
-        <SpeakingPracticeCard />
+        <TalkToATunisianCard />
       </Reveal>
       <Reveal delay={180}>
         <AlphabetPracticeCard />
@@ -271,7 +281,7 @@ function AdultHomeContent({ data }: { data: HomeData }) {
         <CultureCornerCard />
       </Reveal>
 
-      <Reveal delay={270}>
+      <Reveal delay={240}>
         <View style={styles.progressTeaserRow}>
           <ProgressTeaser value={progressSummary.wordsLearning} label="learning" />
           <ProgressTeaser value={progressSummary.wordsMastered} label="mastered" />
@@ -279,7 +289,7 @@ function AdultHomeContent({ data }: { data: HomeData }) {
       </Reveal>
 
       {progressInsights.focusArea || progressInsights.strongArea ? (
-        <Reveal delay={300}>
+        <Reveal delay={270}>
           <ProgressInsightsCard insights={progressInsights} />
         </Reveal>
       ) : null}
@@ -291,13 +301,17 @@ function AdultHomeContent({ data }: { data: HomeData }) {
 
 /** Kid: one big friendly action, a simple review nudge, then the map — no numbers, no goal tracking. */
 function KidHomeContent({ data }: { data: HomeData }) {
-  const { unitsWithLessons, reviewDueCount } = data;
+  const { unitsWithLessons, reviewDueCount, badges } = data;
   const continueLesson = findContinueLesson(unitsWithLessons);
 
   return (
     <>
+      <Reveal delay={0}>
+        <BadgesShelf badges={badges} />
+      </Reveal>
+
       {continueLesson ? (
-        <Reveal delay={0}>
+        <Reveal delay={30}>
           <PressableScale
             haptic
             onPress={() => router.push(`/lesson/${continueLesson.id}`)}
@@ -338,6 +352,29 @@ function KidHomeContent({ data }: { data: HomeData }) {
 
       <LessonMap unitsWithLessons={unitsWithLessons} track="kid" />
     </>
+  );
+}
+
+/** A horizontal shelf of earned/locked badge medallions — see src/lib/badges.ts
+ * for how earned status is derived (always live, never stored). */
+function BadgesShelf({ badges }: { badges: Badge[] }) {
+  if (badges.length === 0) return null;
+  return (
+    <View style={{ marginBottom: spacing.lg }}>
+      <Text style={styles.badgesTitle}>My Badges</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.badgesRow}>
+        {badges.map((badge) => (
+          <View key={badge.id} style={styles.badgeItem}>
+            <View style={[styles.badgeCircle, badge.earned ? styles.badgeCircleEarned : styles.badgeCircleLocked]}>
+              <Text style={[styles.badgeEmoji, !badge.earned && styles.badgeEmojiLocked]}>{badge.emoji}</Text>
+            </View>
+            <Text style={styles.badgeLabel} numberOfLines={1}>
+              {badge.title}
+            </Text>
+          </View>
+        ))}
+      </ScrollView>
+    </View>
   );
 }
 
@@ -442,60 +479,62 @@ function CultureCornerCard() {
   );
 }
 
-/** Lightweight, always-visible "what you've learned today" recap — adapts
- * its copy to whether anything's happened yet so it never reads as a nag. */
-function TodayRecapCard({
-  minutesToday,
-  todayPractice,
-}: {
-  minutesToday: number;
-  todayPractice: TodayPracticeSummary;
-}) {
-  const hasActivity = minutesToday > 0 || todayPractice.wordsPracticedToday > 0;
+/** "Learned today" as one confident sentence, not a metrics grid — the
+ * minute count already lives on the goal card above, so this focuses on
+ * what those minutes actually produced. Copy adapts to how much has
+ * happened so it reads as a genuine win, never a nag on a quiet day. */
+function TodayRecapCard({ todayPractice }: { todayPractice: TodayPracticeSummary }) {
+  const { wordsPracticedToday, wordsMasteredToday } = todayPractice;
+  const hasActivity = wordsPracticedToday > 0;
+  const hasMastered = wordsMasteredToday > 0;
+
+  const body = !hasActivity
+    ? "Your progress shows up here the moment you start today's session."
+    : hasMastered
+      ? `You've mastered ${wordsMasteredToday} ${wordsMasteredToday === 1 ? 'word' : 'words'} and practiced ${wordsPracticedToday} today — that adds up.`
+      : `You've practiced ${wordsPracticedToday} ${wordsPracticedToday === 1 ? 'word' : 'words'} today — keep going.`;
 
   return (
     <View style={[styles.recapCard, shadows.card]}>
-      <Text style={styles.recapTitle}>{hasActivity ? "Learned today" : 'Ready when you are'}</Text>
-      <Text style={styles.recapSubtitle}>
-        {hasActivity
-          ? "Nice work — here's what you've picked up today."
-          : "Your daily recap shows up here once you start a session."}
-      </Text>
-      <View style={styles.recapStatsRow}>
-        <RecapStat value={minutesToday} label={minutesToday === 1 ? 'minute' : 'minutes'} />
-        <RecapStat value={todayPractice.wordsPracticedToday} label="practiced" />
-        <RecapStat value={todayPractice.wordsMasteredToday} label="mastered" />
-      </View>
+      <Text style={styles.recapTitle}>{hasActivity ? 'Nice momentum today' : 'Ready when you are'}</Text>
+      <Text style={styles.recapSubtitle}>{body}</Text>
     </View>
   );
 }
 
-function RecapStat({ value, label }: { value: number; label: string }) {
-  return (
-    <View style={styles.recapStat}>
-      <Text style={styles.recapStatValue}>{value}</Text>
-      <Text style={styles.recapStatLabel}>{label}</Text>
-    </View>
-  );
-}
+/** The one thing worth doing next: review if anything's due, otherwise the
+ * weakest unlocked lesson — a single card with a single reason, replacing
+ * what used to be a lesson CTA and a separate review card shown together. */
+function RecommendedNextCard({ recommendation }: { recommendation: NextStepRecommendation | null }) {
+  if (!recommendation) return null;
 
-function ReviewCard({ dueCount }: { dueCount: number }) {
+  const isReview = recommendation.type === 'review';
+  const title = isReview ? 'Review time' : recommendation.lesson.title ?? recommendation.lesson.unitName;
+  const reasonText = isReview
+    ? `${recommendation.dueCount} ${recommendation.dueCount === 1 ? 'word' : 'words'} due — a quick review keeps them fresh`
+    : recommendation.reason === 'weak_spot'
+      ? 'Keep building up an area that needs more practice'
+      : 'Pick up right where you left off';
+
   return (
-    <PressableScale haptic onPress={() => router.push('/review')} style={[styles.reviewCard, shadows.card]}>
+    <PressableScale
+      haptic
+      onPress={() => router.push(isReview ? '/review' : `/lesson/${recommendation.lesson.id}`)}
+      style={[styles.reviewCard, shadows.card]}
+    >
       <LinearGradient
-        colors={gradients.accent}
+        colors={gradients.primary}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.reviewCardGradient}
       >
-        <Text style={styles.reviewEmoji}>🔄</Text>
+        <Text style={styles.reviewEmoji}>{isReview ? '🔄' : '📚'}</Text>
         <View style={{ flex: 1 }}>
-          <Text style={styles.reviewTitle}>Review time</Text>
-          <Text style={styles.reviewSubtitle}>
-            {dueCount} {dueCount === 1 ? 'word is' : 'words are'} due for review
-          </Text>
+          <Text style={styles.recommendEyebrow}>Recommended next</Text>
+          <Text style={[styles.reviewTitle, { color: colors.textOnPrimary }]}>{title}</Text>
+          <Text style={[styles.reviewSubtitle, { color: colors.textOnPrimary }]}>{reasonText}</Text>
         </View>
-        <Text style={styles.reviewChevron}>›</Text>
+        <Text style={[styles.reviewChevron, { color: colors.textOnPrimary }]}>›</Text>
       </LinearGradient>
     </PressableScale>
   );
@@ -605,14 +644,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   goalReachedText: { fontSize: 13, fontWeight: '700', color: colors.success },
-  recommendReason: { fontSize: 12, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.sm },
   recapCard: { backgroundColor: colors.surface, borderRadius: radii.lg, padding: spacing.md, marginBottom: spacing.lg },
   recapTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
-  recapSubtitle: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
-  recapStatsRow: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.md },
-  recapStat: { alignItems: 'center', flex: 1 },
-  recapStatValue: { fontSize: 20, fontWeight: '800', color: colors.primaryDark },
-  recapStatLabel: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  recapSubtitle: { fontSize: 13, color: colors.textSecondary, marginTop: 2, lineHeight: 19 },
   challengesHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   challengesCount: { fontSize: 13, fontWeight: '700', color: colors.textSecondary },
   challengesAllDone: { fontSize: 14, fontWeight: '700', color: colors.success, marginTop: spacing.sm },
@@ -638,6 +672,15 @@ const styles = StyleSheet.create({
   reviewCard: { borderRadius: radii.lg, marginBottom: spacing.xl, overflow: 'hidden' },
   reviewCardGradient: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md },
   reviewEmoji: { fontSize: 32 },
+  recommendEyebrow: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.textOnPrimary,
+    opacity: 0.75,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
   reviewTitle: { fontSize: 17, fontWeight: '700', color: colors.textPrimary },
   reviewSubtitle: { fontSize: 13, color: colors.textPrimary, opacity: 0.75, marginTop: 2 },
   reviewChevron: { fontSize: 28, color: colors.textPrimary, opacity: 0.5 },
@@ -667,6 +710,21 @@ const styles = StyleSheet.create({
   },
   kidReviewEmoji: { fontSize: 32 },
   kidReviewLabel: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.xs },
+  badgesTitle: { fontSize: 14, fontWeight: '700', color: colors.textSecondary, marginBottom: spacing.sm },
+  badgesRow: { gap: spacing.md, paddingRight: spacing.md },
+  badgeItem: { alignItems: 'center', width: 72 },
+  badgeCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeCircleEarned: { backgroundColor: colors.accentLight },
+  badgeCircleLocked: { backgroundColor: colors.background, borderWidth: 1.5, borderColor: colors.border },
+  badgeEmoji: { fontSize: 28 },
+  badgeEmojiLocked: { opacity: 0.35 },
+  badgeLabel: { fontSize: 11, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.xs },
   emptyText: { fontSize: 15, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.xxl },
   errorContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm, padding: spacing.lg },
   errorEmoji: { fontSize: 48, marginBottom: spacing.sm },

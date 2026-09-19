@@ -11,7 +11,7 @@ export default function Index() {
   const { profiles, activeProfile, isLoading: profilesLoading } = useActiveProfile();
 
   if (authLoading) return <LoadingScreen />;
-  if (!session) return <Redirect href="/auth/sign-in" />;
+  if (!session) return <Redirect href="/welcome" />;
   if (profilesLoading) return <LoadingScreen />;
   if (profiles.length === 0) return <Redirect href="/onboarding/who" />;
   if (!activeProfile) return <Redirect href="/profiles" />;

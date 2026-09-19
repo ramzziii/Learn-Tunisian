@@ -45,13 +45,25 @@ export default function ReviewSession() {
   if (!isReady || !groups || !activeProfile) return <LoadingScreen />;
 
   if (groups.length === 0) {
+    // Review and speaking are the same "keep it fresh" loop — with nothing
+    // due, speaking practice is the natural next thing to point an
+    // adult/teen at, instead of a dead end. Kids never get mic prompts, so
+    // this stays adult/teen-only.
+    const canSuggestSpeaking = activeProfile.track !== 'kid';
     return (
       <ScreenContainer>
         <Reveal style={styles.emptyContainer}>
           <Text style={styles.emptyEmoji}>🌿</Text>
           <Text style={styles.emptyTitle}>All caught up</Text>
           <Text style={styles.emptyBody}>Nothing is due for review right now — nice work staying on top of it.</Text>
-          <Button label="Back to home" variant="secondary" onPress={() => router.replace('/home')} />
+          {canSuggestSpeaking ? (
+            <Button label="Practice speaking instead" onPress={() => router.replace('/speaking-practice')} />
+          ) : null}
+          <Button
+            label="Back to home"
+            variant={canSuggestSpeaking ? 'ghost' : 'secondary'}
+            onPress={() => router.replace('/home')}
+          />
         </Reveal>
       </ScreenContainer>
     );

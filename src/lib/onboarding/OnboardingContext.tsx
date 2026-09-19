@@ -27,9 +27,12 @@ const initialState: OnboardingState = {
   dateOfBirth: null,
   nativeLanguage: '',
   country: '',
-  startingProficiency: null,
+  // Pre-selected so both preference screens can be blown through with a
+  // single tap if the user doesn't want to think about it yet — still fully
+  // editable, and editable again later in Settings.
+  startingProficiency: 'none',
   learningGoal: null,
-  dailyGoalMinutes: null,
+  dailyGoalMinutes: 10,
   reminderHour: null,
   reminderMinute: null,
 };

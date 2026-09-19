@@ -20,6 +20,8 @@ export default function Consent() {
   return (
     <OnboardingStepLayout
       title="Before we start"
+      step={1}
+      totalSteps={4}
       subtitle={
         isForChild
           ? 'Please review our Terms & Conditions and Privacy Policy. As the parent or guardian, you are agreeing to these on your child’s behalf.'

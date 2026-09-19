@@ -48,6 +48,7 @@ export default function LessonSession() {
       track={activeProfile.track}
       sessionType="lesson"
       emptyMessage="This lesson doesn't have any words yet."
+      currentLessonId={lessonId}
     />
   );
 }

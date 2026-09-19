@@ -78,7 +78,7 @@ export default function SignUp() {
     <ScreenContainer>
       <BackButton />
       <Text style={{ fontSize: 28, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md }}>
-        Create your account
+        Let&apos;s get you started
       </Text>
       <Text style={{ fontSize: 15, color: colors.textSecondary, marginTop: spacing.sm, marginBottom: spacing.xl }}>
         One account can hold profiles for you and your kids.
@@ -103,7 +103,15 @@ export default function SignUp() {
         error={error}
       />
 
-      <Button label="Create account" onPress={handleSignUp} loading={isSubmitting} disabled={!email || !password} />
+      <Button
+        label="Start learning free"
+        onPress={handleSignUp}
+        loading={isSubmitting}
+        disabled={!email || !password}
+      />
+      <Text style={{ fontSize: 12, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.sm, lineHeight: 17 }}>
+        🔒 No ads, no selling your data. Your progress saves automatically, and you can change any setting later.
+      </Text>
 
       <Link href="/auth/sign-in" style={{ marginTop: spacing.lg, textAlign: 'center', color: colors.primary }}>
         Already have an account? Sign in
