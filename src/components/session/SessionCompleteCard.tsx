@@ -35,9 +35,11 @@ interface SessionCompleteCardProps {
 
 /**
  * Every session's natural stopping point: a positive completion message with
- * a clear, bounded set of choices — "Close", "Review weak words" (only when
- * there's something worth reviewing), or "Continue learning" — never an
- * auto-advance into more content.
+ * a clear, bounded set of choices — "Back to home", "Review weak words"
+ * (only when there's something worth reviewing), or "Continue to next
+ * lesson" — never an auto-advance into more content. "Back to home" matches
+ * the exact wording review.tsx and speaking-practice.tsx use for the same
+ * router.replace('/home') action, so it reads the same everywhere it appears.
  */
 export function SessionCompleteCard({
   minutesLearned,
@@ -137,7 +139,7 @@ export function SessionCompleteCard({
           </>
         )}
 
-        <Button label="Close" onPress={onClose} style={{ marginTop: spacing.xl, width: '100%' }} />
+        <Button label="Back to home" onPress={onClose} style={{ marginTop: spacing.xl, width: '100%' }} />
         {onContinueLesson ? (
           <>
             <Button

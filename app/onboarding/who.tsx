@@ -1,18 +1,42 @@
 import { router } from 'expo-router';
+import { useEffect } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { BackButton } from '@/components/ui/BackButton';
+import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { colors, radii, spacing } from '@/constants/theme';
+import { KIDS_SECTION_ENABLED } from '@/constants/features';
+import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
 import { useOnboarding } from '@/lib/onboarding/OnboardingContext';
 
 export default function WhoIsThisFor() {
   const { update } = useOnboarding();
+  const { profiles } = useActiveProfile();
+
+  // Where either path below sends the user next: the trial/pricing preview
+  // only makes sense the first time an account creates a profile, not when
+  // an existing user is adding a second one.
+  const nextRoute = profiles.length === 0 ? '/onboarding/plans' : '/onboarding/consent';
 
   const choose = (forWhom: 'myself' | 'child') => {
     update({ forWhom });
-    router.push('/onboarding/consent');
+    router.push(nextRoute);
   };
+
+  useEffect(() => {
+    // Kids section is hidden for now (see src/constants/features.ts) — this
+    // screen's only real choice is unreachable, so skip straight through
+    // rather than showing a single-button "choice." Nothing here is
+    // deleted; flip the flag back on and this screen behaves as before.
+    if (!KIDS_SECTION_ENABLED) {
+      update({ forWhom: 'myself' });
+      router.replace(nextRoute);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (!KIDS_SECTION_ENABLED) return <LoadingScreen />;
 
   return (
     <ScreenContainer>

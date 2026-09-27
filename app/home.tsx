@@ -12,6 +12,7 @@ import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Reveal } from '@/components/ui/Reveal';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { colors, gradients, radii, shadows, spacing } from '@/constants/theme';
+import { KIDS_SECTION_ENABLED } from '@/constants/features';
 import { fetchBadgeStats } from '@/data/badgeStats';
 import { fetchLessonMap, type UnitWithLessons } from '@/data/content';
 import { fetchDailyGoalSettings } from '@/data/profiles';
@@ -138,6 +139,11 @@ export default function Home() {
   const isKid = activeProfile.track === 'kid';
   const goToProfiles = () => (isKid ? setParentGateTarget('/profiles') : router.push('/profiles'));
   const goToSettings = () => (isKid ? setParentGateTarget('/settings') : router.push('/settings'));
+  // Kids section is hidden for now (see src/constants/features.ts) — any
+  // kid-track profile falls back to the adult experience instead of kid
+  // UI/badges/celebration. Nothing kid-related is deleted; this is the one
+  // gate that makes it all unreachable while the flag is off.
+  const showKidUI = KIDS_SECTION_ENABLED && isKid;
 
   return (
     <ScreenContainer style={{ padding: 0 }}>
@@ -170,7 +176,7 @@ export default function Home() {
           contentContainerStyle={styles.scrollContent}
           refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />}
         >
-          {activeProfile.track === 'kid' ? (
+          {showKidUI ? (
             <KidHomeContent data={data} />
           ) : (
             <AdultHomeContent data={data} />
@@ -256,7 +262,7 @@ function AdultHomeContent({ data }: { data: HomeData }) {
       </Reveal>
 
       <Reveal delay={30}>
-        <RecommendedNextCard recommendation={recommendation} />
+        <RecommendedNextCard recommendation={recommendation} isFirstLesson={progressSummary.totalWordsSeen === 0} />
       </Reveal>
 
       <Reveal delay={60}>
@@ -504,17 +510,32 @@ function TodayRecapCard({ todayPractice }: { todayPractice: TodayPracticeSummary
 
 /** The one thing worth doing next: review if anything's due, otherwise the
  * weakest unlocked lesson — a single card with a single reason, replacing
- * what used to be a lesson CTA and a separate review card shown together. */
-function RecommendedNextCard({ recommendation }: { recommendation: NextStepRecommendation | null }) {
+ * what used to be a lesson CTA and a separate review card shown together.
+ * For a learner with zero progress anywhere, this becomes their "Start
+ * Here" moment instead of generic "pick up where you left off" copy that
+ * makes no sense before they've started anything. */
+function RecommendedNextCard({
+  recommendation,
+  isFirstLesson,
+}: {
+  recommendation: NextStepRecommendation | null;
+  isFirstLesson: boolean;
+}) {
   if (!recommendation) return null;
 
   const isReview = recommendation.type === 'review';
+  const showAsFirstLesson = !isReview && isFirstLesson;
+
   const title = isReview ? 'Review time' : recommendation.lesson.title ?? recommendation.lesson.unitName;
+  const eyebrow = showAsFirstLesson ? 'Your first lesson' : 'Recommended next';
+  const emoji = isReview ? '🔄' : showAsFirstLesson ? '🌱' : '📚';
   const reasonText = isReview
     ? `${recommendation.dueCount} ${recommendation.dueCount === 1 ? 'word' : 'words'} due — a quick review keeps them fresh`
-    : recommendation.reason === 'weak_spot'
-      ? 'Keep building up an area that needs more practice'
-      : 'Pick up right where you left off';
+    : showAsFirstLesson
+      ? "Everyday phrases you'll actually use — no experience needed"
+      : recommendation.reason === 'weak_spot'
+        ? 'Keep building up an area that needs more practice'
+        : 'Pick up right where you left off';
 
   return (
     <PressableScale
@@ -528,9 +549,9 @@ function RecommendedNextCard({ recommendation }: { recommendation: NextStepRecom
         end={{ x: 1, y: 1 }}
         style={styles.reviewCardGradient}
       >
-        <Text style={styles.reviewEmoji}>{isReview ? '🔄' : '📚'}</Text>
+        <Text style={styles.reviewEmoji}>{emoji}</Text>
         <View style={{ flex: 1 }}>
-          <Text style={styles.recommendEyebrow}>Recommended next</Text>
+          <Text style={styles.recommendEyebrow}>{eyebrow}</Text>
           <Text style={[styles.reviewTitle, { color: colors.textOnPrimary }]}>{title}</Text>
           <Text style={[styles.reviewSubtitle, { color: colors.textOnPrimary }]}>{reasonText}</Text>
         </View>
@@ -581,11 +602,12 @@ function LessonMap({
   }
   return (
     <>
-      {unitsWithLessons.map((unitWithLessons) => (
+      {unitsWithLessons.map((unitWithLessons, index) => (
         <UnitSection
           key={unitWithLessons.unit.id}
           unitWithLessons={unitWithLessons}
           track={track}
+          isFirstUnit={index === 0}
           onSelectLesson={(lessonId) => router.push(`/lesson/${lessonId}`)}
           onBrowseWords={(lessonId) => router.push(`/words/${lessonId}`)}
         />

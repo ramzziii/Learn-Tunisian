@@ -36,7 +36,7 @@ export default function Welcome() {
         </View>
 
         <View style={styles.footer}>
-          <Button label="Start learning free" onPress={() => router.push('/auth/sign-up')} />
+          <Button label="Start learning free" onPress={() => router.push('/onboarding/goal-select')} />
           <Button
             label="I already have an account"
             variant="ghost"
