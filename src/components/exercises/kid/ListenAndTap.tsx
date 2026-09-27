@@ -94,6 +94,7 @@ export function ListenAndTap({ exercise, onComplete }: ListenAndTapProps) {
           isCorrect={isCorrectSelection}
           correctWordArabic={exercise.promptVariant.wordArabic}
           onListenAgain={play}
+          kidFriendly
         />
       ) : null}
     </View>

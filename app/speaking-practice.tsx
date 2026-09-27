@@ -120,7 +120,7 @@ export default function SpeakingPracticeScreen() {
           <Text style={styles.centeredBody}>
             {correctCount} of {queue.length} sounded right.
           </Text>
-          <Button label="Done" onPress={() => router.replace('/home')} />
+          <Button label="Back to home" onPress={() => router.replace('/home')} />
         </Reveal>
       </ScreenContainer>
     );

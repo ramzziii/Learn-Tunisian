@@ -9,13 +9,18 @@ import { PressableScale } from '@/components/ui/PressableScale';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { colors, radii, spacing } from '@/constants/theme';
+import { fetchBadgeStats } from '@/data/badgeStats';
+import { fetchLessonMap } from '@/data/content';
 import { recordWordGroupResult } from '@/data/progress';
 import { recordSessionLog } from '@/data/sessionLogs';
 import { useExerciseQueue } from '@/hooks/useExerciseQueue';
 import { useFadeInOnChange } from '@/hooks/useFadeInOnChange';
 import { useSessionTimer } from '@/hooks/useSessionTimer';
+import { evaluateBadges, type Badge } from '@/lib/badges';
+import { getSeenBadgeIds, markBadgesSeen } from '@/lib/badgeProgress';
 import { masteryLabel, type MasteryLabel } from '@/lib/masteryStatus';
-import type { DailyGoalMinutes, SessionType, Track, WordGroupWithVariants } from '@/types/models';
+import { recommendNextStep } from '@/lib/nextStepRecommendation';
+import type { DailyGoalMinutes, LessonWithState, SessionType, Track, WordGroupWithVariants } from '@/types/models';
 
 const MASTERY_BADGE_COLOR: Record<MasteryLabel, string> = {
   New: colors.textSecondary,
@@ -34,6 +39,10 @@ interface SessionRunnerProps {
   emptyMessage: string;
   /** Where "Close" on the completion card and the exit button return to. Defaults to /home. */
   exitHref?: Href;
+  /** The lesson this session is running, if any — used only to avoid
+   * recommending the exact same lesson as "Continue" right after finishing
+   * it. Review sessions (no single current lesson) omit this. */
+  currentLessonId?: string;
   /** Fires once, the moment the session's time goal is reached (before the
    * user necessarily taps Close) — e.g. for marking a daily challenge done. */
   onComplete?: () => void;
@@ -53,6 +62,7 @@ export function SessionRunner({
   sessionType,
   emptyMessage,
   exitHref,
+  currentLessonId,
   onComplete,
 }: SessionRunnerProps) {
   const timer = useSessionTimer(goalMinutes);
@@ -74,6 +84,62 @@ export function SessionRunner({
 
   const [masteryBadge, setMasteryBadge] = useState<MasteryLabel | null>(null);
   const badgeAnim = useRef(new Animated.Value(0)).current;
+
+  const [newlyEarnedBadges, setNewlyEarnedBadges] = useState<Badge[]>([]);
+  const hasCheckedBadgesRef = useRef(false);
+
+  useEffect(() => {
+    if (track !== 'kid' || !timer.isComplete || hasCheckedBadgesRef.current) return;
+    hasCheckedBadgesRef.current = true;
+    (async () => {
+      try {
+        const [stats, seenIds] = await Promise.all([fetchBadgeStats(profileId), getSeenBadgeIds(profileId)]);
+        const earned = evaluateBadges(stats).filter((b) => b.earned);
+        const newlyEarned = earned.filter((b) => !seenIds.has(b.id));
+        setNewlyEarnedBadges(newlyEarned);
+        await markBadgesSeen(
+          profileId,
+          earned.map((b) => b.id)
+        );
+      } catch {
+        // Badges are a best-effort celebration, not a blocking feature.
+      }
+    })();
+  }, [track, timer.isComplete, profileId]);
+
+  const [nextLesson, setNextLesson] = useState<{ lesson: LessonWithState; reasonText: string } | null>(null);
+  const hasCheckedNextLessonRef = useRef(false);
+
+  useEffect(() => {
+    if (!timer.isComplete || hasCheckedNextLessonRef.current) return;
+    hasCheckedNextLessonRef.current = true;
+    (async () => {
+      try {
+        const units = await fetchLessonMap(profileId);
+        const allLessons = units.flatMap((u) => u.lessons);
+        // Forced reviewDueCount to 0, same as the Home screen's own lesson
+        // pick — review already has its own dedicated flow, this is purely
+        // "what's the next lesson worth doing."
+        const recommendation = recommendNextStep(allLessons, 0);
+        const candidate = recommendation?.type === 'lesson' ? recommendation.lesson : null;
+        // Don't recommend the exact lesson just finished — Add more time
+        // already covers "do more of this one."
+        if (candidate && candidate.id !== currentLessonId) {
+          // Same reason copy Home's "Recommended next" card uses, so the
+          // language stays consistent from lesson to completion to home.
+          const reasonText =
+            recommendation?.type === 'lesson' && recommendation.reason === 'weak_spot'
+              ? 'Keep building up an area that needs more practice'
+              : 'Pick up right where you left off';
+          setNextLesson({ lesson: candidate, reasonText });
+        } else {
+          setNextLesson(null);
+        }
+      } catch {
+        // Best-effort — no "Continue" button if this fails, nothing blocks.
+      }
+    })();
+  }, [timer.isComplete, profileId, currentLessonId]);
 
   const showMasteryBadge = useCallback(
     (label: MasteryLabel) => {
@@ -181,11 +247,15 @@ export function SessionRunner({
           correctCount={stats.correct}
           incorrectCount={stats.incorrect}
           sessionType={sessionType}
+          track={track}
           onClose={() => logAndExit()}
           onAddMore={(minutes) => timer.addMinutes(minutes)}
           onReviewWeakWords={
             sessionType !== 'review' && stats.incorrect > 0 ? () => logAndExit('/review') : undefined
           }
+          onContinueLesson={nextLesson ? () => logAndExit(`/lesson/${nextLesson.lesson.id}`) : undefined}
+          continueLessonReason={nextLesson?.reasonText}
+          newlyEarnedBadges={newlyEarnedBadges}
         />
       ) : null}
     </ScreenContainer>

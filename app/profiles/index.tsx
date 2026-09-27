@@ -7,14 +7,18 @@ import { PressableScale } from '@/components/ui/PressableScale';
 import { Reveal } from '@/components/ui/Reveal';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { colors, radii, spacing } from '@/constants/theme';
+import { KIDS_SECTION_ENABLED } from '@/constants/features';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
 import { useAuth } from '@/lib/auth/AuthContext';
 import { calculateAge } from '@/lib/age';
 import type { Profile } from '@/types/models';
 
 export default function ProfileSwitcher() {
-  const { profiles, setActiveProfileId } = useActiveProfile();
+  const { profiles: allProfiles, setActiveProfileId } = useActiveProfile();
   const { signOut } = useAuth();
+  // Kids section is hidden for now — don't list a kid profile as
+  // selectable, though its data is untouched in the account.
+  const profiles = KIDS_SECTION_ENABLED ? allProfiles : allProfiles.filter((p) => p.track !== 'kid');
 
   const choose = async (profile: Profile) => {
     await setActiveProfileId(profile.id);
@@ -59,7 +63,7 @@ export default function ProfileSwitcher() {
         )}
       />
 
-      <Button label="Add a profile" variant="secondary" onPress={() => router.push('/onboarding/who')} />
+      <Button label="Add a profile" variant="secondary" onPress={() => router.push('/onboarding/goal-select')} />
       <Button label="Sign out" variant="ghost" onPress={handleSignOut} style={{ marginTop: spacing.sm }} />
     </ScreenContainer>
   );

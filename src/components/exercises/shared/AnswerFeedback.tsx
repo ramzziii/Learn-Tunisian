@@ -11,6 +11,9 @@ interface AnswerFeedbackProps {
   correctMeaning?: string;
   /** Replays the correct word's audio — shown only when provided, so an incorrect answer teaches rather than just says "wrong." */
   onListenAgain?: () => void;
+  /** Warmer, more game-like copy for the kid track — same layout/animation,
+   * just softer wording and no ❌ on a miss. */
+  kidFriendly?: boolean;
 }
 
 export function AnswerFeedback({
@@ -19,6 +22,7 @@ export function AnswerFeedback({
   correctTransliteration,
   correctMeaning,
   onListenAgain,
+  kidFriendly = false,
 }: AnswerFeedbackProps) {
   // This banner mounts fresh on every single answer in every lesson — by far
   // the most-repeated moment in the app — so it gets a real spring entrance
@@ -41,16 +45,16 @@ export function AnswerFeedback({
   if (isCorrect) {
     return (
       <Animated.View style={[styles.banner, styles.correct, bannerStyle]}>
-        <Animated.Text style={[styles.icon, iconStyle]}>✅</Animated.Text>
-        <Text style={styles.correctText}>Nice! That&apos;s correct.</Text>
+        <Animated.Text style={[styles.icon, iconStyle]}>{kidFriendly ? '🎉' : '✅'}</Animated.Text>
+        <Text style={styles.correctText}>{kidFriendly ? 'Yay! You got it!' : "Nice! That's correct."}</Text>
       </Animated.View>
     );
   }
 
   return (
     <Animated.View style={[styles.banner, styles.incorrect, bannerStyle]}>
-      <Animated.Text style={[styles.icon, iconStyle]}>❌</Animated.Text>
-      <Text style={styles.notQuiteText}>Not quite.</Text>
+      <Animated.Text style={[styles.icon, iconStyle]}>{kidFriendly ? '🌟' : '❌'}</Animated.Text>
+      <Text style={styles.notQuiteText}>{kidFriendly ? "Almost! Let's try that again." : 'Not quite.'}</Text>
       {correctWordArabic ? (
         <View style={styles.wordRow}>
           <Text style={styles.wordArabic}>{correctWordArabic}</Text>

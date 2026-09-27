@@ -5,6 +5,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ActiveProfileProvider } from '@/lib/account/ActiveProfileContext';
 import { AuthProvider } from '@/lib/auth/AuthContext';
+import { OnboardingProvider } from '@/lib/onboarding/OnboardingContext';
 
 export default function RootLayout() {
   useEffect(() => {
@@ -18,13 +19,15 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <AuthProvider>
         <ActiveProfileProvider>
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              animation: 'fade',
-              animationDuration: 220,
-            }}
-          />
+          <OnboardingProvider>
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                animation: 'fade',
+                animationDuration: 220,
+              }}
+            />
+          </OnboardingProvider>
         </ActiveProfileProvider>
       </AuthProvider>
     </SafeAreaProvider>

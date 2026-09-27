@@ -192,9 +192,12 @@ export default function ProfileSettings() {
         <Button
           label="Add another profile"
           variant="ghost"
-          onPress={() => router.push('/onboarding/who')}
+          onPress={() => router.push('/onboarding/goal-select')}
           style={{ marginTop: spacing.sm }}
         />
+
+        <Text style={styles.sectionTitle}>Premium</Text>
+        <Button label="See plans & pricing" variant="secondary" onPress={() => router.push('/onboarding/plans')} />
 
         <Text style={styles.sectionTitle}>Account</Text>
         <Button label="Sign out" variant="secondary" onPress={handleSignOut} />

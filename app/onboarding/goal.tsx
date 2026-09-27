@@ -7,8 +7,10 @@ import { TimeWheelPicker } from '@/components/onboarding/TimeWheelPicker';
 import { Button } from '@/components/ui/Button';
 import { SelectableCard } from '@/components/ui/SelectableCard';
 import { colors, spacing } from '@/constants/theme';
+import { fetchLessonMap } from '@/data/content';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
 import { useAuth } from '@/lib/auth/AuthContext';
+import { recommendNextStep } from '@/lib/nextStepRecommendation';
 import { useOnboarding } from '@/lib/onboarding/OnboardingContext';
 import type { DailyGoalMinutes } from '@/types/models';
 
@@ -35,7 +37,18 @@ export default function DailyGoalSetup() {
       await refreshProfiles();
       await setActiveProfileId(profile.id);
       reset();
-      router.replace('/home');
+
+      // Drop the user straight into a real lesson instead of the lesson map,
+      // so the very first thing they do after onboarding is learn something —
+      // falls back to /home if there's nothing to recommend yet.
+      const firstLesson = await fetchLessonMap(profile.id)
+        .then((units) => {
+          const allLessons = units.flatMap((u) => u.lessons);
+          const recommendation = recommendNextStep(allLessons, 0);
+          return (recommendation?.type === 'lesson' ? recommendation.lesson : null) ?? allLessons[0] ?? null;
+        })
+        .catch(() => null);
+      router.replace(firstLesson ? `/lesson/${firstLesson.id}` : '/home');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Something went wrong. Please try again.');
     } finally {
@@ -47,6 +60,8 @@ export default function DailyGoalSetup() {
     <OnboardingStepLayout
       title="Set a daily goal"
       subtitle="You can change this anytime from settings."
+      step={4}
+      totalSteps={4}
       footer={
         <>
           {error ? <Text style={{ color: colors.error, marginBottom: spacing.sm }}>{error}</Text> : null}
