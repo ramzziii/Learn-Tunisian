@@ -1,25 +1,27 @@
 import { router } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Reveal } from '@/components/ui/Reveal';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { sortScenariosByGoal, TALK_SCENARIOS } from '@/constants/talkScenarios';
-import { colors, radii, shadows, spacing } from '@/constants/theme';
+import { radii, spacing, type ThemeColors } from '@/constants/theme';
 import { fetchTalkLevel } from '@/data/talkContext';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
 import { canAccessTalkFeature } from '@/lib/ai/accessControl';
 import { meetsTalkLevel, type TalkLevel } from '@/lib/talkLevel';
+import { useTheme } from '@/lib/theme/ThemeContext';
 
 const LEVEL_LABEL: Record<TalkLevel, string> = { beginner: 'Beginner', intermediate: 'Intermediate', advanced: 'Advanced' };
 const LEVEL_EMOJI: Record<TalkLevel, string> = { beginner: '🌱', intermediate: '🌿', advanced: '🌳' };
 
 export default function TalkScenarioPicker() {
   const { activeProfile } = useActiveProfile();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [level, setLevel] = useState<TalkLevel | null>(null);
   const [loadError, setLoadError] = useState(false);
 
@@ -37,15 +39,14 @@ export default function TalkScenarioPicker() {
     load();
   }, [load]);
 
-  if (!activeProfile) return <LoadingScreen />;
+  if (!activeProfile) return <LoadingScreen themed />;
 
-  // Defense in depth: Home only shows the entry point for adult/teen
-  // profiles, but if a kid profile somehow reaches this route directly,
-  // it must not expose the feature — handled gracefully, not with an error.
+  // Defense in depth: the tab bar itself isn't hidden per-track, but if a
+  // kid profile reaches this tab, it must not expose the feature — handled
+  // gracefully, not with an error.
   if (!canAccessTalkFeature(activeProfile.track)) {
     return (
-      <ScreenContainer>
-        <BackButton />
+      <ScreenContainer themed>
         <View style={styles.unavailableContainer}>
           <Text style={styles.unavailableEmoji}>🌱</Text>
           <Text style={styles.unavailableTitle}>Coming soon!</Text>
@@ -59,25 +60,23 @@ export default function TalkScenarioPicker() {
 
   if (loadError || level === null) {
     return (
-      <ScreenContainer>
-        <BackButton />
+      <ScreenContainer themed>
         {loadError ? (
           <View style={styles.unavailableContainer}>
             <Text style={styles.unavailableEmoji}>😕</Text>
             <Text style={styles.unavailableTitle}>Couldn&apos;t load this</Text>
             <Text style={styles.unavailableBody}>Check your connection and try again.</Text>
-            <Button label="Try again" variant="secondary" onPress={load} style={{ marginTop: spacing.md }} />
+            <Button themed label="Try again" variant="secondary" onPress={load} style={{ marginTop: spacing.md }} />
           </View>
         ) : (
-          <LoadingScreen />
+          <LoadingScreen themed />
         )}
       </ScreenContainer>
     );
   }
 
   return (
-    <ScreenContainer>
-      <BackButton />
+    <ScreenContainer themed>
       <ScrollView showsVerticalScrollIndicator={false}>
         <Text style={styles.title}>Talk to a Tunisian 🇹🇳</Text>
         <Text style={styles.subtitle}>Choose a situation to practice a real conversation.</Text>
@@ -98,7 +97,7 @@ export default function TalkScenarioPicker() {
                 <PressableScale
                   haptic={unlocked}
                   disabled={!unlocked}
-                  style={[styles.scenarioRow, shadows.card, !unlocked && styles.scenarioRowLocked]}
+                  style={[styles.scenarioRow, styles.shadowCard, !unlocked && styles.scenarioRowLocked]}
                   onPress={() => router.push(`/talk/${scenario.id}`)}
                 >
                   <Text style={styles.scenarioEmoji}>{unlocked ? scenario.emoji : '🔒'}</Text>
@@ -127,43 +126,48 @@ export default function TalkScenarioPicker() {
   );
 }
 
-const styles = StyleSheet.create({
-  title: { fontSize: 26, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md },
-  subtitle: { fontSize: 14, color: colors.textSecondary, marginTop: spacing.xs },
-  levelBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: colors.surface,
-    borderRadius: radii.pill,
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.md,
-    marginTop: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  levelBadgeText: { fontSize: 13, fontWeight: '700', color: colors.primaryDark },
-  scenarioList: { gap: spacing.sm, paddingBottom: spacing.xl },
-  scenarioRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-    padding: spacing.md,
-  },
-  scenarioRowLocked: { opacity: 0.55 },
-  scenarioEmoji: { fontSize: 32 },
-  scenarioTextColumn: { flex: 1 },
-  scenarioTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  scenarioTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
-  recommendedBadge: {
-    backgroundColor: '#EAF6EF',
-    borderRadius: radii.pill,
-    paddingVertical: 2,
-    paddingHorizontal: spacing.xs,
-  },
-  recommendedBadgeText: { fontSize: 10, fontWeight: '700', color: colors.success },
-  scenarioDescription: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
-  unavailableContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm, padding: spacing.lg },
-  unavailableEmoji: { fontSize: 48, marginBottom: spacing.sm },
-  unavailableTitle: { fontSize: 20, fontWeight: '700', color: colors.textPrimary },
-  unavailableBody: { fontSize: 14, color: colors.textSecondary, textAlign: 'center' },
-});
+const makeStyles = (colors: ThemeColors) => {
+  const shadowCard = { shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 3 };
+
+  return StyleSheet.create({
+    shadowCard,
+    title: { fontSize: 26, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md },
+    subtitle: { fontSize: 14, color: colors.textSecondary, marginTop: spacing.xs },
+    levelBadge: {
+      alignSelf: 'flex-start',
+      backgroundColor: colors.surface,
+      borderRadius: radii.pill,
+      paddingVertical: spacing.xs,
+      paddingHorizontal: spacing.md,
+      marginTop: spacing.md,
+      marginBottom: spacing.lg,
+    },
+    levelBadgeText: { fontSize: 13, fontWeight: '700', color: colors.primaryDark },
+    scenarioList: { gap: spacing.sm, paddingBottom: spacing.xl },
+    scenarioRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      backgroundColor: colors.surface,
+      borderRadius: radii.lg,
+      padding: spacing.md,
+    },
+    scenarioRowLocked: { opacity: 0.55 },
+    scenarioEmoji: { fontSize: 32 },
+    scenarioTextColumn: { flex: 1 },
+    scenarioTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+    scenarioTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
+    recommendedBadge: {
+      backgroundColor: `${colors.success}1F`,
+      borderRadius: radii.pill,
+      paddingVertical: 2,
+      paddingHorizontal: spacing.xs,
+    },
+    recommendedBadgeText: { fontSize: 10, fontWeight: '700', color: colors.success },
+    scenarioDescription: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
+    unavailableContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm, padding: spacing.lg },
+    unavailableEmoji: { fontSize: 48, marginBottom: spacing.sm },
+    unavailableTitle: { fontSize: 20, fontWeight: '700', color: colors.textPrimary },
+    unavailableBody: { fontSize: 14, color: colors.textSecondary, textAlign: 'center' },
+  });
+};

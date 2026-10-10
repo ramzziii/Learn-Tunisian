@@ -58,6 +58,7 @@ export interface Unit {
   id: string;
   name: string;
   sortOrder: number;
+  isCurriculum: boolean;
 }
 
 export interface Lesson {

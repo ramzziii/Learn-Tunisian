@@ -45,6 +45,9 @@ export interface UnitRow {
   id: string;
   name: string;
   sort_order: number;
+  /** False for a phrasebook category unit — excluded from the sequential
+   * curriculum lesson map, reached through the Phrasebook screens instead. */
+  is_curriculum: boolean;
 }
 
 export interface LessonRow {

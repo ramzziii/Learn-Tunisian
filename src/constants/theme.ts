@@ -1,4 +1,8 @@
-export const colors = {
+// The light palette — this app's original, established look. Kept as the
+// flat `colors`/`gradients` exports below for every screen not yet
+// converted to the theme system (see src/lib/theme/ThemeContext.tsx), so
+// nothing outside that converted set changes behavior at all.
+export const lightColors = {
   background: '#FBF8F3',
   surface: '#FFFFFF',
   surfaceRaised: '#FFFFFF',
@@ -17,15 +21,53 @@ export const colors = {
   locked: '#D9D2C6',
 } as const;
 
-// Gradient pairs — used with expo-linear-gradient for headers, primary
-// buttons, and celebration moments, so the app doesn't read as flat blocks
-// of solid color everywhere.
-export const gradients = {
-  primary: [colors.primaryLight, colors.primaryDark] as const,
-  accent: [colors.accentLight, colors.accent] as const,
-  celebration: ['#FFD97D', colors.accent] as const,
-  success: [colors.successLight, colors.success] as const,
+// The dark palette — a deliberate design pass, not an inversion of light.
+// Deep navy rather than pure black (softer, more premium); primary/success
+// brightened for contrast against dark surfaces; two real elevation tiers
+// (surface vs. surfaceRaised are genuinely different tones here, since dark
+// UIs usually show elevation via lightness rather than shadow alone).
+export const darkColors = {
+  background: '#0F1419',
+  surface: '#1A2028',
+  surfaceRaised: '#232B35',
+  primary: '#4E8AC2',
+  primaryLight: '#6FA8D8',
+  primaryDark: '#35618C',
+  accent: '#F5B673',
+  accentLight: '#F8CB99',
+  success: '#5FBE87',
+  successLight: '#7FCE9E',
+  error: '#E2786A',
+  textPrimary: '#F2F0ED',
+  textSecondary: '#9CA3AD',
+  textOnPrimary: '#FFFFFF',
+  border: '#2A323C',
+  locked: '#3A424C',
 } as const;
+
+export type ThemeColors = Record<keyof typeof lightColors, string>;
+
+function buildGradients(c: ThemeColors) {
+  return {
+    primary: [c.primaryLight, c.primaryDark] as const,
+    accent: [c.accentLight, c.accent] as const,
+    // Celebration stays a consistent warm gold in both themes deliberately —
+    // a festive accent that should pop the same way regardless of theme.
+    celebration: ['#FFD97D', c.accent] as const,
+    success: [c.successLight, c.success] as const,
+  };
+}
+
+export type ThemeGradients = ReturnType<typeof buildGradients>;
+
+export const lightGradients = buildGradients(lightColors);
+export const darkGradients = buildGradients(darkColors);
+
+// Flat exports — the light theme, used directly by every screen not yet
+// converted to useTheme(). Converted screens import lightColors/darkColors
+// (or just useTheme()) instead.
+export const colors = lightColors;
+export const gradients = lightGradients;
 
 export const shadows = {
   card: {

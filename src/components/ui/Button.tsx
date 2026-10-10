@@ -1,8 +1,17 @@
 import { LinearGradient } from 'expo-linear-gradient';
+import { useMemo } from 'react';
 import { ActivityIndicator, StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native';
 
 import { PressableScale } from '@/components/ui/PressableScale';
-import { colors, gradients, radii, shadows, spacing } from '@/constants/theme';
+import {
+  colors as lightColors,
+  gradients as lightGradients,
+  radii,
+  shadows,
+  spacing,
+  type ThemeColors,
+} from '@/constants/theme';
+import { useTheme } from '@/lib/theme/ThemeContext';
 
 interface ButtonProps {
   label: string;
@@ -11,9 +20,17 @@ interface ButtonProps {
   disabled?: boolean;
   loading?: boolean;
   style?: StyleProp<ViewStyle>;
+  /** Opts into the live light/dark theme — see ScreenContainer's `themed`
+   * prop for why this defaults to false (safe for screens not yet
+   * converted to the theme system). */
+  themed?: boolean;
 }
 
-export function Button({ label, onPress, variant = 'primary', disabled, loading, style }: ButtonProps) {
+export function Button({ label, onPress, variant = 'primary', disabled, loading, style, themed = false }: ButtonProps) {
+  const live = useTheme();
+  const colors = themed ? live.colors : lightColors;
+  const gradients = themed ? live.gradients : lightGradients;
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const isDisabled = disabled || loading;
 
   const content = loading ? (
@@ -72,20 +89,21 @@ export function Button({ label, onPress, variant = 'primary', disabled, loading,
   );
 }
 
-const styles = StyleSheet.create({
-  base: {
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radii.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 52,
-  },
-  secondary: { backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.primary },
-  ghost: { backgroundColor: 'transparent' },
-  disabled: { opacity: 0.5 },
-  label: { fontSize: 16, fontWeight: '700' },
-  labelPrimary: { color: colors.textOnPrimary },
-  labelSecondary: { color: colors.primary },
-  labelGhost: { color: colors.textSecondary },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    base: {
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.lg,
+      borderRadius: radii.md,
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: 52,
+    },
+    secondary: { backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.primary },
+    ghost: { backgroundColor: 'transparent' },
+    disabled: { opacity: 0.5 },
+    label: { fontSize: 16, fontWeight: '700' },
+    labelPrimary: { color: colors.textOnPrimary },
+    labelSecondary: { color: colors.primary },
+    labelGhost: { color: colors.textSecondary },
+  });

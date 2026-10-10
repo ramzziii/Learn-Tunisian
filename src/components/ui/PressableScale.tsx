@@ -15,7 +15,7 @@ interface PressableScaleProps extends Omit<PressableProps, 'style'> {
 /** A Pressable that gives tactile feedback — scales down slightly on press instead of just an opacity flicker. */
 export function PressableScale({
   style,
-  scaleTo = 0.96,
+  scaleTo = 0.95,
   haptic = false,
   children,
   onPressIn,
@@ -23,24 +23,32 @@ export function PressableScale({
   ...props
 }: PressableScaleProps) {
   const scale = useRef(new Animated.Value(1)).current;
+  const opacity = useRef(new Animated.Value(1)).current;
 
-  const animateTo = (value: number) =>
-    Animated.spring(scale, { toValue: value, useNativeDriver: true, speed: 40, bounciness: 6 }).start();
+  // A touch more spring personality than a plain scale — a slight opacity
+  // dip alongside the scale reads more premium than scale alone, and this
+  // one shared tweak cascades to nearly every tappable surface in the app.
+  const animateTo = (scaleValue: number, opacityValue: number) => {
+    Animated.parallel([
+      Animated.spring(scale, { toValue: scaleValue, useNativeDriver: true, speed: 32, bounciness: 8 }),
+      Animated.timing(opacity, { toValue: opacityValue, duration: 100, useNativeDriver: true }),
+    ]).start();
+  };
 
   return (
     <Pressable
       onPressIn={(e) => {
-        animateTo(scaleTo);
+        animateTo(scaleTo, 0.85);
         if (haptic) Haptics.selectionAsync();
         onPressIn?.(e);
       }}
       onPressOut={(e) => {
-        animateTo(1);
+        animateTo(1, 1);
         onPressOut?.(e);
       }}
       {...props}
     >
-      <Animated.View style={[style, { transform: [{ scale }] }]}>{children}</Animated.View>
+      <Animated.View style={[style, { transform: [{ scale }], opacity }]}>{children}</Animated.View>
     </Pressable>
   );
 }

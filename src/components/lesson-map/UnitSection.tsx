@@ -1,8 +1,10 @@
+import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { LessonNode } from '@/components/lesson-map/LessonNode';
 import { Reveal } from '@/components/ui/Reveal';
-import { colors, radii, spacing } from '@/constants/theme';
+import { radii, spacing, type ThemeColors } from '@/constants/theme';
+import { useTheme } from '@/lib/theme/ThemeContext';
 import type { UnitWithLessons } from '@/data/content';
 import type { Track } from '@/types/models';
 
@@ -17,7 +19,11 @@ interface UnitSectionProps {
   isFirstUnit?: boolean;
 }
 
+// Like LessonNode, this component's only consumer is app/(tabs)/learn.tsx,
+// so it reacts to the live theme unconditionally.
 export function UnitSection({ unitWithLessons, track, onSelectLesson, onBrowseWords, isFirstUnit }: UnitSectionProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { unit, lessons } = unitWithLessons;
   const browsableLesson = lessons.find((lesson) => lesson.state !== 'locked');
 
@@ -49,13 +55,14 @@ export function UnitSection({ unitWithLessons, track, onSelectLesson, onBrowseWo
   );
 }
 
-const styles = StyleSheet.create({
-  section: { marginBottom: spacing.xxl },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.lg },
-  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  unitTitle: { fontSize: 15, fontWeight: '700', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 },
-  startHereBadge: { backgroundColor: colors.accentLight, borderRadius: radii.pill, paddingVertical: 2, paddingHorizontal: spacing.sm },
-  startHereText: { fontSize: 11, fontWeight: '700', color: colors.primaryDark, textTransform: 'none', letterSpacing: 0 },
-  browseLink: { fontSize: 13, fontWeight: '600', color: colors.primary },
-  lessonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xl, paddingBottom: spacing.md },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    section: { marginBottom: spacing.xxl },
+    headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.lg },
+    headerLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+    unitTitle: { fontSize: 15, fontWeight: '700', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 },
+    startHereBadge: { backgroundColor: colors.accentLight, borderRadius: radii.pill, paddingVertical: 2, paddingHorizontal: spacing.sm },
+    startHereText: { fontSize: 11, fontWeight: '700', color: colors.primaryDark, textTransform: 'none', letterSpacing: 0 },
+    browseLink: { fontSize: 13, fontWeight: '600', color: colors.primary },
+    lessonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xl, paddingBottom: spacing.md },
+  });

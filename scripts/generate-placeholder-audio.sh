@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Generates placeholder audio for every word_variants row in supabase/seed.sql
-# using macOS's built-in Arabic text-to-speech voice ("Majed"), so the app has
-# real (if not authentic) audio to play instead of silence.
+# and supabase/migrations/0007_phrasebook_content.sql, using macOS's built-in
+# Arabic text-to-speech voice ("Majed"), so the app has real (if not
+# authentic) audio to play instead of silence.
 #
 # IMPORTANT CAVEAT: "Majed" reads Modern Standard Arabic. It does NOT produce
 # authentic Tunisian dialect pronunciation — it's a functional stand-in for
@@ -39,16 +40,22 @@ MANIFEST=$(mktemp)
 trap 'rm -f "$MANIFEST"' EXIT
 
 python3 -c "
-import json, re
-content = open('supabase/seed.sql').read()
-section = content.split('insert into public.word_variants')[1]
+import re
+
 row_re = re.compile(
     r\"\('([^']*(?:''[^']*)*)',\s*'([^']*)',\s*'([^']*(?:''[^']*)*)',\s*'([^']*(?:''[^']*)*)',\s*'([^']*(?:''[^']*)*)',\"
 )
-for m in row_re.finditer(section):
-    wgid, label, arabic, translit, audio_path = m.groups()
-    unesc = lambda s: s.replace(chr(39)+chr(39), chr(39))
-    print(unesc(arabic) + '\t' + unesc(audio_path))
+unesc = lambda s: s.replace(chr(39)+chr(39), chr(39))
+
+# Every 'insert into public.word_variants (...) values ...' block across both
+# files — seed.sql's original content plus the phrasebook migration added
+# later — shares the exact same row shape, so one parser covers both.
+for path in ('supabase/seed.sql', 'supabase/migrations/0007_phrasebook_content.sql'):
+    content = open(path).read()
+    for section in content.split('insert into public.word_variants')[1:]:
+        for m in row_re.finditer(section):
+            wgid, label, arabic, translit, audio_path = m.groups()
+            print(unesc(arabic) + '\t' + unesc(audio_path))
 " > "$MANIFEST"
 
 count=0

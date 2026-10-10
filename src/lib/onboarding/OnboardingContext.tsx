@@ -33,8 +33,13 @@ const initialState: OnboardingState = {
   startingProficiency: 'none',
   learningGoal: null,
   dailyGoalMinutes: 10,
-  reminderHour: null,
-  reminderMinute: null,
+  // Pre-selected to match the 6:00 PM default the reminder-time picker
+  // already *displays* (see app/onboarding/goal.tsx) — previously these
+  // stayed null until the user actually touched the picker, so finishing
+  // onboarding without changing the time silently failed submit()'s
+  // "missing reminder settings" check even though the screen showed a time.
+  reminderHour: 18,
+  reminderMinute: 0,
 };
 
 interface OnboardingContextValue {

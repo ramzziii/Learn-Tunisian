@@ -73,7 +73,7 @@ export function mapConsentRecord(row: ConsentRecordRow): ConsentRecord {
 }
 
 export function mapUnit(row: UnitRow): Unit {
-  return { id: row.id, name: row.name, sortOrder: row.sort_order };
+  return { id: row.id, name: row.name, sortOrder: row.sort_order, isCurriculum: row.is_curriculum };
 }
 
 export function mapLesson(row: LessonRow): Lesson {
