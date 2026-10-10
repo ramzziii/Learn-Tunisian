@@ -23,14 +23,26 @@ export interface UnitWithLessons {
 export async function fetchLessonMap(profileId: string): Promise<UnitWithLessons[]> {
   const [{ data: unitRows, error: unitsError }, { data: lessonRows, error: lessonsError }] =
     await Promise.all([
-      supabase.from('units').select('*').order('sort_order'),
+      // Phrasebook categories (is_curriculum = false) are deliberately excluded
+      // here — they're not part of the sequential-unlock curriculum map,
+      // they're reached through the Phrasebook screens instead (see
+      // fetchPhrasebookCategories below), which still reuse this same content
+      // model and the exact same /lesson/[lessonId] session.
+      supabase.from('units').select('*').eq('is_curriculum', true).order('sort_order'),
       supabase.from('lessons').select('*').order('sort_order'),
     ]);
   if (unitsError) throw unitsError;
   if (lessonsError) throw lessonsError;
 
   const units = (unitRows ?? []) as UnitRow[];
-  const lessons = (lessonRows ?? []) as LessonRow[];
+  const curriculumUnitIds = new Set(units.map((u) => u.id));
+  // Excluding phrasebook-unit lessons here too (not just their units above)
+  // matters for correctness, not just tidiness — computeLessonStates below
+  // walks this list in order to decide which lesson unlocks first, and a
+  // phrasebook lesson whose unit got filtered out would otherwise sort to
+  // the front (its missing unit's sort_order defaults to 0) and wrongly
+  // become "the first lesson."
+  const lessons = ((lessonRows ?? []) as LessonRow[]).filter((l) => curriculumUnitIds.has(l.unit_id));
 
   const { data: groupRows, error: groupsError } = await supabase.from('word_groups').select('*');
   if (groupsError) throw groupsError;
@@ -88,6 +100,61 @@ export async function fetchLessonMap(profileId: string): Promise<UnitWithLessons
       });
     return { unit, lessons: unitLessons };
   });
+}
+
+export interface PhrasebookCategory {
+  unitId: string;
+  lessonId: string;
+  name: string;
+  phraseCount: number;
+}
+
+/**
+ * The phrasebook's own category list — units with is_curriculum = false,
+ * each with exactly one lesson (see 0007_phrasebook_content.sql). Deliberately
+ * separate from fetchLessonMap rather than a shared helper: this has no lock
+ * state, no progress-derived mastery count, none of the curriculum map's
+ * per-profile concerns — just "which categories exist and how big are they."
+ */
+export async function fetchPhrasebookCategories(): Promise<PhrasebookCategory[]> {
+  const { data: unitRows, error: unitsError } = await supabase
+    .from('units')
+    .select('*')
+    .eq('is_curriculum', false)
+    .order('sort_order');
+  if (unitsError) throw unitsError;
+  const units = (unitRows ?? []) as UnitRow[];
+  if (units.length === 0) return [];
+
+  const { data: lessonRows, error: lessonsError } = await supabase
+    .from('lessons')
+    .select('*')
+    .in('unit_id', units.map((u) => u.id));
+  if (lessonsError) throw lessonsError;
+  const lessonByUnitId = new Map(((lessonRows ?? []) as LessonRow[]).map((l) => [l.unit_id, l]));
+
+  const { data: groupRows, error: groupsError } = await supabase
+    .from('word_groups')
+    .select('id, unit_id')
+    .in('unit_id', units.map((u) => u.id));
+  if (groupsError) throw groupsError;
+  const countByUnitId = new Map<string, number>();
+  for (const row of (groupRows ?? []) as { id: string; unit_id: string }[]) {
+    countByUnitId.set(row.unit_id, (countByUnitId.get(row.unit_id) ?? 0) + 1);
+  }
+
+  return units
+    .map((unit) => {
+      const lesson = lessonByUnitId.get(unit.id);
+      if (!lesson) return null;
+      return {
+        unitId: unit.id,
+        lessonId: lesson.id,
+        name: unit.name,
+        phraseCount: countByUnitId.get(unit.id) ?? 0,
+      } satisfies PhrasebookCategory;
+    })
+    .filter((c): c is PhrasebookCategory => c !== null);
 }
 
 export async function fetchWordGroupsForLesson(lessonId: string): Promise<WordGroupWithVariants[]> {

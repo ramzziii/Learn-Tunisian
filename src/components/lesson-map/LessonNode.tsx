@@ -1,9 +1,10 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
 
 import { PressableScale } from '@/components/ui/PressableScale';
-import { adultTrackSizing, colors, gradients, kidTrackSizing, shadows, spacing } from '@/constants/theme';
+import { adultTrackSizing, kidTrackSizing, shadows, spacing, type ThemeColors } from '@/constants/theme';
+import { useTheme } from '@/lib/theme/ThemeContext';
 import type { LessonWithState, Track } from '@/types/models';
 
 interface LessonNodeProps {
@@ -12,7 +13,13 @@ interface LessonNodeProps {
   onPress: () => void;
 }
 
+// This component's only consumer is app/(tabs)/learn.tsx (also converted to
+// the theme system), so unlike most shared UI components it can react to
+// the live theme unconditionally — no risk of an unconverted screen
+// suddenly rendering it in the wrong palette.
 export function LessonNode({ lesson, track, onPress }: LessonNodeProps) {
+  const { colors, gradients } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const sizing = track === 'kid' ? kidTrackSizing : adultTrackSizing;
   const isLocked = lesson.state === 'locked';
   const isCompleted = lesson.state === 'completed';
@@ -80,10 +87,11 @@ export function LessonNode({ lesson, track, onPress }: LessonNodeProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  node: { alignItems: 'center', justifyContent: 'center' },
-  locked: { backgroundColor: colors.background, borderWidth: 3, borderColor: colors.locked },
-  emoji: { fontSize: 28 },
-  labelWrap: { position: 'absolute', bottom: -spacing.lg, width: 120, alignItems: 'center', alignSelf: 'center' },
-  label: { fontWeight: '600', color: colors.textPrimary, textAlign: 'center' },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    node: { alignItems: 'center', justifyContent: 'center' },
+    locked: { backgroundColor: colors.background, borderWidth: 3, borderColor: colors.locked },
+    emoji: { fontSize: 28 },
+    labelWrap: { position: 'absolute', bottom: -spacing.lg, width: 120, alignItems: 'center', alignSelf: 'center' },
+    label: { fontWeight: '600', color: colors.textPrimary, textAlign: 'center' },
+  });

@@ -1,13 +1,17 @@
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { colors, radii, spacing } from '@/constants/theme';
+import { colors as lightColors, radii, spacing, type ThemeColors } from '@/constants/theme';
+import { useTheme } from '@/lib/theme/ThemeContext';
 
 interface TimeWheelPickerProps {
   hour24: number;
   minute: number;
   onChange: (hour24: number, minute: number) => void;
+  /** Opts into the live light/dark theme — see ScreenContainer's `themed`
+   * prop for why this defaults to false. */
+  themed?: boolean;
 }
 
 function toDate(hour24: number, minute: number): Date {
@@ -26,7 +30,10 @@ function formatTime(hour24: number, minute: number): string {
  * always visible; Android doesn't have an inline wheel mode, so there it's a
  * button that opens the platform's native time dialog.
  */
-export function TimeWheelPicker({ hour24, minute, onChange }: TimeWheelPickerProps) {
+export function TimeWheelPicker({ hour24, minute, onChange, themed = false }: TimeWheelPickerProps) {
+  const live = useTheme();
+  const colors = themed ? live.colors : lightColors;
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [isAndroidPickerOpen, setIsAndroidPickerOpen] = useState(false);
 
   const handleChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
@@ -45,6 +52,11 @@ export function TimeWheelPicker({ hour24, minute, onChange }: TimeWheelPickerPro
           display="spinner"
           onChange={handleChange}
           style={styles.iosPicker}
+          // Without this, the native wheel's own text stays light-mode-only
+          // regardless of the surface it sits on — themed+dark would
+          // otherwise put unreadable dark text on this component's own dark
+          // background.
+          themeVariant={themed && live.isDark ? 'dark' : 'light'}
         />
       </View>
     );
@@ -62,23 +74,24 @@ export function TimeWheelPicker({ hour24, minute, onChange }: TimeWheelPickerPro
   );
 }
 
-const styles = StyleSheet.create({
-  iosWrapper: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.md,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    alignItems: 'center',
-  },
-  iosPicker: { height: 170, width: '100%' },
-  androidButton: {
-    alignSelf: 'center',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xl,
-    borderRadius: radii.md,
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-    backgroundColor: colors.surface,
-  },
-  androidButtonText: { fontSize: 20, fontWeight: '700', color: colors.primary },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    iosWrapper: {
+      backgroundColor: colors.surface,
+      borderRadius: radii.md,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      alignItems: 'center',
+    },
+    iosPicker: { height: 170, width: '100%' },
+    androidButton: {
+      alignSelf: 'center',
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.xl,
+      borderRadius: radii.md,
+      borderWidth: 1.5,
+      borderColor: colors.primary,
+      backgroundColor: colors.surface,
+    },
+    androidButtonText: { fontSize: 20, fontWeight: '700', color: colors.primary },
+  });
