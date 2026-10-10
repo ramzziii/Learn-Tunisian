@@ -20,6 +20,12 @@ export type PhoneticCue = {
   exampleWord: string;
 };
 
+export type ArabiziNote = {
+  /** How this sound is commonly typed in Tunisian Arabizi (Latin letters/digits), e.g. "3", "5 / kh". */
+  label: string;
+  explanation: string;
+};
+
 export type DiacriticId = 'fatha' | 'damma' | 'kasra';
 
 export type LetterPosition = 'isolated' | 'initial' | 'medial' | 'final';
@@ -52,6 +58,8 @@ export type ArabicLetter = {
   phoneticCue: PhoneticCue;
   /** Groups letters that share the same base glyph shape (differing only in dot count/placement) — the classic beginner mix-up set, used to pick distractors that actually test visual discrimination instead of random letters. */
   similarShapeGroup: string;
+  /** How this letter's sound is written in Tunisian Arabizi texting shorthand, for the handful of letters with no obvious Latin equivalent. Undefined for letters that just use their transliteration as-is. */
+  arabiziNote?: ArabiziNote;
   /** One example word per short vowel, for the per-letter diacritics screen. */
   vowelExamples: Record<DiacriticId, LetterExample>;
   /** One example word per connected-form position, for the Letter Forms/Examples section of the detail modal. */
@@ -174,7 +182,7 @@ export function splitAtLetter(word: string, letter: ArabicLetter): HighlightedWo
 // diacritics screen already makes everywhere (its vocalized glyphs are a
 // pronunciation drill, not a claim about standard spelling).
 export const ARABIC_LETTERS: ArabicLetter[] = [
-  { id: 'alif', label: 'أ', name: 'Alif', transliteration: 'a', sound: 'a', forms: formsOf('أ'), similarShapeGroup: 'alif', phoneticCue: { sound: 'A', exampleWord: 'Apple' }, positionExamples: {
+  { id: 'alif', label: 'أ', name: 'Alif', transliteration: 'a', sound: 'a', forms: formsOf('أ'), similarShapeGroup: 'alif', phoneticCue: { sound: 'A', exampleWord: 'Apple' }, arabiziNote: { label: '2', explanation: "A glottal stop — the little catch in your throat in 'uh-oh'. Appears in careful Arabizi spellings like sou2el (question)." }, positionExamples: {
     isolated: { arabic: 'أ', transliteration: 'a', english: 'standing alone' },
     initial: null,
     medial: null,
@@ -226,7 +234,7 @@ export const ARABIC_LETTERS: ArabicLetter[] = [
     { arabic: 'ثعلب', transliteration: "tha'lab", english: 'fox', emoji: '🦊' },
     { arabic: 'ثلج', transliteration: 'thalj', english: 'snow', emoji: '❄️' },
   ] },
-  { id: 'jeem', label: 'ج', name: 'Jeem', transliteration: 'j', sound: 'j', forms: formsOf('ج'), similarShapeGroup: 'hook', phoneticCue: { sound: 'Ja', exampleWord: 'Jar' }, positionExamples: {
+  { id: 'jeem', label: 'ج', name: 'Jeem', transliteration: 'j', sound: 'j', forms: formsOf('ج'), similarShapeGroup: 'hook', phoneticCue: { sound: 'Ja', exampleWord: 'Jar' }, arabiziNote: { label: 'j', explanation: "Usually just like the English 'j' in 'jam', written simply as j in Arabizi. Example: jey (coming), jaw (they came)." }, positionExamples: {
     isolated: { arabic: 'ج', transliteration: 'j', english: 'standing alone' },
     initial: { arabic: 'جمل', transliteration: 'jamal', english: 'camel', emoji: '🐫' },
     medial: { arabic: 'رجل', transliteration: 'rajul', english: 'man', emoji: '👨' },
@@ -239,7 +247,7 @@ export const ARABIC_LETTERS: ArabicLetter[] = [
     { arabic: 'جمل', transliteration: 'jamal', english: 'camel', emoji: '🐫' },
     { arabic: 'جبل', transliteration: 'jabal', english: 'mountain', emoji: '⛰️' },
   ] },
-  { id: 'haa', label: 'ح', name: 'Haa', transliteration: 'h', sound: 'h', forms: formsOf('ح'), similarShapeGroup: 'hook', phoneticCue: { sound: 'Ha', exampleWord: 'Hat' }, positionExamples: {
+  { id: 'haa', label: 'ح', name: 'Haa', transliteration: 'h', sound: 'h', forms: formsOf('ح'), similarShapeGroup: 'hook', phoneticCue: { sound: 'Ha', exampleWord: 'Hat' }, arabiziNote: { label: '7', explanation: 'A strong, breathy h pushed from the throat — heavier than the English h. Example: 7keya (talk/chat), n7eb (I like/love).' }, positionExamples: {
     isolated: { arabic: 'ح', transliteration: 'h', english: 'standing alone' },
     initial: { arabic: 'حصان', transliteration: 'hisan', english: 'horse', emoji: '🐎' },
     medial: { arabic: 'صحراء', transliteration: "sahra'", english: 'desert', emoji: '🏜️' },
@@ -252,7 +260,7 @@ export const ARABIC_LETTERS: ArabicLetter[] = [
     { arabic: 'حصان', transliteration: 'hisan', english: 'horse', emoji: '🐎' },
     { arabic: 'حليب', transliteration: 'haleeb', english: 'milk', emoji: '🥛' },
   ] },
-  { id: 'khaa', label: 'خ', name: 'Khaa', transliteration: 'kh', sound: 'kh', forms: formsOf('خ'), similarShapeGroup: 'hook', phoneticCue: { sound: 'Kha', exampleWord: 'Khaki' }, positionExamples: {
+  { id: 'khaa', label: 'خ', name: 'Khaa', transliteration: 'kh', sound: 'kh', forms: formsOf('خ'), similarShapeGroup: 'hook', phoneticCue: { sound: 'Kha', exampleWord: 'Khaki' }, arabiziNote: { label: '5 / kh', explanation: 'A rough, scraping sound from the back of the throat — like the "ch" in the German word Bach. Example: 5ir / khir (good).' }, positionExamples: {
     isolated: { arabic: 'خ', transliteration: 'kh', english: 'standing alone' },
     initial: { arabic: 'خبز', transliteration: 'khubz', english: 'bread', emoji: '🍞' },
     medial: { arabic: 'فخر', transliteration: 'fakhr', english: 'pride', emoji: '🏆' },
@@ -330,7 +338,7 @@ export const ARABIC_LETTERS: ArabicLetter[] = [
     { arabic: 'سمك', transliteration: 'samak', english: 'fish', emoji: '🐟' },
     { arabic: 'سيارة', transliteration: 'sayyara', english: 'car', emoji: '🚗' },
   ] },
-  { id: 'sheen', label: 'ش', name: 'Sheen', transliteration: 'sh', sound: 'sh', forms: formsOf('ش'), similarShapeGroup: 'seen', phoneticCue: { sound: 'Sha', exampleWord: 'Shark' }, positionExamples: {
+  { id: 'sheen', label: 'ش', name: 'Sheen', transliteration: 'sh', sound: 'sh', forms: formsOf('ش'), similarShapeGroup: 'seen', phoneticCue: { sound: 'Sha', exampleWord: 'Shark' }, arabiziNote: { label: 'ch / sh', explanation: 'Usually just the English sh sound. Both spellings are common: chnowa and shnowa both mean "what".' }, positionExamples: {
     isolated: { arabic: 'ش', transliteration: 'sh', english: 'standing alone' },
     initial: { arabic: 'شمس', transliteration: 'shams', english: 'sun', emoji: '☀️' },
     medial: { arabic: 'عشرة', transliteration: 'ashara', english: 'ten', emoji: '🔟' },
@@ -395,7 +403,7 @@ export const ARABIC_LETTERS: ArabicLetter[] = [
     { arabic: 'ظل', transliteration: 'dhill', english: 'shadow', emoji: '🌑' },
     { arabic: 'ظرف', transliteration: 'dharf', english: 'envelope', emoji: '✉️' },
   ] },
-  { id: 'ain', label: 'ع', name: 'Ayn', transliteration: 'a', sound: 'a', forms: formsOf('ع'), similarShapeGroup: 'ain', phoneticCue: { sound: 'A', exampleWord: 'Arm' }, positionExamples: {
+  { id: 'ain', label: 'ع', name: 'Ayn', transliteration: 'a', sound: 'a', forms: formsOf('ع'), similarShapeGroup: 'ain', phoneticCue: { sound: 'A', exampleWord: 'Arm' }, arabiziNote: { label: '3', explanation: "A deep sound made from the back of the throat — not like the English letter 'a'. Common in greetings: 3aychek (thank you / bless you)." }, positionExamples: {
     isolated: { arabic: 'ع', transliteration: 'a', english: 'standing alone' },
     initial: { arabic: 'عين', transliteration: 'ayn', english: 'eye', emoji: '👁️' },
     medial: { arabic: 'شعر', transliteration: "sha'r", english: 'hair', emoji: '💇' },
@@ -408,7 +416,7 @@ export const ARABIC_LETTERS: ArabicLetter[] = [
     { arabic: 'عين', transliteration: 'ayn', english: 'eye', emoji: '👁️' },
     { arabic: 'عصفور', transliteration: 'asfoor', english: 'bird', emoji: '🐦' },
   ] },
-  { id: 'ghayn', label: 'غ', name: 'Ghayn', transliteration: 'gh', sound: 'gh', forms: formsOf('غ'), similarShapeGroup: 'ain', phoneticCue: { sound: 'Gha', exampleWord: 'Guard' }, positionExamples: {
+  { id: 'ghayn', label: 'غ', name: 'Ghayn', transliteration: 'gh', sound: 'gh', forms: formsOf('غ'), similarShapeGroup: 'ain', phoneticCue: { sound: 'Gha', exampleWord: 'Guard' }, arabiziNote: { label: 'gh', explanation: "The voiced partner of 5/kh — a rough throaty sound, close to a French 'r' in some accents. Example: ghali (expensive)." }, positionExamples: {
     isolated: { arabic: 'غ', transliteration: 'gh', english: 'standing alone' },
     initial: { arabic: 'غزال', transliteration: 'ghazal', english: 'gazelle', emoji: '🦌' },
     medial: { arabic: 'صغير', transliteration: 'sagheer', english: 'small', emoji: '🤏' },
@@ -434,7 +442,7 @@ export const ARABIC_LETTERS: ArabicLetter[] = [
     { arabic: 'فيل', transliteration: 'feel', english: 'elephant', emoji: '🐘' },
     { arabic: 'فراشة', transliteration: 'farasha', english: 'butterfly', emoji: '🦋' },
   ] },
-  { id: 'qaaf', label: 'ق', name: 'Qaaf', transliteration: 'q', sound: 'q', forms: formsOf('ق'), similarShapeGroup: 'faa', phoneticCue: { sound: 'Qa', exampleWord: 'Cup' }, positionExamples: {
+  { id: 'qaaf', label: 'ق', name: 'Qaaf', transliteration: 'q', sound: 'q', forms: formsOf('ق'), similarShapeGroup: 'faa', phoneticCue: { sound: 'Qa', exampleWord: 'Cup' }, arabiziNote: { label: '9', explanation: 'Depending on the speaker and region this can come out as a hard q or a softer sound — Tunisians usually type it as 9.' }, positionExamples: {
     isolated: { arabic: 'ق', transliteration: 'q', english: 'standing alone' },
     initial: { arabic: 'قمر', transliteration: 'qamar', english: 'moon', emoji: '🌙' },
     medial: { arabic: 'رقم', transliteration: 'raqam', english: 'number', emoji: '🔢' },
@@ -512,7 +520,7 @@ export const ARABIC_LETTERS: ArabicLetter[] = [
     { arabic: 'هدية', transliteration: 'hadiya', english: 'gift', emoji: '🎁' },
     { arabic: 'هلال', transliteration: 'hilal', english: 'crescent', emoji: '🌙' },
   ] },
-  { id: 'waaw', label: 'و', name: 'Waw', transliteration: 'w', sound: 'w', forms: formsOf('و'), similarShapeGroup: 'waaw', phoneticCue: { sound: 'Wa', exampleWord: 'Water' }, positionExamples: {
+  { id: 'waaw', label: 'و', name: 'Waw', transliteration: 'w', sound: 'w', forms: formsOf('و'), similarShapeGroup: 'waaw', phoneticCue: { sound: 'Wa', exampleWord: 'Water' }, arabiziNote: { label: 'ou / w', explanation: "Can be a vowel ('ou') or a consonant ('w') depending on the word. Example: tounsi (Tunisian), wa9t (time)." }, positionExamples: {
     isolated: { arabic: 'وَ', transliteration: 'wa', english: 'and', emoji: '➕' },
     initial: null,
     medial: null,

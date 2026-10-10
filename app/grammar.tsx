@@ -1,34 +1,61 @@
-import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import * as Haptics from 'expo-haptics';
+import { useEffect, useMemo, useState } from 'react';
+import { LayoutAnimation, Platform, ScrollView, StyleSheet, Text, UIManager, View } from 'react-native';
 
 import { BackButton } from '@/components/ui/BackButton';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Reveal } from '@/components/ui/Reveal';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
-import { colors, radii, shadows, spacing } from '@/constants/theme';
+import { radii, spacing, type ThemeColors } from '@/constants/theme';
 import { GRAMMAR_NOTES } from '@/constants/grammarNotes';
+import { useLetterSpeech } from '@/hooks/useLetterSpeech';
+import { useTheme } from '@/lib/theme/ThemeContext';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+const EXPAND_ANIMATION = LayoutAnimation.create(220, 'easeInEaseOut', 'opacity');
 
 export default function GrammarScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [expandedId, setExpandedId] = useState<string | null>(GRAMMAR_NOTES[0]?.id ?? null);
+  const { speak, isSpeaking } = useLetterSpeech();
+  const [activeKey, setActiveKey] = useState<string | null>(null);
+
+  const toggle = (id: string) => {
+    LayoutAnimation.configureNext(EXPAND_ANIMATION);
+    setExpandedId((prev) => (prev === id ? null : id));
+  };
+
+  const play = (key: string, text: string) => {
+    Haptics.selectionAsync();
+    setActiveKey(key);
+    speak(text);
+  };
+
+  useEffect(() => {
+    if (!isSpeaking) setActiveKey(null);
+  }, [isSpeaking]);
 
   return (
-    <ScreenContainer>
-      <BackButton />
-      <Text style={styles.title}>Grammar Notes</Text>
-      <Text style={styles.subtitle}>Tounsi patterns — tap a topic to see examples and quick forms.</Text>
+    <ScreenContainer themed>
+      <BackButton themed />
+      <Text style={styles.eyebrow}>Grammar</Text>
+      <Text style={styles.title}>Tounsi Patterns</Text>
+      <Text style={styles.subtitle}>Tap a topic to see examples and quick forms.</Text>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.list}>
         {GRAMMAR_NOTES.map((note, index) => {
           const isExpanded = expandedId === note.id;
           return (
             <Reveal key={note.id} delay={Math.min(index * 60, 400)}>
-              <View style={[styles.card, shadows.card]}>
-                <PressableScale
-                  haptic
-                  onPress={() => setExpandedId(isExpanded ? null : note.id)}
-                  style={styles.headerRow}
-                >
-                  <Text style={styles.emoji}>{note.emoji}</Text>
+              <View style={[styles.card, styles.shadowCard, isExpanded && styles.cardExpanded]}>
+                <PressableScale haptic onPress={() => toggle(note.id)} style={styles.headerRow}>
+                  <View style={styles.emojiTile}>
+                    <Text style={styles.emoji}>{note.emoji}</Text>
+                  </View>
                   <Text style={styles.cardTitle}>{note.title}</Text>
                   <Text style={styles.chevron}>{isExpanded ? '⌄' : '›'}</Text>
                 </PressableScale>
@@ -38,9 +65,13 @@ export default function GrammarScreen() {
                     <Text style={styles.explanation}>{note.explanation}</Text>
 
                     {note.examples.map((example) => (
-                      <Text key={example.transliteration} style={styles.example}>
-                        &ldquo;{example.transliteration}&rdquo; — {example.english}
-                      </Text>
+                      <View key={example.transliteration} style={styles.exampleRow}>
+                        <Text style={styles.quoteMark}>&ldquo;</Text>
+                        <Text style={styles.example}>
+                          <Text style={styles.exampleTransliteration}>{example.transliteration}</Text> —{' '}
+                          {example.english}
+                        </Text>
+                      </View>
                     ))}
 
                     <View style={styles.termsBox}>
@@ -51,6 +82,45 @@ export default function GrammarScreen() {
                         </Text>
                       ))}
                     </View>
+
+                    {note.conjugationTable ? (
+                      <View style={styles.conjugationSection}>
+                        <View style={styles.patternPill}>
+                          <Text style={styles.patternPillText}>{note.conjugationTable.patternSummary}</Text>
+                        </View>
+                        <Text style={styles.modelLine}>
+                          MODEL{'  '}
+                          <Text style={styles.modelArabic}>{note.conjugationTable.modelArabic}</Text> ·{' '}
+                          {note.conjugationTable.modelTransliteration} · “{note.conjugationTable.modelMeaning}”
+                        </Text>
+                        <View style={styles.conjugationTable}>
+                          {note.conjugationTable.rows.map((row, rowIndex) => {
+                            const key = `${note.id}-${row.pronounEnglish}`;
+                            const isActive = activeKey === key;
+                            return (
+                              <PressableScale
+                                key={row.pronounEnglish}
+                                onPress={() => play(key, row.verbArabic)}
+                                style={[
+                                  styles.conjugationRow,
+                                  rowIndex % 2 === 1 && styles.conjugationRowAlt,
+                                ]}
+                              >
+                                <View>
+                                  <Text style={styles.conjugationPronounArabic}>{row.pronounArabic}</Text>
+                                  <Text style={styles.conjugationPronounEnglish}>{row.pronounEnglish}</Text>
+                                </View>
+                                <View style={styles.conjugationVerb}>
+                                  <Text style={styles.conjugationVerbArabic}>{row.verbArabic}</Text>
+                                  <Text style={styles.conjugationVerbTranslit}>{row.verbTransliteration}</Text>
+                                </View>
+                                <Text style={styles.conjugationAudioIcon}>{isActive ? '🔊' : '🔈'}</Text>
+                              </PressableScale>
+                            );
+                          })}
+                        </View>
+                      </View>
+                    ) : null}
                   </View>
                 ) : null}
               </View>
@@ -62,19 +132,81 @@ export default function GrammarScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  title: { fontSize: 26, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md },
-  subtitle: { fontSize: 14, color: colors.textSecondary, marginTop: spacing.xs, marginBottom: spacing.lg, lineHeight: 20 },
-  list: { gap: spacing.md, paddingBottom: spacing.xxl },
-  card: { backgroundColor: colors.surface, borderRadius: radii.lg, padding: spacing.md },
-  headerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  emoji: { fontSize: 22 },
-  cardTitle: { flex: 1, fontSize: 17, fontWeight: '700', color: colors.textPrimary },
-  chevron: { fontSize: 18, color: colors.textSecondary },
-  body: { marginTop: spacing.md },
-  explanation: { fontSize: 14, color: colors.textPrimary, lineHeight: 20, marginBottom: spacing.md },
-  example: { fontSize: 13, color: colors.textSecondary, fontStyle: 'italic', lineHeight: 19, marginBottom: spacing.xs },
-  termsBox: { backgroundColor: colors.background, borderRadius: radii.md, padding: spacing.md, marginTop: spacing.sm, gap: spacing.xs },
-  termLine: { fontSize: 14, color: colors.textPrimary },
-  termLabel: { fontWeight: '700' },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    shadowCard: {
+      shadowColor: '#000',
+      shadowOpacity: 0.06,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 3,
+    },
+    eyebrow: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: colors.error,
+      letterSpacing: 1,
+      textTransform: 'uppercase',
+      marginTop: spacing.md,
+    },
+    title: { fontSize: 30, fontWeight: '800', color: colors.textPrimary, marginTop: spacing.xs },
+    subtitle: { fontSize: 14, color: colors.textSecondary, marginTop: spacing.xs, marginBottom: spacing.lg, lineHeight: 20 },
+    list: { gap: spacing.md, paddingBottom: spacing.xxl },
+    card: { backgroundColor: colors.surface, borderRadius: radii.lg, padding: spacing.md },
+    cardExpanded: { borderWidth: 1, borderColor: `${colors.error}33` },
+    headerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+    emojiTile: {
+      width: 36,
+      height: 36,
+      borderRadius: radii.sm,
+      backgroundColor: `${colors.error}1F`,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    emoji: { fontSize: 18 },
+    cardTitle: { flex: 1, fontSize: 17, fontWeight: '700', color: colors.error },
+    chevron: { fontSize: 18, color: colors.textSecondary },
+    body: { marginTop: spacing.md },
+    explanation: { fontSize: 14, color: colors.textPrimary, lineHeight: 20, marginBottom: spacing.md },
+    exampleRow: { flexDirection: 'row', gap: spacing.xs, marginBottom: spacing.xs },
+    quoteMark: { fontSize: 16, color: colors.textSecondary, lineHeight: 19 },
+    example: { flex: 1, fontSize: 13, color: colors.textSecondary, lineHeight: 19 },
+    exampleTransliteration: { color: colors.textPrimary, fontWeight: '600' },
+    termsBox: {
+      backgroundColor: `${colors.error}14`,
+      borderRadius: radii.md,
+      padding: spacing.md,
+      marginTop: spacing.sm,
+      gap: spacing.xs,
+    },
+    termLine: { fontSize: 14, color: colors.textPrimary },
+    termLabel: { fontWeight: '700', color: colors.error },
+    conjugationSection: { marginTop: spacing.md },
+    patternPill: {
+      backgroundColor: `${colors.primary}1A`,
+      borderRadius: radii.pill,
+      paddingVertical: spacing.xs,
+      paddingHorizontal: spacing.md,
+      alignSelf: 'flex-start',
+      marginBottom: spacing.sm,
+    },
+    patternPillText: { fontSize: 12, fontWeight: '700', color: colors.primary },
+    modelLine: { fontSize: 12, color: colors.textSecondary, marginBottom: spacing.sm, letterSpacing: 0.5 },
+    modelArabic: { fontSize: 14, color: colors.textPrimary, letterSpacing: 0 },
+    conjugationTable: { borderRadius: radii.md, overflow: 'hidden' },
+    conjugationRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.sm,
+      backgroundColor: colors.surface,
+    },
+    conjugationRowAlt: { backgroundColor: colors.background },
+    conjugationPronounArabic: { fontSize: 14, color: colors.primary, textAlign: 'right' },
+    conjugationPronounEnglish: { fontSize: 11, color: colors.textSecondary, marginTop: 1 },
+    conjugationVerb: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.xs },
+    conjugationVerbArabic: { fontSize: 16, color: colors.textPrimary },
+    conjugationVerbTranslit: { fontSize: 12, color: colors.textSecondary, fontStyle: 'italic' },
+    conjugationAudioIcon: { fontSize: 13, marginLeft: spacing.sm, opacity: 0.6 },
+  });

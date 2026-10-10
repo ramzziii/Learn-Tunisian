@@ -83,6 +83,18 @@ export default function AlphabetFlashcardsScreen() {
           </View>
           <Text style={styles.exampleAudioHint}>🔈</Text>
         </PressableScale>
+
+        {letter.arabiziNote ? (
+          <View style={styles.arabiziCard}>
+            <View style={styles.arabiziHeaderRow}>
+              <Text style={styles.arabiziTitle}>Tunisian Arabizi</Text>
+              <View style={styles.arabiziBadge}>
+                <Text style={styles.arabiziBadgeText}>{letter.arabiziNote.label}</Text>
+              </View>
+            </View>
+            <Text style={styles.arabiziExplanation}>{letter.arabiziNote.explanation}</Text>
+          </View>
+        ) : null}
       </Animated.View>
 
       <View style={styles.navRow}>
@@ -156,6 +168,22 @@ const styles = StyleSheet.create({
   exampleArabicHighlight: { fontSize: 26, color: colors.error, fontWeight: '400' },
   exampleMeta: { fontSize: 13, color: colors.textSecondary, marginTop: spacing.xs },
   exampleAudioHint: { fontSize: 14, opacity: 0.5 },
+  arabiziCard: {
+    marginTop: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    padding: spacing.md,
+  },
+  arabiziHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  arabiziTitle: { fontSize: 12, fontWeight: '700', color: colors.textSecondary, textTransform: 'uppercase' },
+  arabiziBadge: {
+    backgroundColor: colors.primary,
+    borderRadius: radii.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+  },
+  arabiziBadgeText: { fontSize: 13, fontWeight: '700', color: colors.textOnPrimary },
+  arabiziExplanation: { fontSize: 13, color: colors.textPrimary, lineHeight: 19, marginTop: spacing.xs },
   navRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xl },
   navButtonWrapper: { flex: 1 },
   navButton: { paddingVertical: spacing.md, borderRadius: radii.md, alignItems: 'center' },

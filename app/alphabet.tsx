@@ -116,6 +116,11 @@ export default function AlphabetScreen() {
                 onPress={() => selectLetter(letter)}
                 style={[styles.letterCard, { width: cardWidth }, isAccessed && styles.letterCardPracticed]}
               >
+                {letter.arabiziNote ? (
+                  <View style={styles.arabiziBadge}>
+                    <Text style={styles.arabiziBadgeText}>{letter.arabiziNote.label}</Text>
+                  </View>
+                ) : null}
                 <Text style={styles.letter}>{letter.label}</Text>
                 <Text style={styles.letterName}>{letter.name}</Text>
                 <View style={[styles.underline, isAccessed && styles.underlineDone]} />
@@ -228,6 +233,16 @@ const styles = StyleSheet.create({
     ...shadows.card,
   },
   letterCardPracticed: { backgroundColor: '#EAF6EF' },
+  arabiziBadge: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    backgroundColor: colors.primary,
+    borderRadius: radii.sm,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
+  arabiziBadgeText: { fontSize: 9, fontWeight: '700', color: colors.textOnPrimary },
   letter: { fontSize: 32, color: colors.textPrimary },
   letterName: { color: colors.textPrimary, fontWeight: '600', marginTop: spacing.xs, fontSize: 13 },
   underline: { width: '60%', height: 4, borderRadius: 2, backgroundColor: colors.border, marginTop: spacing.sm },

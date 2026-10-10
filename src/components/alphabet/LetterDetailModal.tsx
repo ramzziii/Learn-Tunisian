@@ -90,6 +90,18 @@ export function LetterDetailModal({ letter, onClose }: LetterDetailModalProps) {
                 </PressableScale>
               </Animated.View>
 
+              {letter.arabiziNote ? (
+                <View style={styles.arabiziCard}>
+                  <View style={styles.arabiziHeaderRow}>
+                    <Text style={styles.arabiziTitle}>Tunisian Arabizi</Text>
+                    <View style={styles.arabiziBadge}>
+                      <Text style={styles.arabiziBadgeText}>{letter.arabiziNote.label}</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.arabiziExplanation}>{letter.arabiziNote.explanation}</Text>
+                </View>
+              ) : null}
+
               <Text style={styles.sectionLabel}>Letter Forms</Text>
               <View style={styles.formsRow}>
                 {FORM_LABELS.map((label) => {
@@ -211,6 +223,22 @@ const styles = StyleSheet.create({
   },
   playButtonActive: { backgroundColor: colors.primaryDark },
   playIcon: { fontSize: 22, color: colors.textOnPrimary },
+  arabiziCard: {
+    backgroundColor: colors.background,
+    borderRadius: radii.md,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  arabiziHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  arabiziTitle: { fontSize: 13, fontWeight: '700', color: colors.textSecondary, textTransform: 'uppercase' },
+  arabiziBadge: {
+    backgroundColor: colors.primary,
+    borderRadius: radii.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+  },
+  arabiziBadgeText: { fontSize: 13, fontWeight: '700', color: colors.textOnPrimary },
+  arabiziExplanation: { fontSize: 13, color: colors.textPrimary, lineHeight: 19, marginTop: spacing.xs },
   sectionLabel: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.sm },
   formsRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
   formBoxWrapper: { flex: 1 },
