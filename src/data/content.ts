@@ -44,7 +44,10 @@ export async function fetchLessonMap(profileId: string): Promise<UnitWithLessons
   // become "the first lesson."
   const lessons = ((lessonRows ?? []) as LessonRow[]).filter((l) => curriculumUnitIds.has(l.unit_id));
 
-  const { data: groupRows, error: groupsError } = await supabase.from('word_groups').select('*');
+  const { data: groupRows, error: groupsError } = await supabase
+    .from('word_groups')
+    .select('*')
+    .eq('content_status', 'approved');
   if (groupsError) throw groupsError;
   const groups = (groupRows ?? []) as WordGroupRow[];
 
@@ -136,7 +139,8 @@ export async function fetchPhrasebookCategories(): Promise<PhrasebookCategory[]>
   const { data: groupRows, error: groupsError } = await supabase
     .from('word_groups')
     .select('id, unit_id')
-    .in('unit_id', units.map((u) => u.id));
+    .in('unit_id', units.map((u) => u.id))
+    .eq('content_status', 'approved');
   if (groupsError) throw groupsError;
   const countByUnitId = new Map<string, number>();
   for (const row of (groupRows ?? []) as { id: string; unit_id: string }[]) {
@@ -170,6 +174,7 @@ export async function fetchWordGroupsForLesson(lessonId: string): Promise<WordGr
     .select('*')
     .eq('unit_id', lessonRow.unit_id)
     .eq('lesson_number', lessonRow.lesson_number)
+    .eq('content_status', 'approved')
     .order('sort_order');
   if (groupsError) throw groupsError;
   const groups = (groupRows ?? []) as WordGroupRow[];
@@ -179,6 +184,7 @@ export async function fetchWordGroupsForLesson(lessonId: string): Promise<WordGr
     .from('word_variants')
     .select('*')
     .in('word_group_id', groupIds.length > 0 ? groupIds : ['__none__'])
+    .eq('content_status', 'approved')
     .order('sort_order');
   if (variantsError) throw variantsError;
   const variants = (variantRows ?? []) as WordVariantRow[];
@@ -212,15 +218,23 @@ export async function fetchWordGroupWithSiblings(
     .select('*')
     .eq('unit_id', groupRow.unit_id)
     .eq('lesson_number', groupRow.lesson_number)
+    .eq('content_status', 'approved')
     .neq('id', wordGroupId);
   if (siblingsError) throw siblingsError;
   const siblings = (siblingRows ?? []) as WordGroupRow[];
 
+  // Siblings feed the distractor pool shown to a learner, so drafts must
+  // never appear there — but the primary group itself (looked up by id
+  // above) is intentionally left unfiltered: it's reached only via an id a
+  // learner was already shown through an already-filtered list, so
+  // filtering it again here would only risk a confusing "not found" if an
+  // admin's status edit raced with an open session.
   const allIds = [groupRow.id, ...siblings.map((g) => g.id)];
   const { data: variantRows, error: variantsError } = await supabase
     .from('word_variants')
     .select('*')
-    .in('word_group_id', allIds);
+    .in('word_group_id', allIds)
+    .eq('content_status', 'approved');
   if (variantsError) throw variantsError;
 
   const variantsByGroup = new Map<string, WordVariantRow[]>();

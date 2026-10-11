@@ -9,6 +9,7 @@ import { PressableScale } from '@/components/ui/PressableScale';
 import { colors, radii, shadows, spacing } from '@/constants/theme';
 import { useLetterSpeech } from '@/hooks/useLetterSpeech';
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
+import { useWordAudioPlayer } from '@/hooks/useWordAudioPlayer';
 import { isUsingMockAiProvider } from '@/lib/ai';
 import { transcribeAudio } from '@/lib/ai/functionsClient';
 import { getPrimaryVariant, isAnyVariantSpeechMatch } from '@/lib/wordVariants';
@@ -25,11 +26,17 @@ const MAX_ATTEMPTS = 3;
 
 /**
  * Modeled directly on src/components/culture/ProverbDetailModal.tsx (same
- * bottom-sheet shape/animation) — Arabic script, transliteration, an
- * on-device TTS play button (useLetterSpeech, same approach the Alphabet
- * feature already uses, so this works immediately without waiting on the
- * placeholder-audio pipeline the lesson *exercises* still rely on), the
- * usage note, and a record-and-compare control.
+ * bottom-sheet shape/animation) — Arabic script, transliteration, a play
+ * button, the usage note, and a record-and-compare control.
+ *
+ * The play button prefers the variant's real recorded audio (same
+ * useWordAudioPlayer/ensureAudioCached path every lesson exercise uses, so
+ * it benefits from the same offline caching and picks up admin-recorded
+ * native audio immediately) and only falls back to on-device TTS
+ * (useLetterSpeech, same approach the Alphabet feature uses) when this
+ * particular variant genuinely has no audio_path yet — previously this
+ * button used TTS unconditionally, which meant no phrase ever played a real
+ * recording even after one existed.
  *
  * Pronunciation checking reuses the exact same pipeline
  * src/components/exercises/adult/SpeakingPractice.tsx already uses for
@@ -59,6 +66,11 @@ export function PhraseDetailModal({ phrase, track, onClose }: PhraseDetailModalP
   const contentAnim = useRef(new Animated.Value(0)).current;
   const isVisible = phrase !== null;
   const scoringActive = !isUsingMockAiProvider;
+  // Computed here (not after the early returns below) so useWordAudioPlayer
+  // can be called unconditionally every render, same requirement as every
+  // other hook above it.
+  const variant = phrase ? getPrimaryVariant(phrase) : null;
+  const wordPlayer = useWordAudioPlayer(variant);
 
   useEffect(() => {
     Animated.timing(backdropAnim, { toValue: isVisible ? 1 : 0, duration: 200, useNativeDriver: true }).start();
@@ -74,13 +86,18 @@ export function PhraseDetailModal({ phrase, track, onClose }: PhraseDetailModalP
     Animated.spring(contentAnim, { toValue: 1, useNativeDriver: true, speed: 16, bounciness: 8 }).start();
   }, [phrase?.id, isVisible, contentAnim]);
 
-  if (!phrase) return null;
-  const variant = getPrimaryVariant(phrase);
-  if (!variant) return null;
+  if (!phrase || !variant) return null;
 
   const playPhrase = () => {
     Haptics.selectionAsync();
-    speak(variant.wordArabic);
+    if (wordPlayer.hasAudio) {
+      wordPlayer.play();
+    } else {
+      // No audio_path recorded for this variant yet — on-device TTS as a
+      // placeholder so the phrase is still audible, same fallback
+      // SpeakingPractice-style exercises use elsewhere in the app.
+      speak(variant.wordArabic);
+    }
   };
 
   const startRecording = async () => {
@@ -169,8 +186,13 @@ export function PhraseDetailModal({ phrase, track, onClose }: PhraseDetailModalP
               <Text style={styles.arabic}>{variant.wordArabic}</Text>
               <Text style={styles.transliteration}>{variant.transliteration}</Text>
 
-              <PressableScale onPress={playPhrase} style={[styles.playButton, isSpeaking && styles.playButtonActive]}>
-                <Text style={styles.playIcon}>{isSpeaking ? '🔊' : '▶'}</Text>
+              <PressableScale
+                onPress={playPhrase}
+                style={[styles.playButton, (wordPlayer.isPlaying || isSpeaking) && styles.playButtonActive]}
+              >
+                <Text style={styles.playIcon}>
+                  {wordPlayer.isResolving ? '…' : wordPlayer.isPlaying || isSpeaking ? '🔊' : '▶'}
+                </Text>
               </PressableScale>
             </Animated.View>
 

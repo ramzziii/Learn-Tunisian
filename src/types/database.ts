@@ -6,6 +6,7 @@ export interface AccountRow {
   id: string;
   email: string;
   created_at: string;
+  is_admin: boolean;
 }
 
 export interface ProfileRow {
@@ -48,6 +49,10 @@ export interface UnitRow {
   /** False for a phrasebook category unit — excluded from the sequential
    * curriculum lesson map, reached through the Phrasebook screens instead. */
   is_curriculum: boolean;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface LessonRow {
@@ -56,6 +61,10 @@ export interface LessonRow {
   lesson_number: number;
   title: string | null;
   sort_order: number;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface WordGroupRow {
@@ -66,6 +75,11 @@ export interface WordGroupRow {
   image_keyword: string | null;
   image_path: string | null;
   sort_order: number;
+  content_status: string;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface WordVariantRow {
@@ -78,6 +92,16 @@ export interface WordVariantRow {
   notes: string | null;
   sort_order: number;
   native_verified: boolean;
+  content_status: string;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+  speaker_name: string | null;
+  dialect_notes: string | null;
+  is_native_voice: boolean;
+  approved_by: string | null;
+  approved_at: string | null;
 }
 
 export interface ProgressRow {
@@ -123,4 +147,5 @@ export interface CorrectionRow {
   reviewed_at: string | null;
   notes: string | null;
   created_at: string;
+  correction_reason: string | null;
 }

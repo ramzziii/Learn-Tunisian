@@ -1,33 +1,62 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { PillSelect } from '@/components/admin/PillSelect';
 import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
-import { PressableScale } from '@/components/ui/PressableScale';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { colors, radii, shadows, spacing } from '@/constants/theme';
-import { fetchPendingCorrections, submitReview, type PendingCorrection } from '@/data/corrections';
+import {
+  fetchPendingCorrections,
+  fetchReviewedCorrections,
+  submitReview,
+  type CorrectionReason,
+  type PendingCorrection,
+  type ReviewedCorrection,
+} from '@/data/corrections';
 
-// Deliberately not linked from Settings/Home navigation, and no new
-// auth/role system — reachable only via this direct route. This app has one
-// trusted household account right now; revisit if that ever changes. See
-// the plan's Context section for the reasoning.
+// Gated by app/admin/_layout.tsx (admin-only) — not linked from
+// Settings/Home navigation, reachable only via this direct route, same as
+// every other /admin/* screen.
+
+const TARGET_TABLE_OPTIONS = [
+  { value: 'sentence', label: 'Sentence' },
+  { value: 'phrase', label: 'Phrase' },
+];
+
+const REASON_OPTIONS: { value: CorrectionReason; label: string }[] = [
+  { value: 'too_formal', label: 'Too formal' },
+  { value: 'too_casual', label: 'Too casual' },
+  { value: 'dialected', label: 'Dialected' },
+  { value: 'incorrect', label: 'Incorrect' },
+  { value: 'other', label: 'Other' },
+];
+
+const REASON_LABEL: Record<CorrectionReason, string> = Object.fromEntries(
+  REASON_OPTIONS.map((o) => [o.value, o.label])
+) as Record<CorrectionReason, string>;
 
 interface DraftFields {
   tunisian: string;
   english: string;
   transliteration: string;
   targetTable: 'phrase' | 'sentence';
+  correctionReason: CorrectionReason | null;
 }
 
 export default function CorrectionsReview() {
+  const [view, setView] = useState<'pending' | 'history'>('pending');
+
   const [reviewerName, setReviewerName] = useState('');
   const [pending, setPending] = useState<PendingCorrection[] | null>(null);
   const [drafts, setDrafts] = useState<Record<string, DraftFields>>({});
   const [loadError, setLoadError] = useState(false);
   const [submittingId, setSubmittingId] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const [history, setHistory] = useState<ReviewedCorrection[] | null>(null);
+  const [historyError, setHistoryError] = useState(false);
 
   const load = useCallback(async () => {
     setLoadError(false);
@@ -38,7 +67,13 @@ export default function CorrectionsReview() {
         Object.fromEntries(
           rows.map((row) => [
             row.id,
-            { tunisian: row.tunisian, english: row.english, transliteration: row.transliteration, targetTable: row.targetTable },
+            {
+              tunisian: row.tunisian,
+              english: row.english,
+              transliteration: row.transliteration,
+              targetTable: row.targetTable,
+              correctionReason: null,
+            },
           ])
         )
       );
@@ -47,9 +82,22 @@ export default function CorrectionsReview() {
     }
   }, []);
 
+  const loadHistory = useCallback(async () => {
+    setHistoryError(false);
+    try {
+      setHistory(await fetchReviewedCorrections());
+    } catch {
+      setHistoryError(true);
+    }
+  }, []);
+
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (view === 'history' && history === null) loadHistory();
+  }, [view, history, loadHistory]);
 
   const updateDraft = (id: string, patch: Partial<DraftFields>) => {
     setDrafts((current) => ({ ...current, [id]: { ...current[id], ...patch } }));
@@ -59,6 +107,10 @@ export default function CorrectionsReview() {
     const draft = drafts[correction.id];
     if (!draft || !reviewerName.trim()) {
       setSubmitError('Enter your reviewer name above first.');
+      return;
+    }
+    if (action === 'reject' && !draft.correctionReason) {
+      setSubmitError('Pick a reason for the correction above first.');
       return;
     }
     setSubmitError(null);
@@ -72,8 +124,10 @@ export default function CorrectionsReview() {
         englishText: draft.english.trim(),
         transliteration: draft.transliteration.trim(),
         reviewerName: reviewerName.trim(),
+        correctionReason: action === 'reject' ? (draft.correctionReason ?? undefined) : undefined,
       });
       setPending((current) => (current ?? []).filter((c) => c.id !== correction.id));
+      setHistory(null); // stale now — reload next time History is opened
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'Review failed.');
     } finally {
@@ -99,96 +153,178 @@ export default function CorrectionsReview() {
     <ScreenContainer>
       <BackButton />
       <Text style={styles.title}>Correction Review</Text>
-      <Text style={styles.subtitle}>
-        {pending.length} pending — approve as-is, or edit and save a correction. Either way it's added to the verified
-        corpus.
-      </Text>
 
-      <TextInput
-        value={reviewerName}
-        onChangeText={setReviewerName}
-        placeholder="Your name (recorded as native_reviewer)"
-        placeholderTextColor={colors.textSecondary}
-        style={styles.reviewerInput}
-      />
-      {submitError ? <Text style={styles.errorText}>{submitError}</Text> : null}
+      <View style={styles.tabRow}>
+        <Button
+          label={`Pending (${pending.length})`}
+          variant={view === 'pending' ? 'primary' : 'secondary'}
+          onPress={() => setView('pending')}
+          style={{ flex: 1 }}
+        />
+        <Button
+          label="History"
+          variant={view === 'history' ? 'primary' : 'secondary'}
+          onPress={() => setView('history')}
+          style={{ flex: 1 }}
+        />
+      </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.list}>
-        {pending.length === 0 ? <Text style={styles.emptyText}>Nothing pending review right now.</Text> : null}
+      {view === 'pending' ? (
+        <>
+          <Text style={styles.subtitle}>
+            Approve as-is, or edit and save a correction. Either way it&apos;s added to the verified corpus.
+          </Text>
 
-        {pending.map((correction) => {
-          const draft = drafts[correction.id];
-          if (!draft) return null;
-          const isSubmitting = submittingId === correction.id;
+          <TextInput
+            value={reviewerName}
+            onChangeText={setReviewerName}
+            placeholder="Your name (recorded as native_reviewer)"
+            placeholderTextColor={colors.textSecondary}
+            style={styles.reviewerInput}
+          />
+          {submitError ? <Text style={styles.errorText}>{submitError}</Text> : null}
 
-          return (
-            <View key={correction.id} style={[styles.card, shadows.card]}>
-              <Text style={styles.cardMeta}>{new Date(correction.createdAt).toLocaleString()}</Text>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.list}>
+            {pending.length === 0 ? <Text style={styles.emptyText}>Nothing pending review right now.</Text> : null}
 
-              <Text style={styles.fieldLabel}>Tunisian</Text>
-              <TextInput
-                value={draft.tunisian}
-                onChangeText={(text) => updateDraft(correction.id, { tunisian: text })}
-                style={styles.input}
-                multiline
-              />
-              <Text style={styles.fieldLabel}>English</Text>
-              <TextInput
-                value={draft.english}
-                onChangeText={(text) => updateDraft(correction.id, { english: text })}
-                style={styles.input}
-                multiline
-              />
-              <Text style={styles.fieldLabel}>Transliteration</Text>
-              <TextInput
-                value={draft.transliteration}
-                onChangeText={(text) => updateDraft(correction.id, { transliteration: text })}
-                style={styles.input}
-              />
+            {pending.map((correction) => {
+              const draft = drafts[correction.id];
+              if (!draft) return null;
+              const isSubmitting = submittingId === correction.id;
+              const isEdited =
+                draft.tunisian !== correction.tunisian ||
+                draft.english !== correction.english ||
+                draft.transliteration !== correction.transliteration;
 
-              <Text style={styles.fieldLabel}>Promote into</Text>
-              <View style={styles.targetRow}>
-                {(['sentence', 'phrase'] as const).map((option) => (
-                  <PressableScale
-                    key={option}
-                    onPress={() => updateDraft(correction.id, { targetTable: option })}
-                    style={[styles.targetOption, draft.targetTable === option && styles.targetOptionSelected]}
-                  >
-                    <Text
-                      style={[styles.targetOptionText, draft.targetTable === option && styles.targetOptionTextSelected]}
-                    >
-                      {option}
-                    </Text>
-                  </PressableScale>
-                ))}
-              </View>
+              return (
+                <View key={correction.id} style={[styles.card, shadows.card]}>
+                  <Text style={styles.cardMeta}>{new Date(correction.createdAt).toLocaleString()}</Text>
 
-              <View style={styles.actionsRow}>
-                <Button
-                  label="❌ Save correction"
-                  variant="secondary"
-                  onPress={() => handleReview(correction, 'reject')}
-                  loading={isSubmitting}
-                  style={{ flex: 1 }}
-                />
-                <Button
-                  label="✅ Correct as shown"
-                  onPress={() => handleReview(correction, 'approve')}
-                  loading={isSubmitting}
-                  style={{ flex: 1 }}
-                />
-              </View>
-            </View>
-          );
-        })}
-      </ScrollView>
+                  <Text style={styles.fieldLabel}>Tunisian</Text>
+                  <TextInput
+                    value={draft.tunisian}
+                    onChangeText={(text) => updateDraft(correction.id, { tunisian: text })}
+                    style={styles.input}
+                    multiline
+                  />
+                  <Text style={styles.fieldLabel}>English</Text>
+                  <TextInput
+                    value={draft.english}
+                    onChangeText={(text) => updateDraft(correction.id, { english: text })}
+                    style={styles.input}
+                    multiline
+                  />
+                  <Text style={styles.fieldLabel}>Transliteration</Text>
+                  <TextInput
+                    value={draft.transliteration}
+                    onChangeText={(text) => updateDraft(correction.id, { transliteration: text })}
+                    style={styles.input}
+                  />
+
+                  <PillSelect
+                    label="Promote into"
+                    options={TARGET_TABLE_OPTIONS}
+                    value={draft.targetTable}
+                    onChange={(v) => updateDraft(correction.id, { targetTable: v as 'phrase' | 'sentence' })}
+                  />
+
+                  {isEdited ? (
+                    <PillSelect
+                      label="Why did this need correcting?"
+                      options={REASON_OPTIONS}
+                      value={draft.correctionReason ?? ''}
+                      onChange={(v) => updateDraft(correction.id, { correctionReason: v as CorrectionReason })}
+                    />
+                  ) : null}
+
+                  <View style={styles.actionsRow}>
+                    <Button
+                      label="❌ Save correction"
+                      variant="secondary"
+                      onPress={() => handleReview(correction, 'reject')}
+                      loading={isSubmitting}
+                      style={{ flex: 1 }}
+                    />
+                    <Button
+                      label="✅ Correct as shown"
+                      onPress={() => handleReview(correction, 'approve')}
+                      loading={isSubmitting}
+                      style={{ flex: 1 }}
+                    />
+                  </View>
+                </View>
+              );
+            })}
+          </ScrollView>
+        </>
+      ) : (
+        <HistoryView history={history} error={historyError} onRetry={loadHistory} />
+      )}
     </ScreenContainer>
+  );
+}
+
+function HistoryView({
+  history,
+  error,
+  onRetry,
+}: {
+  history: ReviewedCorrection[] | null;
+  error: boolean;
+  onRetry: () => void;
+}) {
+  if (error) {
+    return (
+      <View style={styles.centered}>
+        <Text style={styles.centeredTitle}>Couldn&apos;t load history</Text>
+        <Button label="Try again" variant="secondary" onPress={onRetry} />
+      </View>
+    );
+  }
+  if (history === null) return <LoadingScreen />;
+
+  return (
+    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.list}>
+      {history.length === 0 ? <Text style={styles.emptyText}>No reviewed corrections yet.</Text> : null}
+      {history.map((item) => (
+        <View key={item.id} style={[styles.card, shadows.card]}>
+          <Text style={styles.cardMeta}>
+            {new Date(item.reviewedAt).toLocaleString()} · {item.reviewerName ?? 'unknown reviewer'}
+          </Text>
+          {item.wasEdited ? (
+            <>
+              <Text style={styles.fieldLabel}>Original (AI)</Text>
+              <Text style={styles.historyText}>
+                {item.original.tunisian} — {item.original.english}
+              </Text>
+              <Text style={styles.fieldLabel}>Corrected</Text>
+              <Text style={styles.historyText}>
+                {item.final.tunisian} — {item.final.english}
+              </Text>
+              {item.correctionReason ? (
+                <View style={styles.reasonBadge}>
+                  <Text style={styles.reasonBadgeText}>{REASON_LABEL[item.correctionReason]}</Text>
+                </View>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <Text style={styles.fieldLabel}>Approved as shown</Text>
+              <Text style={styles.historyText}>
+                {item.final.tunisian} — {item.final.english}
+              </Text>
+            </>
+          )}
+        </View>
+      ))}
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md },
   subtitle: { fontSize: 13, color: colors.textSecondary, marginTop: spacing.xs, marginBottom: spacing.md },
+  tabRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm, marginBottom: spacing.sm },
   reviewerInput: {
     borderWidth: 1.5,
     borderColor: colors.border,
@@ -216,17 +352,16 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     backgroundColor: colors.background,
   },
-  targetRow: { flexDirection: 'row', gap: spacing.xs, marginTop: 4 },
-  targetOption: {
-    borderWidth: 1,
-    borderColor: colors.border,
+  historyText: { fontSize: 14, color: colors.textPrimary },
+  reasonBadge: {
+    backgroundColor: `${colors.accent}26`,
     borderRadius: radii.pill,
-    paddingVertical: 4,
-    paddingHorizontal: spacing.md,
+    paddingVertical: 2,
+    paddingHorizontal: spacing.sm,
+    alignSelf: 'flex-start',
+    marginTop: spacing.xs,
   },
-  targetOptionSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
-  targetOptionText: { fontSize: 12, color: colors.textPrimary },
-  targetOptionTextSelected: { color: colors.textOnPrimary, fontWeight: '700' },
+  reasonBadgeText: { fontSize: 11, fontWeight: '700', color: colors.primaryDark },
   actionsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
   centeredTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },

@@ -11,6 +11,7 @@ import { colors, radii, shadows, spacing } from '@/constants/theme';
 import { fetchPhrasebookCategories, fetchWordGroupsForLesson } from '@/data/content';
 import { useFadeInOnChange } from '@/hooks/useFadeInOnChange';
 import { useLetterSpeech } from '@/hooks/useLetterSpeech';
+import { useWordAudioPlayer } from '@/hooks/useWordAudioPlayer';
 import { getPrimaryVariant } from '@/lib/wordVariants';
 import type { WordGroupWithVariants } from '@/types/models';
 
@@ -25,6 +26,12 @@ export default function PhrasebookFlashcardsScreen() {
   const [index, setIndex] = useState(0);
   const { speak, isSpeaking } = useLetterSpeech();
   const fadeAnim = useFadeInOnChange(String(index));
+  // Computed here (not after the early returns below) so useWordAudioPlayer
+  // can be called unconditionally every render, same requirement as every
+  // other hook above it.
+  const card = cards?.[index] ?? null;
+  const variant = card ? getPrimaryVariant(card) : null;
+  const wordPlayer = useWordAudioPlayer(variant);
 
   useEffect(() => {
     let cancelled = false;
@@ -54,8 +61,10 @@ export default function PhrasebookFlashcardsScreen() {
     );
   }
 
-  const card = cards[index];
-  const variant = getPrimaryVariant(card);
+  // Unreachable in practice (cards.length > 0 here guarantees cards[index]
+  // exists) — just satisfies narrowing for the render below, which uses
+  // `card` rather than re-indexing `cards[index]` directly.
+  if (!card) return null;
 
   const goNext = () => {
     Haptics.selectionAsync();
@@ -68,7 +77,13 @@ export default function PhrasebookFlashcardsScreen() {
   const playCard = () => {
     if (!variant) return;
     Haptics.selectionAsync();
-    speak(variant.wordArabic);
+    if (wordPlayer.hasAudio) {
+      wordPlayer.play();
+    } else {
+      // No audio_path recorded for this variant yet — on-device TTS as a
+      // placeholder so the card is still audible.
+      speak(variant.wordArabic);
+    }
   };
 
   return (
@@ -95,8 +110,10 @@ export default function PhrasebookFlashcardsScreen() {
               <Text style={styles.transliteration}>{variant.transliteration}</Text>
             </>
           ) : null}
-          <View style={[styles.playBadge, isSpeaking && styles.playBadgeActive]}>
-            <Text style={styles.playIcon}>{isSpeaking ? '🔊 Playing…' : '▶ Tap to hear it'}</Text>
+          <View style={[styles.playBadge, (wordPlayer.isPlaying || isSpeaking) && styles.playBadgeActive]}>
+            <Text style={styles.playIcon}>
+              {wordPlayer.isResolving ? 'Loading…' : wordPlayer.isPlaying || isSpeaking ? '🔊 Playing…' : '▶ Tap to hear it'}
+            </Text>
           </View>
         </PressableScale>
       </Animated.View>

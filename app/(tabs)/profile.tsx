@@ -15,6 +15,7 @@ import { countCompletedLessons } from '@/data/content';
 import { fetchDailyGoalSettings, updateDailyGoalSettings } from '@/data/profiles';
 import { fetchProgressSummary, type ProfileProgressSummary } from '@/data/progress';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
+import { useIsAdmin } from '@/lib/admin/AdminContext';
 import { useAuth } from '@/lib/auth/AuthContext';
 import { cancelDailyReminder, requestNotificationPermission, scheduleDailyReminder } from '@/lib/notifications/reminders';
 import { useTheme, type ThemePreference } from '@/lib/theme/ThemeContext';
@@ -50,6 +51,7 @@ interface ProgressStats extends ProfileProgressSummary {
 export default function ProfileScreen() {
   const { activeProfile, profiles } = useActiveProfile();
   const { signOut } = useAuth();
+  const { isAdmin } = useIsAdmin();
   const { colors, preference, setPreference } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [goalSettings, setGoalSettings] = useState<DailyGoalSettings | null>(null);
@@ -250,6 +252,13 @@ export default function ProfileScreen() {
 
         <Text style={styles.sectionTitle}>Account</Text>
         <Button themed label="Sign out" variant="secondary" onPress={handleSignOut} />
+
+        {isAdmin ? (
+          <>
+            <Text style={styles.sectionTitle}>Admin</Text>
+            <Button themed label="Content Admin" variant="secondary" onPress={() => router.push('/admin')} />
+          </>
+        ) : null}
       </ScrollView>
     </ScreenContainer>
   );
