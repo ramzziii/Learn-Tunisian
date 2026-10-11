@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ActiveProfileProvider } from '@/lib/account/ActiveProfileContext';
+import { AdminProvider } from '@/lib/admin/AdminContext';
 import { AuthProvider } from '@/lib/auth/AuthContext';
 import { OnboardingProvider } from '@/lib/onboarding/OnboardingContext';
 import { ThemeProvider, useTheme } from '@/lib/theme/ThemeContext';
@@ -21,11 +22,13 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <ThemeProvider>
         <AuthProvider>
-          <ActiveProfileProvider>
-            <OnboardingProvider>
-              <RootNavigator />
-            </OnboardingProvider>
-          </ActiveProfileProvider>
+          <AdminProvider>
+            <ActiveProfileProvider>
+              <OnboardingProvider>
+                <RootNavigator />
+              </OnboardingProvider>
+            </ActiveProfileProvider>
+          </AdminProvider>
         </AuthProvider>
       </ThemeProvider>
     </SafeAreaProvider>

@@ -23,6 +23,8 @@ const REQUEST_TIMEOUT_MS = 20_000;
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
 
+type CorrectionReason = 'too_formal' | 'too_casual' | 'dialected' | 'incorrect' | 'other';
+
 interface RequestBody {
   correctionId: string;
   action: 'approve' | 'reject';
@@ -32,6 +34,8 @@ interface RequestBody {
   transliteration: string;
   topic?: string;
   reviewerName: string;
+  /** Why the AI's text needed correcting — only meaningful when action is 'reject'. */
+  correctionReason?: CorrectionReason;
 }
 
 function corsHeaders(): HeadersInit {
@@ -151,6 +155,7 @@ Deno.serve(async (req) => {
         : null,
       reviewer_name: body.reviewerName,
       reviewed_at: new Date().toISOString(),
+      correction_reason: isEdited ? (body.correctionReason ?? null) : null,
     })
     .eq('id', body.correctionId);
   if (updateError) {

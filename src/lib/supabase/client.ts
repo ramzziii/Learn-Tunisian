@@ -33,9 +33,19 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 const AUDIO_BUCKET = 'audio';
 const IMAGES_BUCKET = 'images';
 
-export function getAudioUrl(audioPath: string | null): string | null {
+/**
+ * `cacheBust` defeats CDN/browser caching of the public URL — pass `true`
+ * for an immediate one-off bust (e.g. right after an admin's own upload), or
+ * a stable value (e.g. a word_variant's `updatedAt`) so the URL only
+ * changes when the content actually does, rather than on every single call
+ * (which would defeat the CDN's caching entirely).
+ */
+export function getAudioUrl(audioPath: string | null, cacheBust?: string | number | boolean): string | null {
   if (!audioPath) return null;
-  return supabase.storage.from(AUDIO_BUCKET).getPublicUrl(audioPath).data.publicUrl;
+  const url = supabase.storage.from(AUDIO_BUCKET).getPublicUrl(audioPath).data.publicUrl;
+  if (!cacheBust) return url;
+  const version = cacheBust === true ? Date.now() : cacheBust;
+  return `${url}${url.includes('?') ? '&' : '?'}_=${encodeURIComponent(String(version))}`;
 }
 
 export function getImageUrl(imagePath: string | null): string | null {

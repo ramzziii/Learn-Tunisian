@@ -18,7 +18,12 @@ export interface Account {
   id: string;
   email: string;
   createdAt: string;
+  isAdmin: boolean;
 }
+
+/** The lifecycle a word_group/word_variant moves through before (and after)
+ * it's shown to learners — see supabase/migrations/0009_admin_content_management.sql. */
+export type ContentStatus = 'draft' | 'pending_review' | 'approved' | 'rejected' | 'archived';
 
 export interface Profile {
   id: string;
@@ -59,6 +64,10 @@ export interface Unit {
   name: string;
   sortOrder: number;
   isCurriculum: boolean;
+  createdBy: string | null;
+  updatedBy: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Lesson {
@@ -67,6 +76,10 @@ export interface Lesson {
   lessonNumber: number;
   title: string | null;
   sortOrder: number;
+  createdBy: string | null;
+  updatedBy: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export type VariantLabel = 'primary' | 'also_heard' | 'masculine' | 'feminine';
@@ -80,6 +93,11 @@ export interface WordGroup {
   imageKeyword: string | null;
   imagePath: string | null;
   sortOrder: number;
+  contentStatus: ContentStatus;
+  createdBy: string | null;
+  updatedBy: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 /** One way of saying a word_group's concept — the primary/default form, a synonym, or a speaker-gender form. */
@@ -94,6 +112,17 @@ export interface WordVariant {
   sortOrder: number;
   /** False until a native Tunisian Arabic speaker has reviewed this exact form. */
   nativeVerified: boolean;
+  contentStatus: ContentStatus;
+  createdBy: string | null;
+  updatedBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+  speakerName: string | null;
+  dialectNotes: string | null;
+  isNativeVoice: boolean;
+  /** Stamped automatically when nativeVerified flips to true — see src/data/admin/content.ts. */
+  approvedBy: string | null;
+  approvedAt: string | null;
 }
 
 /**

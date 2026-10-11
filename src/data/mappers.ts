@@ -13,6 +13,7 @@ import type {
 import type {
   Account,
   ConsentRecord,
+  ContentStatus,
   DailyGoalSettings,
   DailyGoalMinutes,
   Favorite,
@@ -30,7 +31,7 @@ import type {
 } from '@/types/models';
 
 export function mapAccount(row: AccountRow): Account {
-  return { id: row.id, email: row.email, createdAt: row.created_at };
+  return { id: row.id, email: row.email, createdAt: row.created_at, isAdmin: row.is_admin };
 }
 
 export function mapProfile(row: ProfileRow): Profile {
@@ -73,7 +74,16 @@ export function mapConsentRecord(row: ConsentRecordRow): ConsentRecord {
 }
 
 export function mapUnit(row: UnitRow): Unit {
-  return { id: row.id, name: row.name, sortOrder: row.sort_order, isCurriculum: row.is_curriculum };
+  return {
+    id: row.id,
+    name: row.name,
+    sortOrder: row.sort_order,
+    isCurriculum: row.is_curriculum,
+    createdBy: row.created_by,
+    updatedBy: row.updated_by,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
 }
 
 export function mapLesson(row: LessonRow): Lesson {
@@ -83,6 +93,10 @@ export function mapLesson(row: LessonRow): Lesson {
     lessonNumber: row.lesson_number,
     title: row.title,
     sortOrder: row.sort_order,
+    createdBy: row.created_by,
+    updatedBy: row.updated_by,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
   };
 }
 
@@ -95,6 +109,11 @@ export function mapWordGroup(row: WordGroupRow): WordGroup {
     imageKeyword: row.image_keyword,
     imagePath: row.image_path,
     sortOrder: row.sort_order,
+    contentStatus: row.content_status as ContentStatus,
+    createdBy: row.created_by,
+    updatedBy: row.updated_by,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
   };
 }
 
@@ -109,6 +128,16 @@ export function mapWordVariant(row: WordVariantRow): WordVariant {
     notes: row.notes,
     sortOrder: row.sort_order,
     nativeVerified: row.native_verified,
+    contentStatus: row.content_status as ContentStatus,
+    createdBy: row.created_by,
+    updatedBy: row.updated_by,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    speakerName: row.speaker_name,
+    dialectNotes: row.dialect_notes,
+    isNativeVoice: row.is_native_voice,
+    approvedBy: row.approved_by,
+    approvedAt: row.approved_at,
   };
 }
 

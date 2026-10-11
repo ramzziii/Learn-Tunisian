@@ -1,0 +1,383 @@
+import { useCallback, useEffect, useState } from 'react';
+import { useLocalSearchParams } from 'expo-router';
+import { ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+
+import { AudioRecorderField } from '@/components/admin/AudioRecorderField';
+import { PillSelect } from '@/components/admin/PillSelect';
+import { BackButton } from '@/components/ui/BackButton';
+import { Button } from '@/components/ui/Button';
+import { LoadingScreen } from '@/components/ui/LoadingScreen';
+import { ScreenContainer } from '@/components/ui/ScreenContainer';
+import { colors, radii, shadows, spacing } from '@/constants/theme';
+import {
+  createWordVariant,
+  deleteWordVariant,
+  getWordGroupAdmin,
+  updateWordGroup,
+  updateWordVariant,
+} from '@/data/admin/content';
+import { hasApprovedPrimaryOrGenderPair } from '@/lib/admin/wordGroupValidation';
+import { useAuth } from '@/lib/auth/AuthContext';
+import type { ContentStatus, VariantLabel, WordGroupWithVariants, WordVariant } from '@/types/models';
+
+const CONTENT_STATUS_OPTIONS: { value: ContentStatus; label: string }[] = [
+  { value: 'draft', label: 'Draft' },
+  { value: 'pending_review', label: 'Pending review' },
+  { value: 'approved', label: 'Approved' },
+  { value: 'rejected', label: 'Rejected' },
+  { value: 'archived', label: 'Archived' },
+];
+
+const VARIANT_LABEL_OPTIONS: { value: VariantLabel; label: string }[] = [
+  { value: 'primary', label: 'Primary' },
+  { value: 'also_heard', label: 'Also heard' },
+  { value: 'masculine', label: 'Masculine' },
+  { value: 'feminine', label: 'Feminine' },
+];
+
+export default function AdminWordGroupDetail() {
+  const { wordGroupId } = useLocalSearchParams<{ wordGroupId: string }>();
+  const { session } = useAuth();
+  const actorAccountId = session?.user.id ?? '';
+
+  const [group, setGroup] = useState<WordGroupWithVariants | null>(null);
+  const [loadError, setLoadError] = useState(false);
+
+  const [englishMeaning, setEnglishMeaning] = useState('');
+  const [imageKeyword, setImageKeyword] = useState('');
+  const [sortOrder, setSortOrder] = useState('0');
+  const [contentStatus, setContentStatus] = useState<ContentStatus>('draft');
+  const [groupError, setGroupError] = useState<string | null>(null);
+  const [isSavingGroup, setIsSavingGroup] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoadError(false);
+    try {
+      const found = await getWordGroupAdmin(wordGroupId);
+      setGroup(found);
+      if (found) {
+        setEnglishMeaning(found.englishMeaning);
+        setImageKeyword(found.imageKeyword ?? '');
+        setSortOrder(String(found.sortOrder));
+        setContentStatus(found.contentStatus);
+      }
+    } catch {
+      setLoadError(true);
+    }
+  }, [wordGroupId]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const handleSaveGroup = async () => {
+    if (!englishMeaning.trim()) {
+      setGroupError('English meaning is required.');
+      return;
+    }
+    if (
+      contentStatus === 'approved' &&
+      !hasApprovedPrimaryOrGenderPair(group?.variants.map((v) => ({ variantLabel: v.variantLabel, contentStatus: v.contentStatus })) ?? [])
+    ) {
+      setGroupError(
+        'Can\'t approve this group yet — it needs an approved "primary" variant, or both an approved "masculine" and "feminine" variant.'
+      );
+      return;
+    }
+    setGroupError(null);
+    setIsSavingGroup(true);
+    try {
+      const updated = await updateWordGroup(
+        wordGroupId,
+        { englishMeaning: englishMeaning.trim(), imageKeyword: imageKeyword.trim() || null, sortOrder: Number(sortOrder) || 0, contentStatus },
+        actorAccountId
+      );
+      setGroup((current) => (current ? { ...current, ...updated } : current));
+    } catch (err) {
+      setGroupError(err instanceof Error ? err.message : 'Could not save word group.');
+    } finally {
+      setIsSavingGroup(false);
+    }
+  };
+
+  const handleVariantSaved = (variant: WordVariant) => {
+    setGroup((current) =>
+      current ? { ...current, variants: current.variants.map((v) => (v.id === variant.id ? variant : v)) } : current
+    );
+  };
+
+  const handleVariantDeleted = (variantId: string) => {
+    setGroup((current) => (current ? { ...current, variants: current.variants.filter((v) => v.id !== variantId) } : current));
+  };
+
+  const handleVariantCreated = (variant: WordVariant) => {
+    setGroup((current) => (current ? { ...current, variants: [...current.variants, variant] } : current));
+  };
+
+  if (loadError) {
+    return (
+      <ScreenContainer>
+        <BackButton />
+        <View style={styles.centered}>
+          <Text style={styles.centeredTitle}>Couldn&apos;t load this word group</Text>
+          <Button label="Try again" variant="secondary" onPress={load} />
+        </View>
+      </ScreenContainer>
+    );
+  }
+
+  if (group === null) return <LoadingScreen />;
+
+  return (
+    <ScreenContainer>
+      <BackButton />
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+        <Text style={styles.title}>{group.englishMeaning}</Text>
+
+        <View style={[styles.card, shadows.card]}>
+          {groupError ? <Text style={styles.errorText}>{groupError}</Text> : null}
+          <Text style={styles.fieldLabel}>English meaning</Text>
+          <TextInput value={englishMeaning} onChangeText={setEnglishMeaning} style={styles.input} />
+          <Text style={styles.fieldLabel}>Image keyword</Text>
+          <TextInput value={imageKeyword} onChangeText={setImageKeyword} style={styles.input} />
+          <Text style={styles.fieldLabel}>Sort order</Text>
+          <TextInput value={sortOrder} onChangeText={setSortOrder} style={styles.input} keyboardType="number-pad" />
+          <PillSelect
+            label="Status"
+            options={CONTENT_STATUS_OPTIONS}
+            value={contentStatus}
+            onChange={(v) => setContentStatus(v as ContentStatus)}
+          />
+          <Button label="Save" onPress={handleSaveGroup} loading={isSavingGroup} style={{ marginTop: spacing.sm }} />
+        </View>
+
+        <Text style={styles.sectionTitle}>Variants ({group.variants.length})</Text>
+        {group.variants.map((variant) => (
+          <VariantRow
+            key={variant.id}
+            variant={variant}
+            actorAccountId={actorAccountId}
+            onSaved={handleVariantSaved}
+            onDeleted={handleVariantDeleted}
+          />
+        ))}
+
+        <NewVariantForm wordGroupId={group.id} actorAccountId={actorAccountId} onCreated={handleVariantCreated} />
+      </ScrollView>
+    </ScreenContainer>
+  );
+}
+
+function VariantRow({
+  variant,
+  actorAccountId,
+  onSaved,
+  onDeleted,
+}: {
+  variant: WordVariant;
+  actorAccountId: string;
+  onSaved: (variant: WordVariant) => void;
+  onDeleted: (variantId: string) => void;
+}) {
+  const [variantLabel, setVariantLabel] = useState<VariantLabel>(variant.variantLabel);
+  const [wordArabic, setWordArabic] = useState(variant.wordArabic);
+  const [transliteration, setTransliteration] = useState(variant.transliteration);
+  const [notes, setNotes] = useState(variant.notes ?? '');
+  const [sortOrder, setSortOrder] = useState(String(variant.sortOrder));
+  const [status, setStatus] = useState<ContentStatus>(variant.contentStatus);
+  const [speakerName, setSpeakerName] = useState(variant.speakerName ?? '');
+  const [dialectNotes, setDialectNotes] = useState(variant.dialectNotes ?? '');
+  const [isNativeVoice, setIsNativeVoice] = useState(variant.isNativeVoice);
+  const [nativeVerified, setNativeVerified] = useState(variant.nativeVerified);
+  const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleSave = async () => {
+    setError(null);
+    setIsSaving(true);
+    try {
+      const updated = await updateWordVariant(
+        variant.id,
+        {
+          variantLabel,
+          wordArabic: wordArabic.trim(),
+          transliteration: transliteration.trim(),
+          notes: notes.trim() || null,
+          sortOrder: Number(sortOrder) || 0,
+          contentStatus: status,
+          speakerName: speakerName.trim() || null,
+          dialectNotes: dialectNotes.trim() || null,
+          isNativeVoice,
+          nativeVerified,
+        },
+        actorAccountId
+      );
+      onSaved(updated);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save variant.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setError(null);
+    setIsDeleting(true);
+    try {
+      await deleteWordVariant(variant.id);
+      onDeleted(variant.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not delete variant.');
+      setIsDeleting(false);
+    }
+  };
+
+  return (
+    <View style={[styles.card, shadows.card]}>
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+      <View style={styles.variantHeaderRow}>
+        <PillSelect label="Label" options={VARIANT_LABEL_OPTIONS} value={variantLabel} onChange={(v) => setVariantLabel(v as VariantLabel)} />
+        <View style={styles.verifiedBox}>
+          <Text style={styles.fieldLabel}>Native verified</Text>
+          <Switch value={nativeVerified} onValueChange={setNativeVerified} trackColor={{ true: colors.success }} />
+        </View>
+      </View>
+      <Text style={styles.fieldLabel}>Arabic</Text>
+      <TextInput value={wordArabic} onChangeText={setWordArabic} style={styles.input} />
+      <Text style={styles.fieldLabel}>Transliteration</Text>
+      <TextInput value={transliteration} onChangeText={setTransliteration} style={styles.input} />
+      <Text style={styles.fieldLabel}>Notes</Text>
+      <TextInput value={notes} onChangeText={setNotes} style={styles.input} />
+      <Text style={styles.fieldLabel}>Sort order</Text>
+      <TextInput value={sortOrder} onChangeText={setSortOrder} style={styles.input} keyboardType="number-pad" />
+      <PillSelect label="Status" options={CONTENT_STATUS_OPTIONS} value={status} onChange={(v) => setStatus(v as ContentStatus)} />
+
+      <AudioRecorderField
+        wordGroupId={variant.wordGroupId}
+        variantId={variant.id}
+        currentAudioPath={variant.audioPath}
+        updatedAt={variant.updatedAt}
+        onUploaded={async (path) => {
+          setError(null);
+          try {
+            const updated = await updateWordVariant(variant.id, { audioPath: path }, actorAccountId);
+            onSaved(updated);
+          } catch (err) {
+            setError(err instanceof Error ? err.message : 'Recorded, but could not save the audio path.');
+          }
+        }}
+      />
+
+      <View style={styles.variantHeaderRow}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.fieldLabel}>Speaker name</Text>
+          <TextInput value={speakerName} onChangeText={setSpeakerName} style={styles.input} />
+        </View>
+        <View style={styles.verifiedBox}>
+          <Text style={styles.fieldLabel}>Native voice</Text>
+          <Switch value={isNativeVoice} onValueChange={setIsNativeVoice} trackColor={{ true: colors.success }} />
+        </View>
+      </View>
+      <Text style={styles.fieldLabel}>Dialect / regional notes</Text>
+      <TextInput value={dialectNotes} onChangeText={setDialectNotes} style={styles.input} />
+
+      <View style={styles.actionsRow}>
+        <Button label="Delete" variant="ghost" onPress={handleDelete} loading={isDeleting} style={{ flex: 1 }} />
+        <Button label="Save" onPress={handleSave} loading={isSaving} style={{ flex: 1 }} />
+      </View>
+    </View>
+  );
+}
+
+function NewVariantForm({
+  wordGroupId,
+  actorAccountId,
+  onCreated,
+}: {
+  wordGroupId: string;
+  actorAccountId: string;
+  onCreated: (variant: WordVariant) => void;
+}) {
+  const [variantLabel, setVariantLabel] = useState<VariantLabel>('primary');
+  const [wordArabic, setWordArabic] = useState('');
+  const [transliteration, setTransliteration] = useState('');
+  const [notes, setNotes] = useState('');
+  const [sortOrder, setSortOrder] = useState('0');
+  const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleCreate = async () => {
+    if (!wordArabic.trim() || !transliteration.trim()) {
+      setError('Arabic and transliteration are required.');
+      return;
+    }
+    setError(null);
+    setIsSaving(true);
+    try {
+      const created = await createWordVariant(
+        {
+          wordGroupId,
+          variantLabel,
+          wordArabic: wordArabic.trim(),
+          transliteration: transliteration.trim(),
+          audioPath: null,
+          notes: notes.trim() || null,
+          sortOrder: Number(sortOrder) || 0,
+          contentStatus: 'draft',
+        },
+        actorAccountId
+      );
+      onCreated(created);
+      setWordArabic('');
+      setTransliteration('');
+      setNotes('');
+      setSortOrder('0');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not create variant.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <View style={[styles.card, shadows.card]}>
+      <Text style={styles.sectionTitle}>Add variant</Text>
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+      <PillSelect label="Label" options={VARIANT_LABEL_OPTIONS} value={variantLabel} onChange={(v) => setVariantLabel(v as VariantLabel)} />
+      <Text style={styles.fieldLabel}>Arabic</Text>
+      <TextInput value={wordArabic} onChangeText={setWordArabic} style={styles.input} />
+      <Text style={styles.fieldLabel}>Transliteration</Text>
+      <TextInput value={transliteration} onChangeText={setTransliteration} style={styles.input} />
+      <Text style={styles.fieldLabel}>Notes</Text>
+      <TextInput value={notes} onChangeText={setNotes} style={styles.input} />
+      <Text style={styles.fieldLabel}>Sort order</Text>
+      <TextInput value={sortOrder} onChangeText={setSortOrder} style={styles.input} keyboardType="number-pad" />
+      <Button label="+ Add Variant" variant="secondary" onPress={handleCreate} loading={isSaving} style={{ marginTop: spacing.sm }} />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  scroll: { gap: spacing.sm, paddingBottom: spacing.xl },
+  title: { fontSize: 22, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md, marginBottom: spacing.sm },
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md },
+  card: { backgroundColor: colors.surface, borderRadius: radii.lg, padding: spacing.md, gap: 4 },
+  errorText: { fontSize: 13, color: colors.error, marginBottom: spacing.xs },
+  fieldLabel: { fontSize: 11, fontWeight: '700', color: colors.textSecondary, marginTop: spacing.sm, textTransform: 'uppercase' },
+  input: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    fontSize: 15,
+    color: colors.textPrimary,
+    backgroundColor: colors.background,
+  },
+  actionsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
+  variantHeaderRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+  verifiedBox: { alignItems: 'flex-start', marginTop: spacing.sm },
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
+  centeredTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
+});
