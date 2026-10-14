@@ -34,6 +34,20 @@ const AUDIO_BUCKET = 'audio';
 const IMAGES_BUCKET = 'images';
 
 /**
+ * Supabase Storage rejects (400) a query string containing a percent-encoded
+ * ISO datetime's ':'/'+' — exactly the shape of word_variant.updatedAt — so
+ * date-like strings are normalized to epoch ms before use.
+ */
+function normalizeCacheBust(cacheBust: string | number | true): string | number {
+  if (cacheBust === true) return Date.now();
+  if (typeof cacheBust === 'number') return cacheBust;
+  const parsed = Date.parse(cacheBust);
+  // Hermes's Date.parse is stricter than V8's about some ISO shapes (e.g. 6
+  // fractional digits) — fall back to the digits alone rather than the raw string.
+  return Number.isNaN(parsed) ? cacheBust.replace(/\D/g, '') || cacheBust : parsed;
+}
+
+/**
  * `cacheBust` defeats CDN/browser caching of the public URL — pass `true`
  * for an immediate one-off bust (e.g. right after an admin's own upload), or
  * a stable value (e.g. a word_variant's `updatedAt`) so the URL only
@@ -44,8 +58,7 @@ export function getAudioUrl(audioPath: string | null, cacheBust?: string | numbe
   if (!audioPath) return null;
   const url = supabase.storage.from(AUDIO_BUCKET).getPublicUrl(audioPath).data.publicUrl;
   if (!cacheBust) return url;
-  const version = cacheBust === true ? Date.now() : cacheBust;
-  return `${url}${url.includes('?') ? '&' : '?'}_=${encodeURIComponent(String(version))}`;
+  return `${url}${url.includes('?') ? '&' : '?'}_=${encodeURIComponent(String(normalizeCacheBust(cacheBust)))}`;
 }
 
 export function getImageUrl(imagePath: string | null): string | null {

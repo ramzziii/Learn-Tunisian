@@ -152,6 +152,13 @@ export default function AdminWordGroupDetail() {
         </View>
 
         <Text style={styles.sectionTitle}>Variants ({group.variants.length})</Text>
+        {!group.variants.some((v) => v.variantLabel === 'primary') ? (
+          <Text style={styles.noPrimaryWarning}>
+            ⚠️ No variant here is labeled &quot;Primary&quot; — the Phrasebook always reads the Primary variant
+            specifically, so nothing will show there until one exists. (A Masculine/Feminine pair still works fine
+            for lesson exercises — just not the Phrasebook.)
+          </Text>
+        ) : null}
         {group.variants.map((variant) => (
           <VariantRow
             key={variant.id}
@@ -236,6 +243,16 @@ function VariantRow({
   return (
     <View style={[styles.card, shadows.card]}>
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
+      {variant.variantLabel === 'primary' ? (
+        <View style={styles.shownBadge}>
+          <Text style={styles.shownBadgeText}>✅ Shown to learners (Primary)</Text>
+        </View>
+      ) : (
+        <Text style={styles.notShownHint}>
+          Not shown in the Phrasebook — only the &quot;Primary&quot; variant is. (Used by lesson exercises if
+          paired with a matching Masculine/Feminine, or as an alternate pronunciation.)
+        </Text>
+      )}
       <View style={styles.variantHeaderRow}>
         <PillSelect label="Label" options={VARIANT_LABEL_OPTIONS} value={variantLabel} onChange={(v) => setVariantLabel(v as VariantLabel)} />
         <View style={styles.verifiedBox}>
@@ -259,13 +276,12 @@ function VariantRow({
         currentAudioPath={variant.audioPath}
         updatedAt={variant.updatedAt}
         onUploaded={async (path) => {
-          setError(null);
-          try {
-            const updated = await updateWordVariant(variant.id, { audioPath: path }, actorAccountId);
-            onSaved(updated);
-          } catch (err) {
-            setError(err instanceof Error ? err.message : 'Recorded, but could not save the audio path.');
-          }
+          // Deliberately not caught: a failure here must propagate back to
+          // AudioRecorderField so it shows the error and keeps the previous
+          // file, rather than reporting success and deleting it.
+          const updated = await updateWordVariant(variant.id, { audioPath: path }, actorAccountId);
+          onSaved(updated);
+          return updated.audioPath;
         }}
       />
 
@@ -376,6 +392,24 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   actionsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
+  noPrimaryWarning: {
+    fontSize: 12,
+    color: colors.error,
+    backgroundColor: `${colors.error}14`,
+    borderRadius: radii.sm,
+    padding: spacing.sm,
+    lineHeight: 17,
+  },
+  shownBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: `${colors.success}1F`,
+    borderRadius: radii.pill,
+    paddingVertical: 2,
+    paddingHorizontal: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  shownBadgeText: { fontSize: 11, fontWeight: '700', color: colors.success },
+  notShownHint: { fontSize: 11, color: colors.textSecondary, lineHeight: 15, marginBottom: spacing.xs },
   variantHeaderRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
   verifiedBox: { alignItems: 'flex-start', marginTop: spacing.sm },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
