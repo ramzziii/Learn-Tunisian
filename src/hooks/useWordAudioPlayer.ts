@@ -49,6 +49,7 @@ export function useWordAudioPlayer(
       .then(async (uri) => {
         if (cancelled) return;
         if (uri) {
+          console.log(`[useWordAudioPlayer] variant ${variant.id} (audioPath=${variant.audioPath}) resolved to: ${uri}`);
           player.replace({ uri });
           setHasAudio(true);
           if (autoPlay) {
@@ -63,6 +64,9 @@ export function useWordAudioPlayer(
           }
         } else if (variant.audioPath) {
           // Had a path to try but resolution failed (vs. never having one at all) — worth a retry.
+          console.error(
+            `[useWordAudioPlayer] variant ${variant.id} has audioPath=${variant.audioPath} but ensureAudioCached returned null — see [audioCache] logs above for why`
+          );
           setHasError(true);
         }
       })
@@ -73,8 +77,18 @@ export function useWordAudioPlayer(
     return () => {
       cancelled = true;
     };
+    // audioPath (not just id) is in the dep list deliberately: a component
+    // holding this hook doesn't necessarily unmount when the same variant
+    // gets re-recorded (e.g. PhraseDetailModal stays mounted across phrase
+    // selections, just toggling Modal's `visible`) — without audioPath here,
+    // re-opening the same phrase after an admin re-recording would keep
+    // playing whatever was already resolved, and since a re-recording's old
+    // Storage file is deleted once the new one is saved (see
+    // deleteWordVariantAudio in src/data/admin/audioUpload.ts), that stale
+    // reference is now a dead link rather than just outdated audio — silent
+    // failure instead of "wrong but working."
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [variant?.id, retryCount]);
+  }, [variant?.id, variant?.audioPath, retryCount]);
 
   const play = useCallback(() => {
     if (!hasAudio) return;

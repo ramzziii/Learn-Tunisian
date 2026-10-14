@@ -47,7 +47,14 @@ function sanitizeForFilename(value: string): string {
  * logic is unit-testable without mocking the File/Directory classes.
  */
 export function buildCacheFileName(audioPath: string, updatedAt: string): string {
-  return `${audioPath.replace(/\//g, '__')}__${sanitizeForFilename(updatedAt)}`;
+  const flattened = audioPath.replace(/\//g, '__');
+  // The version goes *before* the extension: iOS's AVPlayer picks a decoder
+  // from a local file's extension, so "x.m4a__<version>" downloads fine but
+  // plays silently on iOS (Android sniffs content, and web streams the remote
+  // URL, which is why both of those still worked).
+  const dot = flattened.lastIndexOf('.');
+  const [base, extension] = dot > 0 ? [flattened.slice(0, dot), flattened.slice(dot)] : [flattened, ''];
+  return `${base}__${sanitizeForFilename(updatedAt)}${extension}`;
 }
 
 function localFileFor(audioPath: string, updatedAt: string): File {
@@ -74,6 +81,23 @@ export function getCachedAudioUri(variant: Pick<WordVariant, 'audioPath' | 'upda
   if (isWeb || !variant.audioPath) return null;
   const file = localFileFor(variant.audioPath, variant.updatedAt);
   return file.exists ? file.uri : null;
+}
+
+/**
+ * File.downloadFileAsync resolves without throwing even when Storage answers
+ * with an HTTP error — it just writes the error response body (a few hundred
+ * bytes of JSON) to disk as if it were the audio. Real recordings are tens of
+ * KB at minimum, so a size floor is the only reliable signal that the
+ * "download" was actually an error body.
+ */
+const MIN_VALID_AUDIO_BYTES = 1024;
+
+export function isAudioFileSizeValid(size: number | null | undefined): boolean {
+  return typeof size === 'number' && size >= MIN_VALID_AUDIO_BYTES;
+}
+
+function isValidAudioFile(file: File): boolean {
+  return isAudioFileSizeValid(file.size);
 }
 
 /**
@@ -105,8 +129,13 @@ export async function ensureAudioCached(variant: Pick<WordVariant, 'audioPath' |
   if (isWeb) {
     try {
       const response = await fetch(remoteUrl, { method: 'HEAD' });
-      return response.ok ? remoteUrl : null;
-    } catch {
+      if (!response.ok) {
+        console.error(`[audioCache] HEAD ${remoteUrl} -> ${response.status} ${response.statusText}`);
+        return null;
+      }
+      return remoteUrl;
+    } catch (err) {
+      console.error(`[audioCache] HEAD ${remoteUrl} failed`, err);
       return null;
     }
   }
@@ -118,13 +147,40 @@ export async function ensureAudioCached(variant: Pick<WordVariant, 'audioPath' |
     // getCachedAudioUri() lookup for this same variant reliably finds it.
     const destination = localFileFor(variant.audioPath, variant.updatedAt);
     const downloaded = await File.downloadFileAsync(remoteUrl, destination);
-    return downloaded.uri;
-  } catch {
+    if (isValidAudioFile(downloaded)) return downloaded.uri;
+
+    // downloadFileAsync "succeeded" (no throw) but produced a suspiciously
+    // small file — almost certainly an HTTP error response body saved as if
+    // it were the audio (see MIN_VALID_AUDIO_BYTES above), not real content.
+    // Discard it and stream the remote URL directly instead, which doesn't
+    // go through this same local-write step.
+    console.error(
+      `[audioCache] downloadFileAsync for ${remoteUrl} returned a ${downloaded.size ?? 0}-byte file — ` +
+        'treating as a failed/corrupt download, not real audio. Falling back to streaming the remote URL directly.'
+    );
+    try {
+      downloaded.delete();
+    } catch {
+      // No-op.
+    }
+    const response = await fetch(remoteUrl, { method: 'HEAD' });
+    if (!response.ok) {
+      console.error(`[audioCache] HEAD ${remoteUrl} -> ${response.status} ${response.statusText}`);
+      return null;
+    }
+    return remoteUrl;
+  } catch (downloadErr) {
+    console.error(`[audioCache] downloadFileAsync ${remoteUrl} failed, falling back to HEAD check`, downloadErr);
     try {
       const response = await fetch(remoteUrl, { method: 'HEAD' });
-      return response.ok ? remoteUrl : null;
-    } catch {
+      if (!response.ok) {
+        console.error(`[audioCache] HEAD ${remoteUrl} -> ${response.status} ${response.statusText}`);
+        return null;
+      }
+      return remoteUrl;
+    } catch (headErr) {
       // Genuinely offline with nothing cached — no audio available right now.
+      console.error(`[audioCache] HEAD ${remoteUrl} also failed — treating as offline/unreachable`, headErr);
       return null;
     }
   }

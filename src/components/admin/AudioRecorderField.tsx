@@ -4,7 +4,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '@/components/ui/Button';
 import { colors, radii, spacing } from '@/constants/theme';
-import { deleteWordVariantAudio, uploadWordVariantAudio } from '@/data/admin/audioUpload';
+import { saveRecordedWordVariantAudio } from '@/data/admin/audioUpload';
 import { useAdminAudioRecorder } from '@/hooks/useAdminAudioRecorder';
 import { getAudioUrl } from '@/lib/supabase/client';
 import { invalidateCachedAudio } from '@/lib/offline/audioCache';
@@ -18,10 +18,11 @@ interface AudioRecorderFieldProps {
    * so this stays the one consistent mechanism instead of a second ad-hoc one. */
   updatedAt: string;
   /** Called once the new recording has finished uploading, with its storage
-   * path — the caller saves it onto the variant. Awaited before this
-   * component deletes the previous audio file, so an old (but working) file
-   * is never removed until the new path is confirmed durably saved. */
-  onUploaded: (audioPath: string) => void | Promise<void>;
+   * path — the caller saves it onto the variant and resolves with the
+   * audio_path read back from the updated row, or rejects if the save failed.
+   * The previous audio file is only deleted once this resolves with the new
+   * path, so an old (but working) file is never removed prematurely. */
+  onUploaded: (audioPath: string) => Promise<string | null>;
 }
 
 /**
@@ -89,22 +90,23 @@ export function AudioRecorderField({ wordGroupId, variantId, currentAudioPath, u
     setIsUploading(true);
     const previousPath = savedAudioPath;
     try {
-      const path = await uploadWordVariantAudio(recordedUri, wordGroupId, variantId);
-      invalidateCachedAudio(path);
+      // Rejects (without deleting the previous file) unless the new path was
+      // both uploaded and read back from word_variants.audio_path — so the
+      // success state below is only ever reached once that's durable.
+      const path = await saveRecordedWordVariantAudio({
+        localUri: recordedUri,
+        wordGroupId,
+        variantId,
+        previousPath,
+        persistAudioPath: onUploaded,
+      });
       setSavedAudioPath(path);
       setPreviewVersion(Date.now());
-      await onUploaded(path);
       setRecordedUri(null);
       setSuccessMessage('Audio saved successfully.');
-      // Only after the new path is confirmed saved onto the variant — a
-      // fresh storage path per upload means the old one is now a pure
-      // orphan (see uploadWordVariantAudio), never the thing anything is
-      // still trying to play.
-      if (previousPath && previousPath !== path) {
-        invalidateCachedAudio(previousPath);
-        deleteWordVariantAudio(previousPath);
-      }
+      if (previousPath && previousPath !== path) invalidateCachedAudio(previousPath);
     } catch (err) {
+      // recordedUri is kept so the admin can retry without re-recording.
       setError(err instanceof Error ? err.message : 'Could not upload audio.');
     } finally {
       setIsUploading(false);

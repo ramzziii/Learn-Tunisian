@@ -86,3 +86,45 @@ export async function deleteWordVariantAudio(path: string): Promise<void> {
     // no-op
   }
 }
+
+/**
+ * The full admin "Save Recording" sequence: upload → persist the new path
+ * onto word_variants.audio_path → only then delete the previous file.
+ *
+ * `persistAudioPath` must resolve with the audio_path the database now holds
+ * (read back from the updated row), and must reject if the update failed.
+ * Anything short of that — a rejection, or a read-back path that isn't the
+ * one just uploaded — rejects here too and leaves the previous file
+ * untouched, since it's still what learners' audio_path points at.
+ */
+export async function saveRecordedWordVariantAudio({
+  localUri,
+  wordGroupId,
+  variantId,
+  previousPath,
+  persistAudioPath,
+}: {
+  localUri: string;
+  wordGroupId: string;
+  variantId: string;
+  previousPath: string | null;
+  persistAudioPath: (audioPath: string) => Promise<string | null>;
+}): Promise<string> {
+  const path = await uploadWordVariantAudio(localUri, wordGroupId, variantId);
+
+  let savedPath: string | null;
+  try {
+    savedPath = await persistAudioPath(path);
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : 'unknown error';
+    throw new Error(`Audio uploaded, but saving it to this variant failed (${reason}). The previous recording was kept.`);
+  }
+  if (savedPath !== path) {
+    throw new Error('Audio uploaded, but the variant did not pick up the new recording. The previous recording was kept.');
+  }
+
+  if (previousPath && previousPath !== path) {
+    await deleteWordVariantAudio(previousPath);
+  }
+  return path;
+}
