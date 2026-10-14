@@ -496,7 +496,7 @@ const makeStyles = (colors: ThemeColors) => {
     goalHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
     streakBadge: { backgroundColor: `${colors.accent}26`, borderRadius: radii.pill, paddingVertical: 2, paddingHorizontal: spacing.xs },
     streakBadgeText: { fontSize: 13, fontWeight: '700', color: colors.accent },
-    goalValue: { fontSize: 14, fontWeight: '700', color: colors.primaryDark },
+    goalValue: { fontSize: 14, fontWeight: '700', color: colors.primary },
     goalReachedBanner: {
       backgroundColor: `${colors.success}1F`,
       borderRadius: radii.md,

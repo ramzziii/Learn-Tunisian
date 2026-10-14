@@ -2,6 +2,7 @@ import * as Haptics from 'expo-haptics';
 import { useEffect, useMemo, useState } from 'react';
 import { LayoutAnimation, Platform, ScrollView, StyleSheet, Text, UIManager, View } from 'react-native';
 
+import { openUpgradeFlow, PremiumBadge } from '@/components/premium/Premium';
 import { BackButton } from '@/components/ui/BackButton';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Reveal } from '@/components/ui/Reveal';
@@ -9,6 +10,8 @@ import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { radii, spacing, type ThemeColors } from '@/constants/theme';
 import { GRAMMAR_NOTES, type GrammarNote } from '@/constants/grammarNotes';
 import { useLetterSpeech } from '@/hooks/useLetterSpeech';
+import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
+import { canAccessGrammarNote } from '@/lib/premium/access';
 import { useTheme } from '@/lib/theme/ThemeContext';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -46,7 +49,10 @@ export default function GrammarScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const groupedNotes = useMemo(() => groupGrammarNotes(), []);
-  const [expandedId, setExpandedId] = useState<string | null>(GRAMMAR_NOTES[0]?.id ?? null);
+  const isPremium = useActiveProfile().activeProfile?.isPremium ?? false;
+  const [expandedId, setExpandedId] = useState<string | null>(
+    GRAMMAR_NOTES.find((note) => canAccessGrammarNote(isPremium, note.id))?.id ?? null
+  );
   const { speak, isSpeaking } = useLetterSpeech();
   const [activeKey, setActiveKey] = useState<string | null>(null);
 
@@ -77,16 +83,22 @@ export default function GrammarScreen() {
           <View key={group.label} style={styles.categorySection}>
             <Text style={styles.categoryHeading}>{group.label}</Text>
             {group.notes.map(({ note, delay }) => {
-              const isExpanded = expandedId === note.id;
+              const isLocked = !canAccessGrammarNote(isPremium, note.id);
+              // A locked topic never expands — its body isn't rendered at all.
+              const isExpanded = !isLocked && expandedId === note.id;
               return (
                 <Reveal key={note.id} delay={delay}>
                   <View style={[styles.card, styles.shadowCard, isExpanded && styles.cardExpanded]}>
-                    <PressableScale haptic onPress={() => toggle(note.id)} style={styles.headerRow}>
+                    <PressableScale
+                      haptic
+                      onPress={() => (isLocked ? openUpgradeFlow() : toggle(note.id))}
+                      style={styles.headerRow}
+                    >
                       <View style={styles.emojiTile}>
                         <Text style={styles.emoji}>{note.emoji}</Text>
                       </View>
                       <Text style={styles.cardTitle}>{note.title}</Text>
-                      <Text style={styles.chevron}>{isExpanded ? '⌄' : '›'}</Text>
+                      {isLocked ? <PremiumBadge /> : <Text style={styles.chevron}>{isExpanded ? '⌄' : '›'}</Text>}
                     </PressableScale>
 
                     {isExpanded ? (

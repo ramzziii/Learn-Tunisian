@@ -1,8 +1,9 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '@/components/ui/Button';
-import { colors, radii, spacing } from '@/constants/theme';
+import { radii, spacing, type ThemeColors } from '@/constants/theme';
+import { useTheme } from '@/lib/theme/ThemeContext';
 import { useAnswerFeedback } from '@/hooks/useAnswerFeedback';
 
 interface AlphabetExerciseFooterProps {
@@ -28,6 +29,8 @@ export function AlphabetExerciseFooter({
   onCheck,
   onNext,
 }: AlphabetExerciseFooterProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { playCorrect, playIncorrect } = useAnswerFeedback();
   const bannerAnim = useRef(new Animated.Value(0)).current;
   const iconAnim = useRef(new Animated.Value(0)).current;
@@ -70,7 +73,7 @@ export function AlphabetExerciseFooter({
             <Animated.Text style={[styles.icon, { transform: [{ scale: iconAnim }] }]}>
               {isCorrect ? '✓' : '✕'}
             </Animated.Text>
-            <Text style={[styles.resultText, { color: isCorrect ? '#2E9F68' : '#E35A53' }]}>
+            <Text style={[styles.resultText, { color: isCorrect ? colors.success : colors.error }]}>
               {isCorrect ? 'Excellent, correct answer!' : 'Your answer is wrong'}
             </Text>
           </View>
@@ -79,7 +82,7 @@ export function AlphabetExerciseFooter({
         </Animated.View>
       ) : null}
 
-      <Button
+      <Button themed
         label={checked ? 'Next' : 'Check'}
         onPress={checked ? onNext : onCheck}
         disabled={!checked && !canCheck}
@@ -89,15 +92,16 @@ export function AlphabetExerciseFooter({
   );
 }
 
-const styles = StyleSheet.create({
-  container: { marginTop: 'auto' },
-  banner: { borderRadius: radii.lg, padding: spacing.md, alignItems: 'center', marginBottom: spacing.md },
-  correct: { backgroundColor: '#E3F5EA' },
-  incorrect: { backgroundColor: '#FBEAE6' },
-  headerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  icon: { fontSize: 20, fontWeight: '800' },
-  resultText: { fontSize: 18, fontWeight: '700', textAlign: 'center' },
-  correctLabel: { marginTop: spacing.sm, fontSize: 14, color: colors.textSecondary },
-  correctAnswer: { fontSize: 32, color: colors.textPrimary, marginTop: spacing.xs },
-  cta: {},
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    container: { marginTop: 'auto' },
+    banner: { borderRadius: radii.lg, padding: spacing.md, alignItems: 'center', marginBottom: spacing.md },
+    correct: { backgroundColor: `${colors.success}1F` },
+    incorrect: { backgroundColor: `${colors.error}1F` },
+    headerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+    icon: { fontSize: 20, fontWeight: '800' },
+    resultText: { fontSize: 18, fontWeight: '700', textAlign: 'center' },
+    correctLabel: { marginTop: spacing.sm, fontSize: 14, color: colors.textSecondary },
+    correctAnswer: { fontSize: 32, color: colors.textPrimary, marginTop: spacing.xs },
+    cta: {},
+  });

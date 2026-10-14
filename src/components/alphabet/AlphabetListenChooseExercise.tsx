@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { AlphabetAudioPrompt } from '@/components/alphabet/AlphabetAudioPrompt';
 import { AlphabetExerciseFooter } from '@/components/alphabet/AlphabetExerciseFooter';
 import { AnimatedAnswerCard, type AnswerCardState } from '@/components/alphabet/AnimatedAnswerCard';
-import { colors, radii, spacing } from '@/constants/theme';
+import { radii, spacing, type ThemeColors } from '@/constants/theme';
+import { useTheme } from '@/lib/theme/ThemeContext';
 import { buildAlphabetChoices, getLetterById } from '@/lib/alphabet';
 import { useColumnWidth } from '@/hooks/useColumnWidth';
 import { useLetterSpeech } from '@/hooks/useLetterSpeech';
@@ -18,6 +19,8 @@ interface AlphabetListenChooseExerciseProps {
 
 /** "Listen and choose" — hear a letter's sound, tap the matching letter card among 4. */
 export function AlphabetListenChooseExercise({ letterId, onComplete }: AlphabetListenChooseExerciseProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const cardWidth = useColumnWidth(GRID_COLUMNS, spacing.lg, spacing.md);
   const [choices] = useState(() => buildAlphabetChoices(letterId, 4));
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -77,25 +80,26 @@ export function AlphabetListenChooseExercise({ letterId, onComplete }: AlphabetL
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  card: {
-    minHeight: 140,
-    borderRadius: radii.md,
-    borderWidth: 2,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cardSelected: { borderColor: colors.accent, backgroundColor: '#FDF3E4' },
-  cardCorrect: { borderColor: '#4FBF76', backgroundColor: '#DFF4E7' },
-  cardWrong: { borderColor: '#E76B60', backgroundColor: '#F9E0DD' },
-  cardText: { fontSize: 54, color: colors.textPrimary },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    container: { flex: 1 },
+    grid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: spacing.md,
+      marginBottom: spacing.lg,
+    },
+    card: {
+      minHeight: 140,
+      borderRadius: radii.md,
+      borderWidth: 2,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    cardSelected: { borderColor: colors.accent, backgroundColor: `${colors.accent}26` },
+    cardCorrect: { borderColor: colors.success, backgroundColor: `${colors.success}1F` },
+    cardWrong: { borderColor: colors.error, backgroundColor: `${colors.error}1F` },
+    cardText: { fontSize: 54, color: colors.textPrimary },
+  });

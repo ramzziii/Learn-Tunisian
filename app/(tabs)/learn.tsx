@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { UnitSection } from '@/components/lesson-map/UnitSection';
+import { openUpgradeFlow } from '@/components/premium/Premium';
 import { Button } from '@/components/ui/Button';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { Reveal } from '@/components/ui/Reveal';
@@ -11,6 +12,7 @@ import { radii, spacing, type ThemeColors } from '@/constants/theme';
 import { fetchLessonMap, type UnitWithLessons } from '@/data/content';
 import { fetchProgressSummary, type ProfileProgressSummary } from '@/data/progress';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
+import { canAccessLesson, computeFreeLessonIds } from '@/lib/premium/access';
 import { buildProgressInsights, type ProgressInsights } from '@/lib/progressInsights';
 import { useTheme } from '@/lib/theme/ThemeContext';
 
@@ -33,6 +35,16 @@ export default function LearnScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [data, setData] = useState<LearnData | null>(null);
+  // Derived from the already-loaded lesson map (real sort_order columns), so
+  // the map marks exactly the lessons /lesson/[lessonId] would gate.
+  const freeLessonIds = useMemo(
+    () =>
+      computeFreeLessonIds(
+        data?.unitsWithLessons.map(({ unit }) => unit) ?? [],
+        data?.unitsWithLessons.flatMap(({ lessons }) => lessons) ?? []
+      ),
+    [data]
+  );
   const [loadError, setLoadError] = useState(false);
 
   const load = useCallback(async () => {
@@ -65,6 +77,7 @@ export default function LearnScreen() {
   return (
     <ScreenContainer themed style={{ padding: 0 }}>
       <View style={styles.header}>
+        <Text style={styles.eyebrow}>Your path</Text>
         <Text style={styles.title}>Learn</Text>
       </View>
 
@@ -104,6 +117,8 @@ export default function LearnScreen() {
                 isFirstUnit={index === 0}
                 onSelectLesson={(lessonId) => router.push(`/lesson/${lessonId}`)}
                 onBrowseWords={(lessonId) => router.push(`/words/${lessonId}`)}
+                isPremiumLocked={(lessonId) => !canAccessLesson(activeProfile.isPremium, lessonId, freeLessonIds)}
+                onPremiumLockedPress={openUpgradeFlow}
               />
             ))
           )}
@@ -159,8 +174,16 @@ const makeStyles = (colors: ThemeColors) => {
 
   return StyleSheet.create({
     shadowCard,
-    header: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
-    title: { fontSize: 26, fontWeight: '700', color: colors.textPrimary },
+    header: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
+    eyebrow: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: colors.primary,
+      letterSpacing: 1,
+      textTransform: 'uppercase',
+      marginTop: spacing.md,
+    },
+    title: { fontSize: 30, fontWeight: '800', color: colors.textPrimary, marginTop: spacing.xs },
     scrollContent: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.xxl },
     progressTeaserRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
     progressTeaser: {
@@ -170,7 +193,7 @@ const makeStyles = (colors: ThemeColors) => {
       paddingVertical: spacing.sm,
       alignItems: 'center',
     },
-    progressTeaserValue: { fontSize: 18, fontWeight: '800', color: colors.primaryDark },
+    progressTeaserValue: { fontSize: 18, fontWeight: '800', color: colors.primary },
     progressTeaserLabel: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
     insightsCard: { backgroundColor: colors.surface, borderRadius: radii.lg, padding: spacing.md, marginBottom: spacing.lg },
     insightsTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },

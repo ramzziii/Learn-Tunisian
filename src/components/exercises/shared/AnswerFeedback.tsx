@@ -1,8 +1,9 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
 
 import { PressableScale } from '@/components/ui/PressableScale';
-import { colors, radii, spacing } from '@/constants/theme';
+import { radii, spacing, type ThemeColors } from '@/constants/theme';
+import { useTheme } from '@/lib/theme/ThemeContext';
 
 interface AnswerFeedbackProps {
   isCorrect: boolean;
@@ -24,6 +25,8 @@ export function AnswerFeedback({
   onListenAgain,
   kidFriendly = false,
 }: AnswerFeedbackProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   // This banner mounts fresh on every single answer in every lesson — by far
   // the most-repeated moment in the app — so it gets a real spring entrance
   // and a bouncy icon rather than just popping into place.
@@ -71,33 +74,34 @@ export function AnswerFeedback({
   );
 }
 
-const styles = StyleSheet.create({
-  banner: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: spacing.lg,
-    borderTopLeftRadius: radii.lg,
-    borderTopRightRadius: radii.lg,
-    alignItems: 'center',
-  },
-  correct: { backgroundColor: '#E3F5EA' },
-  incorrect: { backgroundColor: '#FBEAE6' },
-  icon: { fontSize: 28, marginBottom: spacing.xs },
-  correctText: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
-  notQuiteText: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
-  wordRow: { alignItems: 'center', marginTop: spacing.sm },
-  wordArabic: { fontSize: 24, fontWeight: '700', color: colors.textPrimary },
-  transliteration: { fontSize: 14, color: colors.textSecondary, fontStyle: 'italic', marginTop: 2 },
-  meaning: { fontSize: 14, color: colors.textSecondary, marginTop: 2, textTransform: 'capitalize' },
-  listenAgainButton: {
-    marginTop: spacing.md,
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.pill,
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-  },
-  listenAgainText: { fontSize: 13, fontWeight: '600', color: colors.primary },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    banner: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      padding: spacing.lg,
+      borderTopLeftRadius: radii.lg,
+      borderTopRightRadius: radii.lg,
+      alignItems: 'center',
+    },
+    correct: { backgroundColor: `${colors.success}1F` },
+    incorrect: { backgroundColor: `${colors.error}1F` },
+    icon: { fontSize: 28, marginBottom: spacing.xs },
+    correctText: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
+    notQuiteText: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
+    wordRow: { alignItems: 'center', marginTop: spacing.sm },
+    wordArabic: { fontSize: 24, fontWeight: '700', color: colors.textPrimary },
+    transliteration: { fontSize: 14, color: colors.textSecondary, fontStyle: 'italic', marginTop: 2 },
+    meaning: { fontSize: 14, color: colors.textSecondary, marginTop: 2, textTransform: 'capitalize' },
+    listenAgainButton: {
+      marginTop: spacing.md,
+      paddingVertical: spacing.xs,
+      paddingHorizontal: spacing.md,
+      borderRadius: radii.pill,
+      borderWidth: 1.5,
+      borderColor: colors.primary,
+    },
+    listenAgainText: { fontSize: 13, fontWeight: '600', color: colors.primary },
+  });

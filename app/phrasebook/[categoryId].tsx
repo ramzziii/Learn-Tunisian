@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { PhraseDetailModal } from '@/components/phrasebook/PhraseDetailModal';
+import { PremiumGate } from '@/components/premium/Premium';
 import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
@@ -11,7 +12,8 @@ import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Reveal } from '@/components/ui/Reveal';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { radii, spacing, type ThemeColors } from '@/constants/theme';
-import { fetchPhrasebookCategories, fetchWordGroupsForLesson } from '@/data/content';
+import { fetchPhrasebookCategories } from '@/data/content';
+import { canAccessPhrasebookCategory, fetchAccessibleLessonWordGroups } from '@/data/premiumAccess';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
 import { getViewedPhraseIds, markPhraseViewed } from '@/lib/phrasebookProgress';
 import { useTheme } from '@/lib/theme/ThemeContext';
@@ -31,6 +33,7 @@ export default function PhrasebookCategoryScreen() {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [data, setData] = useState<CategoryData | null>(null);
   const [loadError, setLoadError] = useState(false);
+  const [isPremiumLocked, setIsPremiumLocked] = useState(false);
   const [viewedIds, setViewedIds] = useState<string[]>([]);
   const [selectedPhrase, setSelectedPhrase] = useState<WordGroupWithVariants | null>(null);
 
@@ -54,7 +57,13 @@ export default function PhrasebookCategoryScreen() {
         setLoadError(true);
         return;
       }
-      const phrases = await fetchWordGroupsForLesson(category.lessonId);
+      // Checked before the category's phrases are fetched, so a direct link
+      // to a locked category never loads them.
+      if (!canAccessPhrasebookCategory(activeProfile.isPremium, category.unitId, categories)) {
+        setIsPremiumLocked(true);
+        return;
+      }
+      const phrases = await fetchAccessibleLessonWordGroups(category.lessonId, activeProfile.isPremium);
       setData({ name: category.name, lessonId: category.lessonId, phrases });
       setViewedIds(viewed);
     } catch (error) {
@@ -75,6 +84,15 @@ export default function PhrasebookCategoryScreen() {
     setViewedIds((prev) => [...prev, phrase.id]);
     markPhraseViewed(activeProfile.id, phrase.id);
   };
+
+  if (isPremiumLocked) {
+    return (
+      <PremiumGate
+        title="This category is part of Premium"
+        message="Your free plan includes the Greetings phrasebook. Upgrade to unlock every category."
+      />
+    );
+  }
 
   if (!activeProfile || (data === null && !loadError)) return <LoadingScreen themed />;
 

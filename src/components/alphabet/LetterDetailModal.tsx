@@ -1,9 +1,10 @@
 import * as Haptics from 'expo-haptics';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { PressableScale } from '@/components/ui/PressableScale';
-import { colors, radii, shadows, spacing } from '@/constants/theme';
+import { radii, shadows, spacing, type ThemeColors } from '@/constants/theme';
+import { useTheme } from '@/lib/theme/ThemeContext';
 import { splitAtLetter, type ArabicLetter, type LetterPosition } from '@/lib/alphabet';
 import { useLetterSpeech } from '@/hooks/useLetterSpeech';
 
@@ -17,14 +18,14 @@ const FORM_LABELS = ['Final', 'Medial', 'Initial', 'Isolated'] as const;
 // three positions already show the letter connected within a real word.
 const EXAMPLE_LABELS = ['Final', 'Medial', 'Initial'] as const;
 
-// Same three-accent palette as LetterDiacriticsModal's ACCENT_BY_DIACRITIC,
+// Same three-accent palette as LetterDiacriticsModal's accentByDiacritic,
 // so the two cards read as the same component family.
-const ACCENT_BY_POSITION: Record<LetterPosition, string> = {
+const accentByPosition = (colors: ThemeColors): Record<LetterPosition, string> => ({
   final: colors.primary,
   medial: colors.accent,
   initial: colors.success,
   isolated: colors.primary,
-};
+});
 
 // Matches LetterDiacriticsModal's CARD_ROW_HEIGHT so the glyph box and the
 // example box line up — explicit height rather than flex-stretch, since
@@ -33,6 +34,8 @@ const ACCENT_BY_POSITION: Record<LetterPosition, string> = {
 const CARD_ROW_HEIGHT = 84;
 
 export function LetterDetailModal({ letter, onClose }: LetterDetailModalProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { speak, isSpeaking } = useLetterSpeech();
   const backdropAnim = useRef(new Animated.Value(0)).current;
   const contentAnim = useRef(new Animated.Value(0)).current;
@@ -123,7 +126,7 @@ export function LetterDetailModal({ letter, onClose }: LetterDetailModalProps) {
                 const key = `example-${position}`;
                 const isActive = activeKey === key;
                 const highlighted = splitAtLetter(example.arabic, letter);
-                const accent = ACCENT_BY_POSITION[position];
+                const accent = accentByPosition(colors)[position];
                 return (
                   <View key={position} style={[styles.card, { borderLeftColor: accent }]}>
                     <View style={styles.formGlyphBox}>
@@ -176,6 +179,8 @@ export function LetterDetailModal({ letter, onClose }: LetterDetailModalProps) {
 }
 
 function FormBox({ label, value }: { label: string; value: string }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   // A plain View, not PressableScale — these are informational only (no tap,
   // no sound), so no press feedback or active-state styling applies here.
   return (
@@ -188,120 +193,121 @@ function FormBox({ label, value }: { label: string; value: string }) {
   );
 }
 
-const styles = StyleSheet.create({
-  overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(36, 32, 33, 0.45)' },
-  sheet: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: radii.lg,
-    borderTopRightRadius: radii.lg,
-    padding: spacing.lg,
-    maxHeight: '80%',
-  },
-  closeButton: {
-    alignSelf: 'flex-end',
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  closeIcon: { fontSize: 18, color: colors.textPrimary },
-  bigLetter: { fontSize: 72, textAlign: 'center', color: colors.textPrimary, marginTop: spacing.sm },
-  letterName: { fontSize: 18, textAlign: 'center', color: colors.textSecondary, marginTop: spacing.xs },
-  playButton: {
-    alignSelf: 'center',
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: spacing.md,
-    marginBottom: spacing.lg,
-    ...shadows.card,
-  },
-  playButtonActive: { backgroundColor: colors.primaryDark },
-  playIcon: { fontSize: 22, color: colors.textOnPrimary },
-  arabiziCard: {
-    backgroundColor: colors.background,
-    borderRadius: radii.md,
-    padding: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  arabiziHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  arabiziTitle: { fontSize: 13, fontWeight: '700', color: colors.textSecondary, textTransform: 'uppercase' },
-  arabiziBadge: {
-    backgroundColor: colors.primary,
-    borderRadius: radii.sm,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-  },
-  arabiziBadgeText: { fontSize: 13, fontWeight: '700', color: colors.textOnPrimary },
-  arabiziExplanation: { fontSize: 13, color: colors.textPrimary, lineHeight: 19, marginTop: spacing.xs },
-  sectionLabel: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.sm },
-  formsRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
-  formBoxWrapper: { flex: 1 },
-  formBox: {
-    borderRadius: radii.md,
-    backgroundColor: colors.background,
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-  },
-  formValue: { fontSize: 26, color: colors.textPrimary },
-  formLabel: { fontSize: 11, fontWeight: '600', color: colors.textSecondary, marginTop: spacing.xs },
-  // Mirrors LetterDiacriticsModal's card row exactly (same box sizes, gaps,
-  // and font sizes as glyphButton/pictureRow) so the two modals' cards read
-  // as the same component family.
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.background,
-    borderRadius: radii.md,
-    borderLeftWidth: 4,
-    padding: spacing.sm,
-    marginBottom: spacing.sm,
-  },
-  formGlyphBox: {
-    width: 76,
-    height: CARD_ROW_HEIGHT,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: radii.md,
-    borderWidth: 2,
-    borderColor: 'transparent',
-    ...shadows.card,
-  },
-  formGlyphText: { fontSize: 30 },
-  formGlyphLabel: { fontSize: 10, color: colors.textSecondary, marginTop: 1 },
-  contentBlock: { flex: 1, minWidth: 0 },
-  exampleRow: {
-    height: CARD_ROW_HEIGHT,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    backgroundColor: colors.surface,
-    borderRadius: radii.md,
-    borderWidth: 2,
-    borderColor: 'transparent',
-    paddingHorizontal: spacing.sm,
-    ...shadows.card,
-  },
-  exampleEmojiBox: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
-  exampleEmoji: { fontSize: 24 },
-  exampleText: { flexShrink: 1, minWidth: 0 },
-  exampleArabic: { fontSize: 18, color: colors.textPrimary },
-  // No bold weight, explicit matching fontSize — a heavier weight renders
-  // visibly larger for this Arabic glyph shape even at an identical
-  // fontSize (same fix already applied on the Flashcards screen and Diacritics modal).
-  exampleArabicHighlight: { fontSize: 18, fontWeight: '400' },
-  exampleTransliteration: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    textTransform: 'capitalize',
-    marginTop: 1,
-  },
-  exampleAudioIcon: { fontSize: 13, marginLeft: 'auto', opacity: 0.6 },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(36, 32, 33, 0.45)' },
+    sheet: {
+      backgroundColor: colors.surface,
+      borderTopLeftRadius: radii.lg,
+      borderTopRightRadius: radii.lg,
+      padding: spacing.lg,
+      maxHeight: '80%',
+    },
+    closeButton: {
+      alignSelf: 'flex-end',
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: colors.background,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    closeIcon: { fontSize: 18, color: colors.textPrimary },
+    bigLetter: { fontSize: 72, textAlign: 'center', color: colors.textPrimary, marginTop: spacing.sm },
+    letterName: { fontSize: 18, textAlign: 'center', color: colors.textSecondary, marginTop: spacing.xs },
+    playButton: {
+      alignSelf: 'center',
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: spacing.md,
+      marginBottom: spacing.lg,
+      ...shadows.card,
+    },
+    playButtonActive: { backgroundColor: colors.primaryDark },
+    playIcon: { fontSize: 22, color: colors.textOnPrimary },
+    arabiziCard: {
+      backgroundColor: colors.background,
+      borderRadius: radii.md,
+      padding: spacing.md,
+      marginBottom: spacing.lg,
+    },
+    arabiziHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    arabiziTitle: { fontSize: 13, fontWeight: '700', color: colors.textSecondary, textTransform: 'uppercase' },
+    arabiziBadge: {
+      backgroundColor: colors.primary,
+      borderRadius: radii.sm,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 2,
+    },
+    arabiziBadgeText: { fontSize: 13, fontWeight: '700', color: colors.textOnPrimary },
+    arabiziExplanation: { fontSize: 13, color: colors.textPrimary, lineHeight: 19, marginTop: spacing.xs },
+    sectionLabel: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.sm },
+    formsRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
+    formBoxWrapper: { flex: 1 },
+    formBox: {
+      borderRadius: radii.md,
+      backgroundColor: colors.background,
+      alignItems: 'center',
+      paddingVertical: spacing.md,
+    },
+    formValue: { fontSize: 26, color: colors.textPrimary },
+    formLabel: { fontSize: 11, fontWeight: '600', color: colors.textSecondary, marginTop: spacing.xs },
+    // Mirrors LetterDiacriticsModal's card row exactly (same box sizes, gaps,
+    // and font sizes as glyphButton/pictureRow) so the two modals' cards read
+    // as the same component family.
+    card: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      backgroundColor: colors.background,
+      borderRadius: radii.md,
+      borderLeftWidth: 4,
+      padding: spacing.sm,
+      marginBottom: spacing.sm,
+    },
+    formGlyphBox: {
+      width: 76,
+      height: CARD_ROW_HEIGHT,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surface,
+      borderRadius: radii.md,
+      borderWidth: 2,
+      borderColor: 'transparent',
+      ...shadows.card,
+    },
+    formGlyphText: { fontSize: 30 },
+    formGlyphLabel: { fontSize: 10, color: colors.textSecondary, marginTop: 1 },
+    contentBlock: { flex: 1, minWidth: 0 },
+    exampleRow: {
+      height: CARD_ROW_HEIGHT,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      backgroundColor: colors.surface,
+      borderRadius: radii.md,
+      borderWidth: 2,
+      borderColor: 'transparent',
+      paddingHorizontal: spacing.sm,
+      ...shadows.card,
+    },
+    exampleEmojiBox: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
+    exampleEmoji: { fontSize: 24 },
+    exampleText: { flexShrink: 1, minWidth: 0 },
+    exampleArabic: { fontSize: 18, color: colors.textPrimary },
+    // No bold weight, explicit matching fontSize — a heavier weight renders
+    // visibly larger for this Arabic glyph shape even at an identical
+    // fontSize (same fix already applied on the Flashcards screen and Diacritics modal).
+    exampleArabicHighlight: { fontSize: 18, fontWeight: '400' },
+    exampleTransliteration: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      textTransform: 'capitalize',
+      marginTop: 1,
+    },
+    exampleAudioIcon: { fontSize: 13, marginLeft: 'auto', opacity: 0.6 },
+  });

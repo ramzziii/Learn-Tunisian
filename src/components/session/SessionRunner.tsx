@@ -1,5 +1,5 @@
 import { router, type Href } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Animated, StyleSheet, Text, View } from 'react-native';
 
 import { ExerciseRenderer } from '@/components/exercises/shared/ExerciseRenderer';
@@ -8,7 +8,8 @@ import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
-import { colors, radii, spacing } from '@/constants/theme';
+import { radii, spacing, type ThemeColors } from '@/constants/theme';
+import { useTheme } from '@/lib/theme/ThemeContext';
 import { fetchBadgeStats } from '@/data/badgeStats';
 import { fetchLessonMap } from '@/data/content';
 import { recordWordGroupResult } from '@/data/progress';
@@ -22,12 +23,12 @@ import { masteryLabel, type MasteryLabel } from '@/lib/masteryStatus';
 import { recommendNextStep } from '@/lib/nextStepRecommendation';
 import type { DailyGoalMinutes, LessonWithState, SessionType, Track, WordGroupWithVariants } from '@/types/models';
 
-const MASTERY_BADGE_COLOR: Record<MasteryLabel, string> = {
+const masteryBadgeColors = (colors: ThemeColors): Record<MasteryLabel, string> => ({
   New: colors.textSecondary,
   Learning: colors.accent,
   'Almost there': colors.primaryDark,
   Mastered: colors.success,
-};
+});
 
 interface SessionRunnerProps {
   groups: WordGroupWithVariants[];
@@ -65,6 +66,8 @@ export function SessionRunner({
   currentLessonId,
   onComplete,
 }: SessionRunnerProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const timer = useSessionTimer(goalMinutes);
   const { currentExercise, next } = useExerciseQueue(groups, track);
 
@@ -195,20 +198,20 @@ export function SessionRunner({
 
   if (groups.length === 0) {
     return (
-      <ScreenContainer>
+      <ScreenContainer themed>
         <Text style={styles.emptyText}>{emptyMessage}</Text>
       </ScreenContainer>
     );
   }
 
   return (
-    <ScreenContainer>
+    <ScreenContainer themed>
       <View style={styles.header}>
         <PressableScale haptic onPress={handleExitPress} accessibilityLabel="Exit session" style={styles.closeButton}>
           <Text style={styles.closeIcon}>✕</Text>
         </PressableScale>
         <View style={{ flex: 1 }}>
-          <ProgressBar progress={timer.goalSeconds > 0 ? timer.elapsedSeconds / timer.goalSeconds : 0} />
+          <ProgressBar themed progress={timer.goalSeconds > 0 ? timer.elapsedSeconds / timer.goalSeconds : 0} />
         </View>
       </View>
 
@@ -226,7 +229,7 @@ export function SessionRunner({
         ]}
       >
         {masteryBadge ? (
-          <View style={[styles.masteryBadge, { backgroundColor: MASTERY_BADGE_COLOR[masteryBadge] }]}>
+          <View style={[styles.masteryBadge, { backgroundColor: masteryBadgeColors(colors)[masteryBadge] }]}>
             <Text style={styles.masteryBadgeText}>{masteryBadge}</Text>
           </View>
         ) : null}
@@ -237,7 +240,7 @@ export function SessionRunner({
           <ExerciseRenderer exercise={currentExercise} onComplete={handleAnswer} />
         </Animated.View>
       ) : (
-        <LoadingScreen />
+        <LoadingScreen themed />
       )}
 
       {timer.isComplete ? (
@@ -262,21 +265,22 @@ export function SessionRunner({
   );
 }
 
-const styles = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.lg },
-  closeButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.surface,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-  },
-  closeIcon: { fontSize: 16, color: colors.textSecondary },
-  masteryBadgeWrap: { position: 'absolute', top: 56, right: spacing.lg, zIndex: 1 },
-  masteryBadge: { borderRadius: radii.pill, paddingVertical: 4, paddingHorizontal: spacing.sm },
-  masteryBadgeText: { fontSize: 11, fontWeight: '700', color: colors.textOnPrimary },
-  emptyText: { fontSize: 16, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.xxl },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.lg },
+    closeButton: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surface,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+    },
+    closeIcon: { fontSize: 16, color: colors.textSecondary },
+    masteryBadgeWrap: { position: 'absolute', top: 56, right: spacing.lg, zIndex: 1 },
+    masteryBadge: { borderRadius: radii.pill, paddingVertical: 4, paddingHorizontal: spacing.sm },
+    masteryBadgeText: { fontSize: 11, fontWeight: '700', color: colors.textOnPrimary },
+    emptyText: { fontSize: 16, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.xxl },
+  });

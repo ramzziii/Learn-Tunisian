@@ -78,6 +78,7 @@ export default function TalkScenarioPicker() {
   return (
     <ScreenContainer themed>
       <ScrollView showsVerticalScrollIndicator={false}>
+        <Text style={styles.eyebrow}>Conversation practice</Text>
         <Text style={styles.title}>Talk to a Tunisian 🇹🇳</Text>
         <Text style={styles.subtitle}>Choose a situation to practice a real conversation.</Text>
 
@@ -131,8 +132,16 @@ const makeStyles = (colors: ThemeColors) => {
 
   return StyleSheet.create({
     shadowCard,
-    title: { fontSize: 26, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md },
-    subtitle: { fontSize: 14, color: colors.textSecondary, marginTop: spacing.xs },
+    eyebrow: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: colors.primary,
+      letterSpacing: 1,
+      textTransform: 'uppercase',
+      marginTop: spacing.md,
+    },
+    title: { fontSize: 30, fontWeight: '800', color: colors.textPrimary, marginTop: spacing.xs },
+    subtitle: { fontSize: 14, color: colors.textSecondary, marginTop: spacing.xs, lineHeight: 20 },
     levelBadge: {
       alignSelf: 'flex-start',
       backgroundColor: colors.surface,
@@ -142,7 +151,7 @@ const makeStyles = (colors: ThemeColors) => {
       marginTop: spacing.md,
       marginBottom: spacing.lg,
     },
-    levelBadgeText: { fontSize: 13, fontWeight: '700', color: colors.primaryDark },
+    levelBadgeText: { fontSize: 13, fontWeight: '700', color: colors.primary },
     scenarioList: { gap: spacing.sm, paddingBottom: spacing.xl },
     scenarioRow: {
       flexDirection: 'row',

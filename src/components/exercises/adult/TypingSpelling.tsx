@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Animated, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { AnswerFeedback } from '@/components/exercises/shared/AnswerFeedback';
 import { VariantCallout } from '@/components/exercises/shared/VariantCallout';
 import { AudioPlayButton } from '@/components/ui/AudioPlayButton';
 import { PressableScale } from '@/components/ui/PressableScale';
-import { adultTrackSizing, colors, radii, spacing } from '@/constants/theme';
+import { adultTrackSizing, radii, spacing, type ThemeColors } from '@/constants/theme';
+import { useTheme } from '@/lib/theme/ThemeContext';
 import { useAnswerFeedback } from '@/hooks/useAnswerFeedback';
 import { useShake } from '@/hooks/useShake';
 import { useWordAudioPlayer } from '@/hooks/useWordAudioPlayer';
@@ -22,6 +23,8 @@ interface TypingSpellingProps {
 
 /** Adult/teen track: hear a word and its meaning, type its transliteration. Any variant of the concept counts as correct. */
 export function TypingSpelling({ exercise, onComplete }: TypingSpellingProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { play, hasAudio, isResolving, hasError, retry } = useWordAudioPlayer(exercise.promptVariant, { autoPlay: true });
   const { playCorrect, playIncorrect } = useAnswerFeedback();
   const { shake, shakeStyle } = useShake();
@@ -99,35 +102,36 @@ export function TypingSpelling({ exercise, onComplete }: TypingSpellingProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, alignItems: 'center' },
-  meaning: { fontSize: 20, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md },
-  instructions: {
-    fontSize: adultTrackSizing.bodyFontSize,
-    color: colors.textSecondary,
-    marginTop: spacing.xs,
-    marginBottom: spacing.md,
-  },
-  input: {
-    width: '100%',
-    borderWidth: 2,
-    borderColor: colors.border,
-    borderRadius: radii.md,
-    padding: spacing.md,
-    fontSize: 18,
-    color: colors.textPrimary,
-    backgroundColor: colors.surface,
-    textAlign: 'center',
-  },
-  inputCorrect: { borderColor: colors.success, backgroundColor: '#E3F5EA' },
-  inputIncorrect: { borderColor: colors.error, backgroundColor: '#FBEAE6' },
-  submitButton: {
-    marginTop: spacing.lg,
-    backgroundColor: colors.primary,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xl,
-    borderRadius: radii.md,
-  },
-  submitButtonDisabled: { opacity: 0.4 },
-  submitLabel: { color: '#fff', fontSize: 16, fontWeight: '700' },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    container: { flex: 1, alignItems: 'center' },
+    meaning: { fontSize: 20, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md },
+    instructions: {
+      fontSize: adultTrackSizing.bodyFontSize,
+      color: colors.textSecondary,
+      marginTop: spacing.xs,
+      marginBottom: spacing.md,
+    },
+    input: {
+      width: '100%',
+      borderWidth: 2,
+      borderColor: colors.border,
+      borderRadius: radii.md,
+      padding: spacing.md,
+      fontSize: 18,
+      color: colors.textPrimary,
+      backgroundColor: colors.surface,
+      textAlign: 'center',
+    },
+    inputCorrect: { borderColor: colors.success, backgroundColor: `${colors.success}1F` },
+    inputIncorrect: { borderColor: colors.error, backgroundColor: `${colors.error}1F` },
+    submitButton: {
+      marginTop: spacing.lg,
+      backgroundColor: colors.primary,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.xl,
+      borderRadius: radii.md,
+    },
+    submitButtonDisabled: { opacity: 0.4 },
+    submitLabel: { color: colors.textOnPrimary, fontSize: 16, fontWeight: '700' },
+  });

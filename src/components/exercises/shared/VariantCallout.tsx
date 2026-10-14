@@ -1,6 +1,8 @@
+import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { colors, radii, spacing } from '@/constants/theme';
+import { radii, spacing, type ThemeColors } from '@/constants/theme';
+import { useTheme } from '@/lib/theme/ThemeContext';
 import { getAlsoHeardVariants, getFeminineVariant, getMasculineVariant } from '@/lib/wordVariants';
 import type { WordGroupWithVariants } from '@/types/models';
 
@@ -16,6 +18,8 @@ interface VariantCalloutProps {
  * group has neither.
  */
 export function VariantCallout({ group }: VariantCalloutProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const alsoHeard = getAlsoHeardVariants(group);
   const masculine = getMasculineVariant(group);
   const feminine = getFeminineVariant(group);
@@ -47,15 +51,16 @@ export function VariantCallout({ group }: VariantCalloutProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: '#FFF8E7',
-    borderRadius: radii.md,
-    padding: spacing.sm + 2,
-    gap: 4,
-    marginBottom: spacing.lg,
-    width: '100%',
-  },
-  line: { fontSize: 13, color: colors.textPrimary, lineHeight: 19 },
-  arabic: { fontWeight: '700' },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    container: {
+      backgroundColor: `${colors.accent}26`,
+      borderRadius: radii.md,
+      padding: spacing.sm + 2,
+      gap: 4,
+      marginBottom: spacing.lg,
+      width: '100%',
+    },
+    line: { fontSize: 13, color: colors.textPrimary, lineHeight: 19 },
+    arabic: { fontWeight: '700' },
+  });

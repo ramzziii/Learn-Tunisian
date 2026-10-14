@@ -626,8 +626,8 @@ export interface AlphabetExerciseItem {
 }
 
 /** A fixed-length, shuffled queue mixing the four alphabet exercise kinds — alphabet practice is a short bite-sized round, not a time-based session like the main lessons. */
-export function buildAlphabetExerciseQueue(size = 8): AlphabetExerciseItem[] {
-  const letterOrder = shuffled(ARABIC_LETTERS);
+export function buildAlphabetExerciseQueue(size = 8, letters: readonly ArabicLetter[] = ARABIC_LETTERS): AlphabetExerciseItem[] {
+  const letterOrder = shuffled([...letters]);
   const items: AlphabetExerciseItem[] = [];
   for (let i = 0; i < size; i++) {
     const letter = letterOrder[i % letterOrder.length];
@@ -661,8 +661,8 @@ export interface MatchingTile {
 }
 
 /** Builds a shuffled grid of glyph/name tile pairs for the timed matching game. */
-export function buildMatchingGrid(pairCount = 6): MatchingTile[] {
-  const chosen = shuffled(ARABIC_LETTERS).slice(0, pairCount);
+export function buildMatchingGrid(pairCount = 6, letters: readonly ArabicLetter[] = ARABIC_LETTERS): MatchingTile[] {
+  const chosen = shuffled([...letters]).slice(0, pairCount);
   const tiles: MatchingTile[] = chosen.flatMap((letter) => [
     { tileId: `${letter.id}-glyph`, letterId: letter.id, kind: 'glyph' as const },
     { tileId: `${letter.id}-name`, letterId: letter.id, kind: 'name' as const },

@@ -109,6 +109,8 @@ export interface PhrasebookCategory {
   unitId: string;
   lessonId: string;
   name: string;
+  /** units.sort_order — the stable order free access is decided by (see src/lib/premium/access.ts). */
+  sortOrder: number;
   phraseCount: number;
 }
 
@@ -155,6 +157,7 @@ export async function fetchPhrasebookCategories(): Promise<PhrasebookCategory[]>
         unitId: unit.id,
         lessonId: lesson.id,
         name: unit.name,
+        sortOrder: unit.sort_order,
         phraseCount: countByUnitId.get(unit.id) ?? 0,
       } satisfies PhrasebookCategory;
     })

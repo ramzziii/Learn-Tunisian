@@ -1,7 +1,9 @@
+import { useMemo } from 'react';
 import { ActivityIndicator, StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native';
 
 import { PressableScale } from '@/components/ui/PressableScale';
-import { colors, shadows } from '@/constants/theme';
+import { shadows, type ThemeColors } from '@/constants/theme';
+import { useTheme } from '@/lib/theme/ThemeContext';
 
 interface AudioPlayButtonProps {
   onPress: () => void;
@@ -32,6 +34,8 @@ export function AudioPlayButton({
   size = 72,
   style,
 }: AudioPlayButtonProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const isRetryable = hasError && !!onRetry;
   const disabled = (!hasAudio && !isRetryable) || isResolving;
 
@@ -59,12 +63,13 @@ export function AudioPlayButton({
   );
 }
 
-const styles = StyleSheet.create({
-  button: {
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  retry: { backgroundColor: colors.accent },
-  disabled: { opacity: 0.4 },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    button: {
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    retry: { backgroundColor: colors.accent },
+    disabled: { opacity: 0.4 },
+  });

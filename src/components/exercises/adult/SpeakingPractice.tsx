@@ -10,14 +10,15 @@ import {
 } from 'expo-audio';
 import { File } from 'expo-file-system';
 import * as Haptics from 'expo-haptics';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Text, View, StyleSheet } from 'react-native';
 
 import { VariantCallout } from '@/components/exercises/shared/VariantCallout';
 import { AudioPlayButton } from '@/components/ui/AudioPlayButton';
 import { Button } from '@/components/ui/Button';
 import { PressableScale } from '@/components/ui/PressableScale';
-import { adultTrackSizing, colors, radii, spacing } from '@/constants/theme';
+import { adultTrackSizing, radii, spacing, type ThemeColors } from '@/constants/theme';
+import { useTheme } from '@/lib/theme/ThemeContext';
 import { useAnswerFeedback } from '@/hooks/useAnswerFeedback';
 import { isUsingMockAiProvider } from '@/lib/ai';
 import { transcribeAudio } from '@/lib/ai/functionsClient';
@@ -57,6 +58,8 @@ interface SpeakingPracticeProps {
  * likely recognition miss shouldn't cost mastery/spaced-repetition standing.
  */
 export function SpeakingPractice({ exercise, onComplete }: SpeakingPracticeProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const {
     play: playNative,
     hasAudio,
@@ -212,7 +215,7 @@ export function SpeakingPractice({ exercise, onComplete }: SpeakingPracticeProps
           We&apos;ll use your microphone so you can record yourself saying this word and play it back to compare —
           just for you, never scored or sent anywhere.
         </Text>
-        <Button label="Allow microphone access" onPress={requestPermission} style={{ marginTop: spacing.lg }} />
+        <Button themed label="Allow microphone access" onPress={requestPermission} style={{ marginTop: spacing.lg }} />
       </View>
     );
   }
@@ -234,7 +237,7 @@ export function SpeakingPractice({ exercise, onComplete }: SpeakingPracticeProps
           onRetry={retryNativeAudio}
           style={{ marginTop: spacing.lg }}
         />
-        <Button label="Continue" onPress={() => onComplete(true)} style={{ marginTop: spacing.lg }} />
+        <Button themed label="Continue" onPress={() => onComplete(true)} style={{ marginTop: spacing.lg }} />
       </View>
     );
   }
@@ -325,13 +328,13 @@ export function SpeakingPractice({ exercise, onComplete }: SpeakingPracticeProps
         <View style={styles.actionsRow}>
           {!scoringActive ? (
             <>
-              <Button label="Try again" variant="secondary" onPress={tryAgain} style={{ flex: 1 }} />
-              <Button label="Continue" onPress={() => onComplete(true)} style={{ flex: 1 }} />
+              <Button themed label="Try again" variant="secondary" onPress={tryAgain} style={{ flex: 1 }} />
+              <Button themed label="Continue" onPress={() => onComplete(true)} style={{ flex: 1 }} />
             </>
           ) : checkStage === 'idle' || checkStage === 'checking' ? (
             <>
-              <Button label="Try again" variant="secondary" onPress={tryAgain} disabled={isChecking} style={{ flex: 1 }} />
-              <Button
+              <Button themed label="Try again" variant="secondary" onPress={tryAgain} disabled={isChecking} style={{ flex: 1 }} />
+              <Button themed
                 label="Check pronunciation"
                 onPress={checkPronunciation}
                 loading={isChecking}
@@ -339,10 +342,10 @@ export function SpeakingPractice({ exercise, onComplete }: SpeakingPracticeProps
               />
             </>
           ) : checkStage === 'incorrect' ? (
-            <Button label="Record again" onPress={tryAgain} style={{ flex: 1 }} />
+            <Button themed label="Record again" onPress={tryAgain} style={{ flex: 1 }} />
           ) : (
             // 'correct' | 'exhausted' | 'check-failed'
-            <Button label="Continue" onPress={() => onComplete(true)} style={{ flex: 1 }} />
+            <Button themed label="Continue" onPress={() => onComplete(true)} style={{ flex: 1 }} />
           )}
         </View>
       ) : null}
@@ -350,67 +353,68 @@ export function SpeakingPractice({ exercise, onComplete }: SpeakingPracticeProps
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, alignItems: 'center' },
-  disabled: { opacity: 0.5 },
-  instructions: {
-    fontSize: adultTrackSizing.bodyFontSize,
-    fontWeight: '600',
-    color: colors.textPrimary,
-    marginTop: spacing.md,
-    marginBottom: spacing.md,
-    textAlign: 'center',
-  },
-  errorText: { fontSize: 13, color: colors.error, textAlign: 'center', marginBottom: spacing.sm },
-  permissionEmoji: { fontSize: 48, marginTop: spacing.xl },
-  permissionTitle: { fontSize: 22, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md },
-  permissionBody: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    marginTop: spacing.sm,
-    lineHeight: 20,
-    paddingHorizontal: spacing.md,
-  },
-  recordButton: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    borderWidth: 4,
-    borderColor: colors.error,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: spacing.xl,
-  },
-  recordButtonActive: { backgroundColor: '#FBEAE6' },
-  recordDot: { width: 56, height: 56, borderRadius: 28, backgroundColor: colors.error },
-  stopSquare: { width: 32, height: 32, borderRadius: radii.sm, backgroundColor: colors.error },
-  recordingTime: { fontSize: 16, color: colors.textSecondary, marginTop: spacing.sm, fontVariant: ['tabular-nums'] },
-  recordedRow: { marginTop: spacing.xl, width: '100%', alignItems: 'center' },
-  playbackButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xl,
-    borderRadius: radii.pill,
-    backgroundColor: colors.surface,
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-  },
-  playbackIcon: { fontSize: 20 },
-  playbackLabel: { fontSize: 16, fontWeight: '600', color: colors.primary },
-  feedbackBanner: {
-    marginTop: spacing.lg,
-    width: '100%',
-    padding: spacing.md,
-    borderRadius: radii.md,
-    backgroundColor: '#FBEAE6',
-    alignItems: 'center',
-  },
-  feedbackBannerCorrect: { backgroundColor: '#E3F5EA' },
-  feedbackText: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
-  feedbackTextCorrect: { color: '#2E9F68' },
-  attemptText: { fontSize: 12, color: colors.textSecondary, marginTop: spacing.xs },
-  actionsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xl, width: '100%' },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    container: { flex: 1, alignItems: 'center' },
+    disabled: { opacity: 0.5 },
+    instructions: {
+      fontSize: adultTrackSizing.bodyFontSize,
+      fontWeight: '600',
+      color: colors.textPrimary,
+      marginTop: spacing.md,
+      marginBottom: spacing.md,
+      textAlign: 'center',
+    },
+    errorText: { fontSize: 13, color: colors.error, textAlign: 'center', marginBottom: spacing.sm },
+    permissionEmoji: { fontSize: 48, marginTop: spacing.xl },
+    permissionTitle: { fontSize: 22, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md },
+    permissionBody: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      marginTop: spacing.sm,
+      lineHeight: 20,
+      paddingHorizontal: spacing.md,
+    },
+    recordButton: {
+      width: 88,
+      height: 88,
+      borderRadius: 44,
+      borderWidth: 4,
+      borderColor: colors.error,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: spacing.xl,
+    },
+    recordButtonActive: { backgroundColor: `${colors.error}1F` },
+    recordDot: { width: 56, height: 56, borderRadius: 28, backgroundColor: colors.error },
+    stopSquare: { width: 32, height: 32, borderRadius: radii.sm, backgroundColor: colors.error },
+    recordingTime: { fontSize: 16, color: colors.textSecondary, marginTop: spacing.sm, fontVariant: ['tabular-nums'] },
+    recordedRow: { marginTop: spacing.xl, width: '100%', alignItems: 'center' },
+    playbackButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.xl,
+      borderRadius: radii.pill,
+      backgroundColor: colors.surface,
+      borderWidth: 1.5,
+      borderColor: colors.primary,
+    },
+    playbackIcon: { fontSize: 20 },
+    playbackLabel: { fontSize: 16, fontWeight: '600', color: colors.primary },
+    feedbackBanner: {
+      marginTop: spacing.lg,
+      width: '100%',
+      padding: spacing.md,
+      borderRadius: radii.md,
+      backgroundColor: `${colors.error}1F`,
+      alignItems: 'center',
+    },
+    feedbackBannerCorrect: { backgroundColor: `${colors.success}1F` },
+    feedbackText: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
+    feedbackTextCorrect: { color: colors.success },
+    attemptText: { fontSize: 12, color: colors.textSecondary, marginTop: spacing.xs },
+    actionsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xl, width: '100%' },
+  });

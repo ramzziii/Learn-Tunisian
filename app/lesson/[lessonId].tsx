@@ -1,12 +1,14 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 
+import { PremiumGate } from '@/components/premium/Premium';
 import { SessionRunner } from '@/components/session/SessionRunner';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
-import { fetchWordGroupsForLesson } from '@/data/content';
+import { fetchAccessibleLessonWordGroups } from '@/data/premiumAccess';
 import { fetchDailyGoalSettings } from '@/data/profiles';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
 import { prefetchLessonAudio } from '@/lib/offline/audioCache';
+import { PremiumRequiredError } from '@/lib/premium/access';
 import type { DailyGoalMinutes, WordGroupWithVariants } from '@/types/models';
 
 const DEFAULT_GOAL_MINUTES: DailyGoalMinutes = 5;
@@ -18,15 +20,29 @@ export default function LessonSession() {
   const [groups, setGroups] = useState<WordGroupWithVariants[] | null>(null);
   const [goalMinutes, setGoalMinutes] = useState<DailyGoalMinutes>(DEFAULT_GOAL_MINUTES);
   const [isReady, setIsReady] = useState(false);
+  const [isPremiumLocked, setIsPremiumLocked] = useState(false);
 
   useEffect(() => {
     if (!activeProfile || !lessonId) return;
     let cancelled = false;
     (async () => {
-      const [lessonGroups, dailyGoal] = await Promise.all([
-        fetchWordGroupsForLesson(lessonId),
-        fetchDailyGoalSettings(activeProfile.id),
-      ]);
+      let lessonGroups: WordGroupWithVariants[];
+      let dailyGoal: Awaited<ReturnType<typeof fetchDailyGoalSettings>>;
+      try {
+        // Access is checked before any of the lesson's content is fetched,
+        // so a direct link to a locked lesson never starts it.
+        [lessonGroups, dailyGoal] = await Promise.all([
+          fetchAccessibleLessonWordGroups(lessonId, activeProfile.isPremium),
+          fetchDailyGoalSettings(activeProfile.id),
+        ]);
+      } catch (error) {
+        if (cancelled) return;
+        if (error instanceof PremiumRequiredError) {
+          setIsPremiumLocked(true);
+          return;
+        }
+        throw error;
+      }
       if (cancelled) return;
       setGroups(lessonGroups);
       setGoalMinutes(dailyGoal?.dailyGoalMinutes ?? DEFAULT_GOAL_MINUTES);
@@ -38,7 +54,16 @@ export default function LessonSession() {
     };
   }, [activeProfile, lessonId]);
 
-  if (!isReady || !groups || !activeProfile) return <LoadingScreen />;
+  if (isPremiumLocked) {
+    return (
+      <PremiumGate
+        title="This lesson is part of Premium"
+        message="Your free plan includes the first lesson and the Greetings phrasebook. Upgrade to unlock every lesson."
+      />
+    );
+  }
+
+  if (!isReady || !groups || !activeProfile) return <LoadingScreen themed />;
 
   return (
     <SessionRunner

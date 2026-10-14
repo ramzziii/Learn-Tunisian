@@ -166,6 +166,7 @@ export default function ProfileScreen() {
   return (
     <ScreenContainer themed>
       <ScrollView showsVerticalScrollIndicator={false}>
+        <Text style={styles.eyebrow}>Profile</Text>
         <Text style={styles.title}>{activeProfile.name}&apos;s settings</Text>
 
         <Text style={styles.sectionTitle}>Appearance</Text>
@@ -281,7 +282,15 @@ const makeStyles = (colors: ThemeColors) => {
 
   return StyleSheet.create({
     shadowCard,
-    title: { fontSize: 24, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md, marginBottom: spacing.lg },
+    eyebrow: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: colors.primary,
+      letterSpacing: 1,
+      textTransform: 'uppercase',
+      marginTop: spacing.md,
+    },
+    title: { fontSize: 30, fontWeight: '800', color: colors.textPrimary, marginTop: spacing.xs, marginBottom: spacing.lg },
     sectionTitle: {
       fontSize: 14,
       fontWeight: '700',
@@ -301,7 +310,7 @@ const makeStyles = (colors: ThemeColors) => {
       alignItems: 'center',
     },
     statEmoji: { fontSize: 20, marginBottom: 2 },
-    statValue: { fontSize: 22, fontWeight: '800', color: colors.primaryDark },
+    statValue: { fontSize: 22, fontWeight: '800', color: colors.primary },
     statLabel: { fontSize: 12, color: colors.textSecondary, marginTop: 2, textAlign: 'center' },
     reminderHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginRight: spacing.xs },
     errorContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
 
 import { AnswerFeedback } from '@/components/exercises/shared/AnswerFeedback';
@@ -6,7 +6,8 @@ import { VariantCallout } from '@/components/exercises/shared/VariantCallout';
 import { AudioPlayButton } from '@/components/ui/AudioPlayButton';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Reveal } from '@/components/ui/Reveal';
-import { adultTrackSizing, colors, radii, spacing } from '@/constants/theme';
+import { adultTrackSizing, radii, spacing, type ThemeColors } from '@/constants/theme';
+import { useTheme } from '@/lib/theme/ThemeContext';
 import { useAnswerFeedback } from '@/hooks/useAnswerFeedback';
 import { useShake } from '@/hooks/useShake';
 import { useWordAudioPlayer } from '@/hooks/useWordAudioPlayer';
@@ -22,6 +23,8 @@ interface ReadingMatchProps {
 
 /** Adult/teen track: listen to a word, tap the matching written Arabic script. */
 export function ReadingMatch({ exercise, onComplete }: ReadingMatchProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { play, hasAudio, isResolving, hasError, retry } = useWordAudioPlayer(exercise.promptVariant, { autoPlay: true });
   const { playCorrect, playIncorrect } = useAnswerFeedback();
   const { shake, shakeStyle } = useShake();
@@ -100,28 +103,29 @@ export function ReadingMatch({ exercise, onComplete }: ReadingMatchProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, alignItems: 'center' },
-  instructions: {
-    fontSize: adultTrackSizing.bodyFontSize,
-    fontWeight: '600',
-    color: colors.textPrimary,
-    marginTop: spacing.md,
-    marginBottom: spacing.md,
-  },
-  list: { width: '100%', gap: spacing.sm },
-  option: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-    padding: spacing.md,
-    borderRadius: radii.md,
-    borderWidth: 2,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  optionCorrect: { borderColor: colors.success, backgroundColor: '#E3F5EA' },
-  optionIncorrect: { borderColor: colors.error, backgroundColor: '#FBEAE6' },
-  arabicScript: { fontSize: 24, color: colors.textPrimary },
-  transliteration: { fontSize: 14, color: colors.textSecondary, fontStyle: 'italic' },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    container: { flex: 1, alignItems: 'center' },
+    instructions: {
+      fontSize: adultTrackSizing.bodyFontSize,
+      fontWeight: '600',
+      color: colors.textPrimary,
+      marginTop: spacing.md,
+      marginBottom: spacing.md,
+    },
+    list: { width: '100%', gap: spacing.sm },
+    option: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      justifyContent: 'space-between',
+      padding: spacing.md,
+      borderRadius: radii.md,
+      borderWidth: 2,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+    },
+    optionCorrect: { borderColor: colors.success, backgroundColor: `${colors.success}1F` },
+    optionIncorrect: { borderColor: colors.error, backgroundColor: `${colors.error}1F` },
+    arabicScript: { fontSize: 24, color: colors.textPrimary },
+    transliteration: { fontSize: 14, color: colors.textSecondary, fontStyle: 'italic' },
+  });

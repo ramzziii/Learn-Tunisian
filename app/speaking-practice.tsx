@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { ExerciseRenderer } from '@/components/exercises/shared/ExerciseRenderer';
@@ -9,7 +9,8 @@ import { PressableScale } from '@/components/ui/PressableScale';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Reveal } from '@/components/ui/Reveal';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
-import { colors, radii, shadows, spacing } from '@/constants/theme';
+import { radii, shadows, spacing, type ThemeColors } from '@/constants/theme';
+import { useTheme } from '@/lib/theme/ThemeContext';
 import { fetchLessonMap, fetchWordGroupsForLesson } from '@/data/content';
 import { fetchFavoriteWordGroups } from '@/data/favorites';
 import { fetchWeakestWordGroups } from '@/data/progress';
@@ -45,6 +46,8 @@ function buildSpeakingQueue(groups: WordGroupWithVariants[]): ExerciseItem[] {
  * something to practice regardless of how much progress exists yet.
  */
 export default function SpeakingPracticeScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { activeProfile } = useActiveProfile();
   const [queue, setQueue] = useState<ExerciseItem[] | null>(null);
   const [index, setIndex] = useState(0);
@@ -94,18 +97,18 @@ export default function SpeakingPracticeScreen() {
     });
   };
 
-  if (!activeProfile || queue === null) return <LoadingScreen />;
+  if (!activeProfile || queue === null) return <LoadingScreen themed />;
 
   if (queue.length === 0) {
     return (
-      <ScreenContainer>
+      <ScreenContainer themed>
         <Reveal style={styles.centered}>
           <Text style={styles.centeredEmoji}>🎙️</Text>
           <Text style={styles.centeredTitle}>Nothing to practice yet</Text>
           <Text style={styles.centeredBody}>
             Finish a lesson first, then come back here to practice saying it out loud.
           </Text>
-          <Button label="Back to home" variant="secondary" onPress={() => router.replace('/home')} />
+          <Button themed label="Back to home" variant="secondary" onPress={() => router.replace('/home')} />
         </Reveal>
       </ScreenContainer>
     );
@@ -113,27 +116,27 @@ export default function SpeakingPracticeScreen() {
 
   if (isDone) {
     return (
-      <ScreenContainer>
+      <ScreenContainer themed>
         <Reveal style={styles.centered}>
           <Text style={styles.centeredEmoji}>🎉</Text>
           <Text style={styles.centeredTitle}>Nice speaking!</Text>
           <Text style={styles.centeredBody}>
             {correctCount} of {queue.length} sounded right.
           </Text>
-          <Button label="Back to home" onPress={() => router.replace('/home')} />
+          <Button themed label="Back to home" onPress={() => router.replace('/home')} />
         </Reveal>
       </ScreenContainer>
     );
   }
 
   return (
-    <ScreenContainer>
+    <ScreenContainer themed>
       <View style={styles.header}>
         <PressableScale haptic onPress={() => router.back()} accessibilityLabel="Exit" style={styles.closeButton}>
           <Text style={styles.closeIcon}>✕</Text>
         </PressableScale>
         <View style={{ flex: 1 }}>
-          <ProgressBar progress={index / queue.length} />
+          <ProgressBar themed progress={index / queue.length} />
         </View>
         <Text style={styles.counter}>
           {index + 1}/{queue.length}
@@ -145,23 +148,24 @@ export default function SpeakingPracticeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.lg },
-  closeButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.surface,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    ...shadows.card,
-  },
-  closeIcon: { fontSize: 16, color: colors.textSecondary },
-  counter: { fontSize: 13, fontWeight: '700', color: colors.textSecondary, minWidth: 32, textAlign: 'right' },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm, padding: spacing.lg },
-  centeredEmoji: { fontSize: 56, marginBottom: spacing.sm },
-  centeredTitle: { fontSize: 24, fontWeight: '700', color: colors.textPrimary },
-  centeredBody: { fontSize: 15, color: colors.textSecondary, textAlign: 'center', marginBottom: spacing.lg },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.lg },
+    closeButton: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surface,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      ...shadows.card,
+    },
+    closeIcon: { fontSize: 16, color: colors.textSecondary },
+    counter: { fontSize: 13, fontWeight: '700', color: colors.textSecondary, minWidth: 32, textAlign: 'right' },
+    centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm, padding: spacing.lg },
+    centeredEmoji: { fontSize: 56, marginBottom: spacing.sm },
+    centeredTitle: { fontSize: 24, fontWeight: '700', color: colors.textPrimary },
+    centeredBody: { fontSize: 15, color: colors.textSecondary, textAlign: 'center', marginBottom: spacing.lg },
+  });

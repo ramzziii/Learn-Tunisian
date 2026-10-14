@@ -3,12 +3,15 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { openUpgradeFlow, PremiumBadge } from '@/components/premium/Premium';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { radii, spacing, type ThemeColors } from '@/constants/theme';
-import { fetchPhrasebookCategories, fetchWordGroupsForLesson } from '@/data/content';
+import { fetchPhrasebookCategories } from '@/data/content';
+import { canAccessPhrasebookCategory, fetchAccessibleLessonWordGroups } from '@/data/premiumAccess';
+import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
 import { useFadeInOnChange } from '@/hooks/useFadeInOnChange';
 import { useLetterSpeech } from '@/hooks/useLetterSpeech';
 import { useWordAudioPlayer } from '@/hooks/useWordAudioPlayer';
@@ -25,7 +28,11 @@ import type { WordGroupWithVariants } from '@/types/models';
 export default function PhrasebookFlashcardsScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const isPremium = useActiveProfile().activeProfile?.isPremium ?? false;
   const [cards, setCards] = useState<WordGroupWithVariants[] | null>(null);
+  // Phrases in Premium categories — counted (from the category list) so the
+  // deck can say what's locked, but never fetched for a free profile.
+  const [lockedPhraseCount, setLockedPhraseCount] = useState(0);
   const [index, setIndex] = useState(0);
   const { speak, isSpeaking } = useLetterSpeech();
   const fadeAnim = useFadeInOnChange(String(index));
@@ -38,11 +45,13 @@ export default function PhrasebookFlashcardsScreen() {
 
   const load = useCallback(async () => {
     const categories = await fetchPhrasebookCategories().catch(() => []);
+    const accessible = categories.filter((c) => canAccessPhrasebookCategory(isPremium, c.unitId, categories));
+    const locked = categories.filter((c) => !accessible.includes(c));
     const perCategory = await Promise.all(
-      categories.map((c) => fetchWordGroupsForLesson(c.lessonId).catch(() => []))
+      accessible.map((c) => fetchAccessibleLessonWordGroups(c.lessonId, isPremium).catch(() => []))
     );
-    return perCategory.flat();
-  }, []);
+    return { cards: perCategory.flat(), lockedPhraseCount: locked.reduce((sum, c) => sum + c.phraseCount, 0) };
+  }, [isPremium]);
 
   // Refetches on every focus (not just mount) so audio re-recorded in the
   // admin tool is picked up on returning to this screen, not just on a cold
@@ -51,8 +60,10 @@ export default function PhrasebookFlashcardsScreen() {
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
-      load().then((cards) => {
-        if (!cancelled) setCards(cards);
+      load().then((result) => {
+        if (cancelled) return;
+        setCards(result.cards);
+        setLockedPhraseCount(result.lockedPhraseCount);
       });
       return () => {
         cancelled = true;
@@ -143,6 +154,16 @@ export default function PhrasebookFlashcardsScreen() {
           </PressableScale>
         </View>
       </View>
+
+      {lockedPhraseCount > 0 ? (
+        <PressableScale haptic onPress={openUpgradeFlow} style={[styles.lockedRow, styles.shadowCard]}>
+          <PremiumBadge />
+          <Text style={styles.lockedText}>
+            {lockedPhraseCount} more {lockedPhraseCount === 1 ? 'phrase' : 'phrases'} in the other categories
+          </Text>
+          <Text style={styles.lockedChevron}>›</Text>
+        </PressableScale>
+      ) : null}
     </ScreenContainer>
   );
 }
@@ -154,6 +175,17 @@ const makeStyles = (colors: ThemeColors) => {
   return StyleSheet.create({
     shadowCard,
     shadowRaised,
+    lockedRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      marginTop: spacing.lg,
+      padding: spacing.md,
+      borderRadius: radii.lg,
+      backgroundColor: colors.surface,
+    },
+    lockedText: { flex: 1, fontSize: 14, color: colors.textSecondary },
+    lockedChevron: { fontSize: 20, color: colors.textSecondary },
     screen: { backgroundColor: colors.background, paddingHorizontal: spacing.lg },
     topbar: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.md },
     closeButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
@@ -179,7 +211,7 @@ const makeStyles = (colors: ThemeColors) => {
       backgroundColor: colors.background,
     },
     playBadgeActive: { backgroundColor: `${colors.accent}26` },
-    playIcon: { fontSize: 14, fontWeight: '600', color: colors.primaryDark },
+    playIcon: { fontSize: 14, fontWeight: '600', color: colors.primary },
     navRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xl },
     navButtonWrapper: { flex: 1 },
     navButton: { paddingVertical: spacing.md, borderRadius: radii.md, alignItems: 'center' },
