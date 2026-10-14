@@ -1,17 +1,18 @@
 import * as Haptics from 'expo-haptics';
-import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { PressableScale } from '@/components/ui/PressableScale';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
-import { colors, radii, shadows, spacing } from '@/constants/theme';
+import { radii, spacing, type ThemeColors } from '@/constants/theme';
 import { fetchPhrasebookCategories, fetchWordGroupsForLesson } from '@/data/content';
 import { useFadeInOnChange } from '@/hooks/useFadeInOnChange';
 import { useLetterSpeech } from '@/hooks/useLetterSpeech';
 import { useWordAudioPlayer } from '@/hooks/useWordAudioPlayer';
+import { useTheme } from '@/lib/theme/ThemeContext';
 import { getPrimaryVariant } from '@/lib/wordVariants';
 import type { WordGroupWithVariants } from '@/types/models';
 
@@ -22,6 +23,8 @@ import type { WordGroupWithVariants } from '@/types/models';
  * mechanic or a separate per-category picker screen.
  */
 export default function PhrasebookFlashcardsScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [cards, setCards] = useState<WordGroupWithVariants[] | null>(null);
   const [index, setIndex] = useState(0);
   const { speak, isSpeaking } = useLetterSpeech();
@@ -33,25 +36,35 @@ export default function PhrasebookFlashcardsScreen() {
   const variant = card ? getPrimaryVariant(card) : null;
   const wordPlayer = useWordAudioPlayer(variant);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const categories = await fetchPhrasebookCategories().catch(() => []);
-      const perCategory = await Promise.all(
-        categories.map((c) => fetchWordGroupsForLesson(c.lessonId).catch(() => []))
-      );
-      if (!cancelled) setCards(perCategory.flat());
-    })();
-    return () => {
-      cancelled = true;
-    };
+  const load = useCallback(async () => {
+    const categories = await fetchPhrasebookCategories().catch(() => []);
+    const perCategory = await Promise.all(
+      categories.map((c) => fetchWordGroupsForLesson(c.lessonId).catch(() => []))
+    );
+    return perCategory.flat();
   }, []);
 
-  if (cards === null) return <LoadingScreen />;
+  // Refetches on every focus (not just mount) so audio re-recorded in the
+  // admin tool is picked up on returning to this screen, not just on a cold
+  // app start — same reasoning/pattern as the category list and detail
+  // screens (both already use useFocusEffect for this).
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      load().then((cards) => {
+        if (!cancelled) setCards(cards);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, [load])
+  );
+
+  if (cards === null) return <LoadingScreen themed />;
 
   if (cards.length === 0) {
     return (
-      <ScreenContainer>
+      <ScreenContainer themed>
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyEmoji}>📇</Text>
           <Text style={styles.emptyTitle}>No phrases yet</Text>
@@ -87,13 +100,13 @@ export default function PhrasebookFlashcardsScreen() {
   };
 
   return (
-    <ScreenContainer style={styles.screen}>
+    <ScreenContainer themed style={styles.screen}>
       <View style={styles.topbar}>
         <Pressable onPress={() => router.back()} style={styles.closeButton}>
           <Text style={styles.closeIcon}>✕</Text>
         </Pressable>
         <View style={styles.progressTrack}>
-          <ProgressBar progress={(index + 1) / cards.length} />
+          <ProgressBar themed progress={(index + 1) / cards.length} />
         </View>
       </View>
 
@@ -102,7 +115,7 @@ export default function PhrasebookFlashcardsScreen() {
       </Text>
 
       <Animated.View style={{ opacity: fadeAnim }}>
-        <PressableScale onPress={playCard} style={[styles.card, shadows.raised]}>
+        <PressableScale onPress={playCard} style={[styles.card, styles.shadowRaised]}>
           <Text style={styles.english}>{card.englishMeaning}</Text>
           {variant ? (
             <>
@@ -134,42 +147,49 @@ export default function PhrasebookFlashcardsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { backgroundColor: '#F7F5F2', paddingHorizontal: spacing.lg },
-  topbar: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.md },
-  closeButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  closeIcon: { fontSize: 26, color: colors.textPrimary },
-  progressTrack: { flex: 1, marginLeft: spacing.md },
-  counter: { fontSize: 13, fontWeight: '600', color: colors.textSecondary, textAlign: 'center', marginTop: spacing.sm },
-  card: {
-    marginTop: spacing.lg,
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-    paddingVertical: spacing.xxl,
-    paddingHorizontal: spacing.lg,
-    alignItems: 'center',
-  },
-  english: { fontSize: 22, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
-  arabic: { fontSize: 32, color: colors.textPrimary, textAlign: 'center', marginTop: spacing.lg },
-  transliteration: { fontSize: 16, color: colors.textSecondary, fontStyle: 'italic', textAlign: 'center', marginTop: spacing.xs },
-  playBadge: {
-    marginTop: spacing.lg,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radii.pill,
-    backgroundColor: colors.background,
-  },
-  playBadgeActive: { backgroundColor: '#FDF3E4' },
-  playIcon: { fontSize: 14, fontWeight: '600', color: colors.primaryDark },
-  navRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xl },
-  navButtonWrapper: { flex: 1 },
-  navButton: { paddingVertical: spacing.md, borderRadius: radii.md, alignItems: 'center' },
-  navButtonSecondary: { backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.primary },
-  navButtonSecondaryText: { fontSize: 15, fontWeight: '700', color: colors.primary },
-  navButtonPrimary: { backgroundColor: colors.primary, ...shadows.card },
-  navButtonPrimaryText: { fontSize: 15, fontWeight: '700', color: colors.textOnPrimary },
-  emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm, padding: spacing.lg },
-  emptyEmoji: { fontSize: 56, marginBottom: spacing.sm },
-  emptyTitle: { fontSize: 24, fontWeight: '700', color: colors.textPrimary },
-  emptyBody: { fontSize: 15, color: colors.textSecondary, textAlign: 'center' },
-});
+const makeStyles = (colors: ThemeColors) => {
+  const shadowCard = { shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 3 };
+  const shadowRaised = { shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 8 };
+
+  return StyleSheet.create({
+    shadowCard,
+    shadowRaised,
+    screen: { backgroundColor: colors.background, paddingHorizontal: spacing.lg },
+    topbar: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.md },
+    closeButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+    closeIcon: { fontSize: 26, color: colors.textPrimary },
+    progressTrack: { flex: 1, marginLeft: spacing.md },
+    counter: { fontSize: 13, fontWeight: '600', color: colors.textSecondary, textAlign: 'center', marginTop: spacing.sm },
+    card: {
+      marginTop: spacing.lg,
+      backgroundColor: colors.surface,
+      borderRadius: radii.lg,
+      paddingVertical: spacing.xxl,
+      paddingHorizontal: spacing.lg,
+      alignItems: 'center',
+    },
+    english: { fontSize: 22, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
+    arabic: { fontSize: 32, color: colors.textPrimary, textAlign: 'center', marginTop: spacing.lg },
+    transliteration: { fontSize: 16, color: colors.textSecondary, fontStyle: 'italic', textAlign: 'center', marginTop: spacing.xs },
+    playBadge: {
+      marginTop: spacing.lg,
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.lg,
+      borderRadius: radii.pill,
+      backgroundColor: colors.background,
+    },
+    playBadgeActive: { backgroundColor: `${colors.accent}26` },
+    playIcon: { fontSize: 14, fontWeight: '600', color: colors.primaryDark },
+    navRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xl },
+    navButtonWrapper: { flex: 1 },
+    navButton: { paddingVertical: spacing.md, borderRadius: radii.md, alignItems: 'center' },
+    navButtonSecondary: { backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.primary },
+    navButtonSecondaryText: { fontSize: 15, fontWeight: '700', color: colors.primary },
+    navButtonPrimary: { backgroundColor: colors.primary, ...shadowCard },
+    navButtonPrimaryText: { fontSize: 15, fontWeight: '700', color: colors.textOnPrimary },
+    emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm, padding: spacing.lg },
+    emptyEmoji: { fontSize: 56, marginBottom: spacing.sm },
+    emptyTitle: { fontSize: 24, fontWeight: '700', color: colors.textPrimary },
+    emptyBody: { fontSize: 15, color: colors.textSecondary, textAlign: 'center' },
+  });
+};

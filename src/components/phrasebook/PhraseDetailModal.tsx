@@ -1,17 +1,18 @@
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { File } from 'expo-file-system';
 import * as Haptics from 'expo-haptics';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '@/components/ui/Button';
 import { PressableScale } from '@/components/ui/PressableScale';
-import { colors, radii, shadows, spacing } from '@/constants/theme';
+import { radii, spacing, type ThemeColors } from '@/constants/theme';
 import { useLetterSpeech } from '@/hooks/useLetterSpeech';
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
 import { useWordAudioPlayer } from '@/hooks/useWordAudioPlayer';
 import { isUsingMockAiProvider } from '@/lib/ai';
 import { transcribeAudio } from '@/lib/ai/functionsClient';
+import { useTheme } from '@/lib/theme/ThemeContext';
 import { getPrimaryVariant, isAnyVariantSpeechMatch } from '@/lib/wordVariants';
 import type { Track, WordGroupWithVariants } from '@/types/models';
 
@@ -53,6 +54,8 @@ const MAX_ATTEMPTS = 3;
  * currently flag-hidden, but keeps this correct either way).
  */
 export function PhraseDetailModal({ phrase, track, onClose }: PhraseDetailModalProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { speak, isSpeaking } = useLetterSpeech();
   const recorder = useVoiceRecorder();
   const player = useAudioPlayer(null);
@@ -170,7 +173,7 @@ export function PhraseDetailModal({ phrase, track, onClose }: PhraseDetailModalP
     <Modal visible={isVisible} transparent animationType="slide" onRequestClose={onClose}>
       <Animated.View style={[styles.overlay, { opacity: backdropAnim }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        <View style={[styles.sheet, shadows.raised]}>
+        <View style={[styles.sheet, styles.shadowRaised]}>
           <Pressable onPress={onClose} style={styles.closeButton}>
             <Text style={styles.closeIcon}>✕</Text>
           </Pressable>
@@ -194,6 +197,9 @@ export function PhraseDetailModal({ phrase, track, onClose }: PhraseDetailModalP
                   {wordPlayer.isResolving ? '…' : wordPlayer.isPlaying || isSpeaking ? '🔊' : '▶'}
                 </Text>
               </PressableScale>
+              <Text style={styles.sourceLabel}>
+                {wordPlayer.hasAudio ? '🎙️ Native recording' : '🤖 Generated voice'}
+              </Text>
             </Animated.View>
 
             {variant.notes ? (
@@ -244,6 +250,7 @@ export function PhraseDetailModal({ phrase, track, onClose }: PhraseDetailModalP
                 {recordedUri && scoringActive ? (
                   checkStage === 'idle' || checkStage === 'checking' ? (
                     <Button
+                      themed
                       label="Check pronunciation"
                       onPress={checkPronunciation}
                       loading={checkStage === 'checking'}
@@ -284,92 +291,106 @@ export function PhraseDetailModal({ phrase, track, onClose }: PhraseDetailModalP
   );
 }
 
-const styles = StyleSheet.create({
-  overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(36, 32, 33, 0.45)' },
-  sheet: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: radii.lg,
-    borderTopRightRadius: radii.lg,
-    padding: spacing.lg,
-    maxHeight: '85%',
-  },
-  closeButton: {
-    alignSelf: 'flex-end',
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  closeIcon: { fontSize: 18, color: colors.textPrimary },
-  english: { fontSize: 15, fontWeight: '600', color: colors.textSecondary, textAlign: 'center', marginTop: spacing.sm },
-  arabic: {
-    fontSize: 28,
-    lineHeight: 42,
-    textAlign: 'center',
-    color: colors.textPrimary,
-    marginTop: spacing.sm,
-    paddingHorizontal: spacing.sm,
-  },
-  transliteration: { fontSize: 15, color: colors.textSecondary, fontStyle: 'italic', textAlign: 'center', marginTop: spacing.xs },
-  playButton: {
-    alignSelf: 'center',
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: spacing.md,
-    marginBottom: spacing.lg,
-    ...shadows.card,
-  },
-  playButtonActive: { backgroundColor: colors.primaryDark },
-  playIcon: { fontSize: 22, color: colors.textOnPrimary },
-  sectionLabel: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.sm },
-  card: { backgroundColor: colors.background, borderRadius: radii.md, padding: spacing.md, marginBottom: spacing.lg },
-  cardText: { fontSize: 15, lineHeight: 22, color: colors.textPrimary },
-  errorText: { fontSize: 13, color: colors.error, marginBottom: spacing.sm },
-  micPrompt: { backgroundColor: colors.background, borderRadius: radii.md, padding: spacing.md, marginBottom: spacing.lg },
-  micPromptText: { fontSize: 13, color: colors.textSecondary, lineHeight: 19 },
-  mutedText: { fontSize: 13, color: colors.textSecondary, marginBottom: spacing.lg },
-  recordRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.md },
-  recordButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    borderWidth: 3,
-    borderColor: colors.error,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  recordButtonActive: { backgroundColor: '#FBEAE6' },
-  recordIcon: { fontSize: 22 },
-  recordLabel: { fontSize: 14, color: colors.textSecondary, flex: 1 },
-  playbackButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.md,
-    borderRadius: radii.pill,
-    backgroundColor: colors.background,
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-    marginBottom: spacing.xl,
-  },
-  playbackIcon: { fontSize: 18 },
-  playbackLabel: { fontSize: 15, fontWeight: '600', color: colors.primary },
-  feedbackBanner: {
-    marginTop: spacing.sm,
-    padding: spacing.md,
-    borderRadius: radii.md,
-    backgroundColor: '#FBEAE6',
-    alignItems: 'center',
-  },
-  feedbackBannerCorrect: { backgroundColor: '#E3F5EA' },
-  feedbackText: { fontSize: 14, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
-  feedbackTextCorrect: { color: '#2E9F68' },
-  attemptText: { fontSize: 12, color: colors.textSecondary, marginTop: spacing.xs },
-});
+const makeStyles = (colors: ThemeColors) => {
+  const shadowCard = { shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 3 };
+  const shadowRaised = { shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 8 };
+
+  return StyleSheet.create({
+    shadowCard,
+    shadowRaised,
+    overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0, 0, 0, 0.5)' },
+    sheet: {
+      backgroundColor: colors.surface,
+      borderTopLeftRadius: radii.lg,
+      borderTopRightRadius: radii.lg,
+      padding: spacing.lg,
+      maxHeight: '85%',
+    },
+    closeButton: {
+      alignSelf: 'flex-end',
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: colors.background,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    closeIcon: { fontSize: 18, color: colors.textPrimary },
+    english: { fontSize: 15, fontWeight: '600', color: colors.textSecondary, textAlign: 'center', marginTop: spacing.sm },
+    arabic: {
+      fontSize: 28,
+      lineHeight: 42,
+      textAlign: 'center',
+      color: colors.textPrimary,
+      marginTop: spacing.sm,
+      paddingHorizontal: spacing.sm,
+    },
+    transliteration: { fontSize: 15, color: colors.textSecondary, fontStyle: 'italic', textAlign: 'center', marginTop: spacing.xs },
+    playButton: {
+      alignSelf: 'center',
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: spacing.md,
+      marginBottom: spacing.xs,
+      ...shadowCard,
+    },
+    playButtonActive: { backgroundColor: colors.primaryDark },
+    playIcon: { fontSize: 22, color: colors.textOnPrimary },
+    sourceLabel: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: colors.textSecondary,
+      textAlign: 'center',
+      marginBottom: spacing.lg,
+    },
+    sectionLabel: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.sm },
+    card: { backgroundColor: colors.background, borderRadius: radii.md, padding: spacing.md, marginBottom: spacing.lg },
+    cardText: { fontSize: 15, lineHeight: 22, color: colors.textPrimary },
+    errorText: { fontSize: 13, color: colors.error, marginBottom: spacing.sm },
+    micPrompt: { backgroundColor: colors.background, borderRadius: radii.md, padding: spacing.md, marginBottom: spacing.lg },
+    micPromptText: { fontSize: 13, color: colors.textSecondary, lineHeight: 19 },
+    mutedText: { fontSize: 13, color: colors.textSecondary, marginBottom: spacing.lg },
+    recordRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.md },
+    recordButton: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      borderWidth: 3,
+      borderColor: colors.error,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    recordButtonActive: { backgroundColor: `${colors.error}1F` },
+    recordIcon: { fontSize: 22 },
+    recordLabel: { fontSize: 14, color: colors.textSecondary, flex: 1 },
+    playbackButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.sm,
+      paddingVertical: spacing.md,
+      borderRadius: radii.pill,
+      backgroundColor: colors.background,
+      borderWidth: 1.5,
+      borderColor: colors.primary,
+      marginBottom: spacing.xl,
+    },
+    playbackIcon: { fontSize: 18 },
+    playbackLabel: { fontSize: 15, fontWeight: '600', color: colors.primary },
+    feedbackBanner: {
+      marginTop: spacing.sm,
+      padding: spacing.md,
+      borderRadius: radii.md,
+      backgroundColor: `${colors.error}1F`,
+      alignItems: 'center',
+    },
+    feedbackBannerCorrect: { backgroundColor: `${colors.success}1F` },
+    feedbackText: { fontSize: 14, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
+    feedbackTextCorrect: { color: colors.success },
+    attemptText: { fontSize: 12, color: colors.textSecondary, marginTop: spacing.xs },
+  });
+};

@@ -7,7 +7,7 @@ import { PressableScale } from '@/components/ui/PressableScale';
 import { Reveal } from '@/components/ui/Reveal';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { radii, spacing, type ThemeColors } from '@/constants/theme';
-import { GRAMMAR_NOTES } from '@/constants/grammarNotes';
+import { GRAMMAR_NOTES, type GrammarNote } from '@/constants/grammarNotes';
 import { useLetterSpeech } from '@/hooks/useLetterSpeech';
 import { useTheme } from '@/lib/theme/ThemeContext';
 
@@ -17,9 +17,35 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 
 const EXPAND_ANIMATION = LayoutAnimation.create(220, 'easeInEaseOut', 'opacity');
 
+// Grouping lives here, not in grammarNotes.ts — a UI-only hierarchy on top
+// of the same flat data, so adding/reordering topics never requires
+// touching this list except to slot a new id into the right bucket.
+const GRAMMAR_CATEGORIES: { label: string; noteIds: string[] }[] = [
+  { label: 'Sentence Basics', noteIds: ['sentence_order', 'everyday_pronouns'] },
+  { label: 'Verbs & Tense', noteIds: ['present_verbs', 'past_tense', 'negation'] },
+  { label: 'Everyday Speech', noteIds: ['questions', 'possession', 'small_words'] },
+];
+
+interface GroupedNote {
+  note: GrammarNote;
+  delay: number;
+}
+
+function groupGrammarNotes(): { label: string; notes: GroupedNote[] }[] {
+  let revealIndex = 0;
+  return GRAMMAR_CATEGORIES.map((category) => ({
+    label: category.label,
+    notes: category.noteIds
+      .map((id) => GRAMMAR_NOTES.find((note) => note.id === id))
+      .filter((note): note is GrammarNote => !!note)
+      .map((note) => ({ note, delay: Math.min(revealIndex++ * 60, 400) })),
+  })).filter((group) => group.notes.length > 0);
+}
+
 export default function GrammarScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const groupedNotes = useMemo(() => groupGrammarNotes(), []);
   const [expandedId, setExpandedId] = useState<string | null>(GRAMMAR_NOTES[0]?.id ?? null);
   const { speak, isSpeaking } = useLetterSpeech();
   const [activeKey, setActiveKey] = useState<string | null>(null);
@@ -47,86 +73,88 @@ export default function GrammarScreen() {
       <Text style={styles.subtitle}>Tap a topic to see examples and quick forms.</Text>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.list}>
-        {GRAMMAR_NOTES.map((note, index) => {
-          const isExpanded = expandedId === note.id;
-          return (
-            <Reveal key={note.id} delay={Math.min(index * 60, 400)}>
-              <View style={[styles.card, styles.shadowCard, isExpanded && styles.cardExpanded]}>
-                <PressableScale haptic onPress={() => toggle(note.id)} style={styles.headerRow}>
-                  <View style={styles.emojiTile}>
-                    <Text style={styles.emoji}>{note.emoji}</Text>
-                  </View>
-                  <Text style={styles.cardTitle}>{note.title}</Text>
-                  <Text style={styles.chevron}>{isExpanded ? '⌄' : '›'}</Text>
-                </PressableScale>
-
-                {isExpanded ? (
-                  <View style={styles.body}>
-                    <Text style={styles.explanation}>{note.explanation}</Text>
-
-                    {note.examples.map((example) => (
-                      <View key={example.transliteration} style={styles.exampleRow}>
-                        <Text style={styles.quoteMark}>&ldquo;</Text>
-                        <Text style={styles.example}>
-                          <Text style={styles.exampleTransliteration}>{example.transliteration}</Text> —{' '}
-                          {example.english}
-                        </Text>
+        {groupedNotes.map((group) => (
+          <View key={group.label} style={styles.categorySection}>
+            <Text style={styles.categoryHeading}>{group.label}</Text>
+            {group.notes.map(({ note, delay }) => {
+              const isExpanded = expandedId === note.id;
+              return (
+                <Reveal key={note.id} delay={delay}>
+                  <View style={[styles.card, styles.shadowCard, isExpanded && styles.cardExpanded]}>
+                    <PressableScale haptic onPress={() => toggle(note.id)} style={styles.headerRow}>
+                      <View style={styles.emojiTile}>
+                        <Text style={styles.emoji}>{note.emoji}</Text>
                       </View>
-                    ))}
+                      <Text style={styles.cardTitle}>{note.title}</Text>
+                      <Text style={styles.chevron}>{isExpanded ? '⌄' : '›'}</Text>
+                    </PressableScale>
 
-                    <View style={styles.termsBox}>
-                      {note.quickTerms.map((t) => (
-                        <Text key={t.term} style={styles.termLine}>
-                          <Text style={styles.termLabel}>{t.term}: </Text>
-                          {t.form}
-                        </Text>
-                      ))}
-                    </View>
+                    {isExpanded ? (
+                      <View style={styles.body}>
+                        <Text style={styles.explanation}>{note.explanation}</Text>
 
-                    {note.conjugationTable ? (
-                      <View style={styles.conjugationSection}>
-                        <View style={styles.patternPill}>
-                          <Text style={styles.patternPillText}>{note.conjugationTable.patternSummary}</Text>
+                        {note.examples.map((example) => (
+                          <View key={example.transliteration} style={styles.exampleRow}>
+                            <Text style={styles.quoteMark}>&ldquo;</Text>
+                            <Text style={styles.example}>
+                              <Text style={styles.exampleTransliteration}>{example.transliteration}</Text> —{' '}
+                              {example.english}
+                            </Text>
+                          </View>
+                        ))}
+
+                        <View style={styles.termsBox}>
+                          {note.quickTerms.map((t) => (
+                            <Text key={t.term} style={styles.termLine}>
+                              <Text style={styles.termLabel}>{t.term}: </Text>
+                              {t.form}
+                            </Text>
+                          ))}
                         </View>
-                        <Text style={styles.modelLine}>
-                          MODEL{'  '}
-                          <Text style={styles.modelArabic}>{note.conjugationTable.modelArabic}</Text> ·{' '}
-                          {note.conjugationTable.modelTransliteration} · “{note.conjugationTable.modelMeaning}”
-                        </Text>
-                        <View style={styles.conjugationTable}>
-                          {note.conjugationTable.rows.map((row, rowIndex) => {
-                            const key = `${note.id}-${row.pronounEnglish}`;
-                            const isActive = activeKey === key;
-                            return (
-                              <PressableScale
-                                key={row.pronounEnglish}
-                                onPress={() => play(key, row.verbArabic)}
-                                style={[
-                                  styles.conjugationRow,
-                                  rowIndex % 2 === 1 && styles.conjugationRowAlt,
-                                ]}
-                              >
-                                <View>
-                                  <Text style={styles.conjugationPronounArabic}>{row.pronounArabic}</Text>
-                                  <Text style={styles.conjugationPronounEnglish}>{row.pronounEnglish}</Text>
-                                </View>
-                                <View style={styles.conjugationVerb}>
-                                  <Text style={styles.conjugationVerbArabic}>{row.verbArabic}</Text>
-                                  <Text style={styles.conjugationVerbTranslit}>{row.verbTransliteration}</Text>
-                                </View>
-                                <Text style={styles.conjugationAudioIcon}>{isActive ? '🔊' : '🔈'}</Text>
-                              </PressableScale>
-                            );
-                          })}
-                        </View>
+
+                        {note.conjugationTable ? (
+                          <View style={styles.conjugationSection}>
+                            <View style={styles.patternPill}>
+                              <Text style={styles.patternPillText}>{note.conjugationTable.patternSummary}</Text>
+                            </View>
+                            <Text style={styles.modelLine}>
+                              MODEL{'  '}
+                              <Text style={styles.modelArabic}>{note.conjugationTable.modelArabic}</Text> ·{' '}
+                              {note.conjugationTable.modelTransliteration} · “{note.conjugationTable.modelMeaning}”
+                            </Text>
+                            <View style={styles.conjugationTable}>
+                              {note.conjugationTable.rows.map((row, rowIndex) => {
+                                const key = `${note.id}-${row.pronounEnglish}`;
+                                const isActive = activeKey === key;
+                                return (
+                                  <PressableScale
+                                    key={row.pronounEnglish}
+                                    onPress={() => play(key, row.verbArabic)}
+                                    style={[styles.conjugationRow, rowIndex % 2 === 1 && styles.conjugationRowAlt]}
+                                  >
+                                    <View>
+                                      <Text style={styles.conjugationPronounArabic}>{row.pronounArabic}</Text>
+                                      <Text style={styles.conjugationPronounEnglish}>{row.pronounEnglish}</Text>
+                                    </View>
+                                    <View style={styles.conjugationVerb}>
+                                      <Text style={styles.conjugationVerbArabic}>{row.verbArabic}</Text>
+                                      <Text style={styles.conjugationVerbTranslit}>{row.verbTransliteration}</Text>
+                                    </View>
+                                    <Text style={styles.conjugationAudioIcon}>{isActive ? '🔊' : '🔈'}</Text>
+                                  </PressableScale>
+                                );
+                              })}
+                            </View>
+                          </View>
+                        ) : null}
                       </View>
                     ) : null}
                   </View>
-                ) : null}
-              </View>
-            </Reveal>
-          );
-        })}
+                </Reveal>
+              );
+            })}
+          </View>
+        ))}
       </ScrollView>
     </ScreenContainer>
   );
@@ -151,7 +179,15 @@ const makeStyles = (colors: ThemeColors) =>
     },
     title: { fontSize: 30, fontWeight: '800', color: colors.textPrimary, marginTop: spacing.xs },
     subtitle: { fontSize: 14, color: colors.textSecondary, marginTop: spacing.xs, marginBottom: spacing.lg, lineHeight: 20 },
-    list: { gap: spacing.md, paddingBottom: spacing.xxl },
+    list: { gap: spacing.lg, paddingBottom: spacing.xxl },
+    categorySection: { gap: spacing.md },
+    categoryHeading: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: colors.textSecondary,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
     card: { backgroundColor: colors.surface, borderRadius: radii.lg, padding: spacing.md },
     cardExpanded: { borderWidth: 1, borderColor: `${colors.error}33` },
     headerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
