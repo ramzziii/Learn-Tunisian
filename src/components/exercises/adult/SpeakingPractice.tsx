@@ -24,20 +24,22 @@ import { isUsingMockAiProvider } from '@/lib/ai';
 import { transcribeAudio } from '@/lib/ai/functionsClient';
 import { isAnyVariantSpeechMatch } from '@/lib/wordVariants';
 import { useWordAudioPlayer } from '@/hooks/useWordAudioPlayer';
-import type { ExerciseItem } from '@/types/exercises';
+import { SPEAKING_MISSES_BEFORE_REVISIT } from '@/lib/speakingRevisit';
+import type { ExerciseCompleteHandler, ExerciseItem } from '@/types/exercises';
 
 type PermissionStage = 'checking' | 'needs-explanation' | 'requesting' | 'denied' | 'ready';
 type RecordingStage = 'idle' | 'recording' | 'recorded';
 // 'scoring' is only ever reached when a live AI provider is configured
 // (isUsingMockAiProvider is false) — see the module doc comment below for
 // why mock mode never attempts this.
-type CheckStage = 'idle' | 'checking' | 'correct' | 'incorrect' | 'exhausted' | 'check-failed';
+type CheckStage = 'idle' | 'checking' | 'correct' | 'incorrect' | 'revisit-later' | 'check-failed';
 
-const MAX_ATTEMPTS = 3;
+/** How long the "we'll come back to this" message shows before moving on by itself. */
+const REVISIT_AUTO_ADVANCE_MS = 2500;
 
 interface SpeakingPracticeProps {
   exercise: ExerciseItem;
-  onComplete: (wasCorrect: boolean) => void;
+  onComplete: ExerciseCompleteHandler;
 }
 
 /**
@@ -50,12 +52,17 @@ interface SpeakingPracticeProps {
  * no dedicated Tunisian Derja mode, so its accuracy here is genuinely
  * unproven; in mock mode (the default, no AI provider configured) this falls
  * back to the original self-comparison-only behavior, so the exercise still
- * works out of the box. When scoring is active: up to 3 attempts, matched
+ * works out of the box. When scoring is active, a recording is matched
  * against any variant in the word group (not just the one played, mirroring
- * how every other exercise type checks answers); a technical failure to
- * reach the STT service never blocks progress, and running out of attempts
- * still counts as correct — this is spoken self-practice, not a gate, so a
- * likely recognition miss shouldn't cost mastery/spaced-repetition standing.
+ * how every other exercise type checks answers). If it isn't recognized, the
+ * learner decides: try again or keep going. After
+ * SPEAKING_MISSES_BEFORE_REVISIT misses it says it'll come back to the word
+ * and moves on by itself; either way a word left mispronounced is reported
+ * as `mispronounced`, and the session host replays it at the end. A
+ * technical failure to reach the STT service never blocks progress, and
+ * moving on still counts as correct — this is spoken self-practice, not a
+ * gate, so a likely recognition miss (Whisper has no Derja mode) shouldn't
+ * cost mastery/spaced-repetition standing.
  */
 export function SpeakingPractice({ exercise, onComplete }: SpeakingPracticeProps) {
   const { colors } = useTheme();
@@ -70,7 +77,7 @@ export function SpeakingPractice({ exercise, onComplete }: SpeakingPracticeProps
   const [permissionStage, setPermissionStage] = useState<PermissionStage>('checking');
   const [recordingStage, setRecordingStage] = useState<RecordingStage>('idle');
   const [checkStage, setCheckStage] = useState<CheckStage>('idle');
-  const [attemptCount, setAttemptCount] = useState(0);
+  const [missCount, setMissCount] = useState(0);
   const [isBusy, setIsBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -157,6 +164,23 @@ export function SpeakingPractice({ exercise, onComplete }: SpeakingPracticeProps
     setRecordingStage('idle');
   };
 
+  // Left mispronounced (skipped, or out of tries): the host revisits it at
+  // the end. Still reported as correct — see the doc comment above.
+  // Guarded: the auto-advance timer and a "Next word" tap can race.
+  const hasMovedOnRef = useRef(false);
+  const moveOnMispronounced = () => {
+    if (hasMovedOnRef.current) return;
+    hasMovedOnRef.current = true;
+    onComplete(true, { mispronounced: true });
+  };
+
+  useEffect(() => {
+    if (checkStage !== 'revisit-later') return;
+    const timeout = setTimeout(moveOnMispronounced, REVISIT_AUTO_ADVANCE_MS);
+    return () => clearTimeout(timeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checkStage]);
+
   const playRecording = () => {
     try {
       recordingPlayer.seekTo(0).then(() => recordingPlayer.play());
@@ -179,17 +203,14 @@ export function SpeakingPractice({ exercise, onComplete }: SpeakingPracticeProps
         return;
       }
 
-      const nextAttemptCount = attemptCount + 1;
-      setAttemptCount(nextAttemptCount);
-
       if (isAnyVariantSpeechMatch(exercise.targetGroup, result.text)) {
         playCorrect();
         setCheckStage('correct');
-      } else if (nextAttemptCount >= MAX_ATTEMPTS) {
-        setCheckStage('exhausted');
       } else {
         playIncorrect();
-        setCheckStage('incorrect');
+        const misses = missCount + 1;
+        setMissCount(misses);
+        setCheckStage(misses >= SPEAKING_MISSES_BEFORE_REVISIT ? 'revisit-later' : 'incorrect');
       }
     } catch {
       setCheckStage('check-failed');
@@ -299,9 +320,9 @@ export function SpeakingPractice({ exercise, onComplete }: SpeakingPracticeProps
 
       {recordingStage === 'recorded' && scoringActive && checkStage === 'incorrect' ? (
         <View style={styles.feedbackBanner}>
-          <Text style={styles.feedbackText}>Not quite — give it another try.</Text>
+          <Text style={styles.feedbackText}>Not quite — try again, or keep going whenever you&apos;re ready.</Text>
           <Text style={styles.attemptText}>
-            Attempt {attemptCount} of {MAX_ATTEMPTS}
+            Try {missCount} of {SPEAKING_MISSES_BEFORE_REVISIT}
           </Text>
         </View>
       ) : null}
@@ -312,9 +333,13 @@ export function SpeakingPractice({ exercise, onComplete }: SpeakingPracticeProps
         </View>
       ) : null}
 
-      {recordingStage === 'recorded' && scoringActive && checkStage === 'exhausted' ? (
+      {recordingStage === 'recorded' && scoringActive && checkStage === 'revisit-later' ? (
         <View style={styles.feedbackBanner}>
-          <Text style={styles.feedbackText}>No worries — here&apos;s how it&apos;s said.</Text>
+          <Text style={styles.feedbackText}>
+            {exercise.isRevisit
+              ? 'Good effort — it’ll come up again in your reviews. Moving on…'
+              : 'This one’s tricky — we’ll come back to it at the end. Moving on…'}
+          </Text>
         </View>
       ) : null}
 
@@ -342,9 +367,14 @@ export function SpeakingPractice({ exercise, onComplete }: SpeakingPracticeProps
               />
             </>
           ) : checkStage === 'incorrect' ? (
-            <Button themed label="Record again" onPress={tryAgain} style={{ flex: 1 }} />
+            <>
+              <Button themed label="Try again" variant="secondary" onPress={tryAgain} style={{ flex: 1 }} />
+              <Button themed label="Keep going" onPress={moveOnMispronounced} style={{ flex: 1 }} />
+            </>
+          ) : checkStage === 'revisit-later' ? (
+            <Button themed label="Next word" onPress={moveOnMispronounced} style={{ flex: 1 }} />
           ) : (
-            // 'correct' | 'exhausted' | 'check-failed'
+            // 'correct' | 'check-failed'
             <Button themed label="Continue" onPress={() => onComplete(true)} style={{ flex: 1 }} />
           )}
         </View>
@@ -414,7 +444,7 @@ const makeStyles = (colors: ThemeColors) =>
     },
     feedbackBannerCorrect: { backgroundColor: `${colors.success}1F` },
     feedbackText: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
-    feedbackTextCorrect: { color: colors.success },
     attemptText: { fontSize: 12, color: colors.textSecondary, marginTop: spacing.xs },
+    feedbackTextCorrect: { color: colors.success },
     actionsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xl, width: '100%' },
   });

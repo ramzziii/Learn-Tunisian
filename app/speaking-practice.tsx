@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { ExerciseRenderer } from '@/components/exercises/shared/ExerciseRenderer';
+import { RevisitIntro } from '@/components/session/RevisitIntro';
 import { Button } from '@/components/ui/Button';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { PressableScale } from '@/components/ui/PressableScale';
@@ -16,8 +17,9 @@ import { fetchFavoriteWordGroups } from '@/data/favorites';
 import { fetchWeakestWordGroups } from '@/data/progress';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
 import { markSpeakingCompletedToday } from '@/lib/dailyChallengeProgress';
+import { buildRevisitExercises, updateRevisitList } from '@/lib/speakingRevisit';
 import { getPromptVariant } from '@/lib/wordVariants';
-import type { ExerciseItem } from '@/types/exercises';
+import type { ExerciseItem, ExerciseOutcome } from '@/types/exercises';
 import type { WordGroupWithVariants } from '@/types/models';
 
 // A fixed, short count — not time-based like the main lesson/review
@@ -51,8 +53,12 @@ export default function SpeakingPracticeScreen() {
   const { activeProfile } = useActiveProfile();
   const [queue, setQueue] = useState<ExerciseItem[] | null>(null);
   const [index, setIndex] = useState(0);
-  const [correctCount, setCorrectCount] = useState(0);
-  const [isDone, setIsDone] = useState(false);
+  // Words that sounded right, by id — a word missed first but nailed in the
+  // revisit pass still counts.
+  const [rightIds, setRightIds] = useState<Set<string>>(new Set());
+  const [revisitIds, setRevisitIds] = useState<string[]>([]);
+  const [phase, setPhase] = useState<'main' | 'revisit-intro' | 'revisit' | 'done'>('main');
+  const isDone = phase === 'done';
 
   useEffect(() => {
     if (!activeProfile) return;
@@ -84,18 +90,39 @@ export default function SpeakingPracticeScreen() {
     };
   }, [activeProfile]);
 
-  const handleComplete = (wasCorrect: boolean) => {
-    if (wasCorrect) setCorrectCount((c) => c + 1);
-    setIndex((i) => {
-      const next = i + 1;
-      if (!queue || next >= queue.length) {
-        setIsDone(true);
-        if (activeProfile) markSpeakingCompletedToday(activeProfile.id);
-        return i;
-      }
-      return next;
-    });
+  const finish = () => {
+    setPhase('done');
+    if (activeProfile) markSpeakingCompletedToday(activeProfile.id);
   };
+
+  const handleComplete = (wasCorrect: boolean, outcome?: ExerciseOutcome) => {
+    if (!queue) return;
+    const current = queue[index];
+    const groupId = current.targetGroup.id;
+    if (wasCorrect && !outcome?.mispronounced) setRightIds((prev) => new Set(prev).add(groupId));
+    const nextRevisitIds = updateRevisitList(revisitIds, groupId, current, outcome);
+    setRevisitIds(nextRevisitIds);
+
+    const next = index + 1;
+    if (next < queue.length) {
+      setIndex(next);
+    } else if (phase === 'main' && nextRevisitIds.length > 0) {
+      // No more new words — go back over the ones that didn't sound right.
+      setPhase('revisit-intro');
+    } else {
+      finish();
+    }
+  };
+
+  const startRevisit = () => {
+    if (!queue) return;
+    const groups = queue.map((item) => item.targetGroup);
+    setQueue([...queue, ...buildRevisitExercises(revisitIds, groups)]);
+    setIndex(queue.length);
+    setPhase('revisit');
+  };
+
+  const wordCount = new Set((queue ?? []).map((item) => item.targetGroup.id)).size;
 
   if (!activeProfile || queue === null) return <LoadingScreen themed />;
 
@@ -121,7 +148,7 @@ export default function SpeakingPracticeScreen() {
           <Text style={styles.centeredEmoji}>🎉</Text>
           <Text style={styles.centeredTitle}>Nice speaking!</Text>
           <Text style={styles.centeredBody}>
-            {correctCount} of {queue.length} sounded right.
+            {rightIds.size} of {wordCount} sounded right.
           </Text>
           <Button themed label="Back to home" onPress={() => router.replace('/home')} />
         </Reveal>
@@ -129,8 +156,17 @@ export default function SpeakingPracticeScreen() {
     );
   }
 
+  if (phase === 'revisit-intro') {
+    return (
+      <ScreenContainer themed>
+        <RevisitIntro count={revisitIds.length} onStart={startRevisit} onSkip={finish} />
+      </ScreenContainer>
+    );
+  }
+
   return (
     <ScreenContainer themed>
+      {phase === 'revisit' ? <Text style={styles.revisitLabel}>🔁 Revisiting tricky words</Text> : null}
       <View style={styles.header}>
         <PressableScale haptic onPress={() => router.back()} accessibilityLabel="Exit" style={styles.closeButton}>
           <Text style={styles.closeIcon}>✕</Text>
@@ -163,6 +199,7 @@ const makeStyles = (colors: ThemeColors) =>
       ...shadows.card,
     },
     closeIcon: { fontSize: 16, color: colors.textSecondary },
+    revisitLabel: { fontSize: 12, fontWeight: '700', color: colors.primary, marginBottom: spacing.xs },
     counter: { fontSize: 13, fontWeight: '700', color: colors.textSecondary, minWidth: 32, textAlign: 'right' },
     centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm, padding: spacing.lg },
     centeredEmoji: { fontSize: 56, marginBottom: spacing.sm },

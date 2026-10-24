@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Animated, StyleSheet, Text, View } from 'react-native';
 
 import { ExerciseRenderer } from '@/components/exercises/shared/ExerciseRenderer';
+import { RevisitIntro } from '@/components/session/RevisitIntro';
 import { SessionCompleteCard } from '@/components/session/SessionCompleteCard';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { PressableScale } from '@/components/ui/PressableScale';
@@ -21,6 +22,8 @@ import { evaluateBadges, type Badge } from '@/lib/badges';
 import { getSeenBadgeIds, markBadgesSeen } from '@/lib/badgeProgress';
 import { masteryLabel, type MasteryLabel } from '@/lib/masteryStatus';
 import { recommendNextStep } from '@/lib/nextStepRecommendation';
+import { buildRevisitExercises, updateRevisitList } from '@/lib/speakingRevisit';
+import type { ExerciseItem, ExerciseOutcome } from '@/types/exercises';
 import type { DailyGoalMinutes, LessonWithState, SessionType, Track, WordGroupWithVariants } from '@/types/models';
 
 const masteryBadgeColors = (colors: ThemeColors): Record<MasteryLabel, string> => ({
@@ -69,7 +72,23 @@ export function SessionRunner({
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const timer = useSessionTimer(goalMinutes);
-  const { currentExercise, next } = useExerciseQueue(groups, track);
+  const { currentExercise: queuedExercise, next } = useExerciseQueue(groups, track);
+
+  // Words left mispronounced in speaking exercises are replayed once the time
+  // goal is reached, before the summary — see src/lib/speakingRevisit.ts.
+  const [revisitIds, setRevisitIds] = useState<string[]>([]);
+  const [phase, setPhase] = useState<'main' | 'revisit-intro' | 'revisit' | 'done'>('main');
+  const [revisitQueue, setRevisitQueue] = useState<ExerciseItem[]>([]);
+  const [revisitIndex, setRevisitIndex] = useState(0);
+
+  useEffect(() => {
+    if (timer.isComplete && phase === 'main') setPhase(revisitIds.length > 0 ? 'revisit-intro' : 'done');
+    // Only the goal being reached moves on from 'main'; revisitIds is read at that moment.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timer.isComplete, phase]);
+
+  const currentExercise = phase === 'revisit' ? (revisitQueue[revisitIndex] ?? null) : queuedExercise;
+  const showComplete = phase === 'done';
 
   useEffect(() => {
     if (timer.isComplete) onComplete?.();
@@ -157,8 +176,18 @@ export function SessionRunner({
     [badgeAnim]
   );
 
-  const handleAnswer = (wasCorrect: boolean) => {
+  const startRevisit = () => {
+    setRevisitQueue(buildRevisitExercises(revisitIds, groups));
+    setRevisitIds([]); // one second chance per word, not a loop
+    setRevisitIndex(0);
+    setPhase('revisit');
+  };
+
+  const handleAnswer = (wasCorrect: boolean, outcome?: ExerciseOutcome) => {
     if (!currentExercise) return;
+    if (phase === 'main') {
+      setRevisitIds((prev) => updateRevisitList(prev, currentExercise.targetGroup.id, currentExercise, outcome));
+    }
     practicedGroupIds.current.add(currentExercise.targetGroup.id);
     setStats((prev) => ({
       correct: prev.correct + (wasCorrect ? 1 : 0),
@@ -169,6 +198,11 @@ export function SessionRunner({
       .catch(() => {
         // Progress is best-effort in v1; a failed write shouldn't block the session.
       });
+    if (phase === 'revisit') {
+      if (revisitIndex + 1 >= revisitQueue.length) setPhase('done');
+      else setRevisitIndex((i) => i + 1);
+      return;
+    }
     next();
   };
 
@@ -235,7 +269,11 @@ export function SessionRunner({
         ) : null}
       </Animated.View>
 
-      {currentExercise ? (
+      {phase === 'revisit' ? <Text style={styles.revisitLabel}>🔁 Revisiting tricky words</Text> : null}
+
+      {phase === 'revisit-intro' ? (
+        <RevisitIntro count={revisitIds.length} onStart={startRevisit} onSkip={() => setPhase('done')} />
+      ) : currentExercise ? (
         <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
           <ExerciseRenderer exercise={currentExercise} onComplete={handleAnswer} />
         </Animated.View>
@@ -243,7 +281,7 @@ export function SessionRunner({
         <LoadingScreen themed />
       )}
 
-      {timer.isComplete ? (
+      {showComplete ? (
         <SessionCompleteCard
           minutesLearned={Math.max(1, Math.round(timer.elapsedSeconds / 60))}
           wordsCount={practicedGroupIds.current.size}
@@ -252,7 +290,10 @@ export function SessionRunner({
           sessionType={sessionType}
           track={track}
           onClose={() => logAndExit()}
-          onAddMore={(minutes) => timer.addMinutes(minutes)}
+          onAddMore={(minutes) => {
+            timer.addMinutes(minutes);
+            setPhase('main');
+          }}
           onReviewWeakWords={
             sessionType !== 'review' && stats.incorrect > 0 ? () => logAndExit('/review') : undefined
           }
@@ -267,6 +308,7 @@ export function SessionRunner({
 
 const makeStyles = (colors: ThemeColors) =>
   StyleSheet.create({
+    revisitLabel: { fontSize: 12, fontWeight: '700', color: colors.primary, marginBottom: spacing.sm },
     header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.lg },
     closeButton: {
       width: 36,

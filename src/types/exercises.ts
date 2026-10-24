@@ -17,4 +17,18 @@ export interface ExerciseItem {
   targetGroup: WordGroupWithVariants;
   promptVariant: WordVariant;
   options: ExerciseOption[];
+  /** True for the end-of-session second pass over mispronounced words (see
+   * src/lib/speakingRevisit.ts) — a miss there moves on without queueing the
+   * word yet again. */
+  isRevisit?: boolean;
 }
+
+/** Extra detail an exercise can report alongside correct/incorrect. */
+export interface ExerciseOutcome {
+  /** A speaking exercise the learner moved on from without saying it right
+   * (chose "Keep going", or ran out of tries). The session host decides
+   * whether to revisit it — see src/lib/speakingRevisit.ts. */
+  mispronounced?: boolean;
+}
+
+export type ExerciseCompleteHandler = (wasCorrect: boolean, outcome?: ExerciseOutcome) => void;
