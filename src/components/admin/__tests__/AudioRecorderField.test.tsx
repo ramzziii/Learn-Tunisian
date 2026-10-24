@@ -51,7 +51,10 @@ jest.mock('@/hooks/useAdminAudioRecorder', () => ({
 
 const PREVIOUS_PATH = 'wg1/v1-1000.m4a';
 
-async function renderField(onUploaded: (path: string) => Promise<string | null>) {
+async function renderField(
+  onUploaded: (path: string) => Promise<string | null>,
+  repeatAfterMe?: { isIncluded: boolean; onDecide: (include: boolean) => Promise<void> }
+) {
   return await render(
     <ThemeProvider>
       <AudioRecorderField
@@ -60,14 +63,15 @@ async function renderField(onUploaded: (path: string) => Promise<string | null>)
         currentAudioPath={PREVIOUS_PATH}
         updatedAt="2026-10-01T00:00:00Z"
         onUploaded={onUploaded}
+        repeatAfterMe={repeatAfterMe}
       />
     </ThemeProvider>
   );
 }
 
 async function recordAndSave() {
-  fireEvent.press(await screen.findByText('Stop (2s)'));
-  fireEvent.press(await screen.findByText('Save Recording'));
+  await fireEvent.press(await screen.findByText('Stop (2s)'));
+  await fireEvent.press(await screen.findByText('Save Recording'));
 }
 
 beforeEach(() => {
@@ -114,4 +118,88 @@ it('on success: confirms, shows the new path, and only then deletes the previous
   expect(screen.getByText(`Current: ${savedPath}`)).toBeOnTheScreen();
   await waitFor(() => expect(mockRemove).toHaveBeenCalledWith([PREVIOUS_PATH]));
   await act(async () => {});
+});
+
+describe('Repeat After Me opt-in after a successful recording', () => {
+  const savedPath = async (path: string) => path;
+
+  it('asks whether to add the new recording to Repeat After Me — only after the save succeeded', async () => {
+    await renderField(savedPath, { isIncluded: false, onDecide: jest.fn() });
+
+    await recordAndSave();
+
+    expect(await screen.findByText('Audio saved successfully.')).toBeOnTheScreen();
+    expect(screen.getByText('Add this recording to Repeat After Me?')).toBeOnTheScreen();
+  });
+
+  it('accepting persists the opt-in and confirms only once that save succeeds', async () => {
+    let resolveDecision: () => void = () => {};
+    const onDecide = jest.fn(() => new Promise<void>((resolve) => (resolveDecision = resolve)));
+    await renderField(savedPath, { isIncluded: false, onDecide });
+
+    await recordAndSave();
+    // Not awaited: the press only settles once the (held) save resolves.
+    const pressing = fireEvent.press(await screen.findByText('Add to Repeat After Me'));
+
+    await waitFor(() => expect(onDecide).toHaveBeenCalledWith(true));
+    expect(screen.queryByText(/Added to Repeat After Me/)).toBeNull(); // not before it's saved
+    await act(async () => resolveDecision());
+    await pressing;
+    expect(await screen.findByText(/Added to Repeat After Me/)).toBeOnTheScreen();
+    expect(screen.queryByText('Add this recording to Repeat After Me?')).toBeNull();
+  });
+
+  it('declining keeps it out of Repeat After Me', async () => {
+    const onDecide = jest.fn(async () => undefined);
+    await renderField(savedPath, { isIncluded: false, onDecide });
+
+    await recordAndSave();
+    await fireEvent.press(await screen.findByText('Not now'));
+
+    expect(onDecide).toHaveBeenCalledWith(false);
+    expect(await screen.findByText(/Not in Repeat After Me/)).toBeOnTheScreen();
+  });
+
+  it('declining a recording that was already included removes it, and says so', async () => {
+    const onDecide = jest.fn(async () => undefined);
+    await renderField(savedPath, { isIncluded: true, onDecide });
+
+    await recordAndSave();
+    await fireEvent.press(await screen.findByText('Remove from Repeat After Me'));
+
+    expect(onDecide).toHaveBeenCalledWith(false);
+    expect(await screen.findByText(/Removed from Repeat After Me/)).toBeOnTheScreen();
+  });
+
+  it('if saving the choice fails: shows the error, no success, and the question stays to retry', async () => {
+    const onDecide = jest.fn().mockRejectedValue(new Error('permission denied for table word_variants'));
+    await renderField(savedPath, { isIncluded: false, onDecide });
+
+    await recordAndSave();
+    await fireEvent.press(await screen.findByText('Add to Repeat After Me'));
+
+    expect(await screen.findByText(/Couldn.t update Repeat After Me.*permission denied/)).toBeOnTheScreen();
+    expect(screen.queryByText(/Added to Repeat After Me/)).toBeNull();
+    expect(screen.getByText('Add to Repeat After Me')).toBeOnTheScreen();
+  });
+
+  it('never asks when the recording itself failed to save', async () => {
+    const onDecide = jest.fn();
+    await renderField(jest.fn().mockRejectedValue(new Error('permission denied')), { isIncluded: false, onDecide });
+
+    await recordAndSave();
+
+    expect(await screen.findByText(/previous recording was kept/i)).toBeOnTheScreen();
+    expect(screen.queryByText('Add this recording to Repeat After Me?')).toBeNull();
+    expect(onDecide).not.toHaveBeenCalled();
+  });
+
+  it('does not ask at all where the screen has not opted into the question', async () => {
+    await renderField(savedPath);
+
+    await recordAndSave();
+
+    expect(await screen.findByText('Audio saved successfully.')).toBeOnTheScreen();
+    expect(screen.queryByText('Add this recording to Repeat After Me?')).toBeNull();
+  });
 });

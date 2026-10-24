@@ -100,6 +100,8 @@ export interface WordVariantRow {
   speaker_name: string | null;
   dialect_notes: string | null;
   is_native_voice: boolean;
+  /** 0012_repeat_after_me.sql — admin opted this recording into Repeat After Me. */
+  in_repeat_after_me: boolean;
   approved_by: string | null;
   approved_at: string | null;
 }

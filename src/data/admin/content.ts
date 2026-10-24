@@ -384,6 +384,7 @@ export async function updateWordVariant(
     speakerName: string | null;
     dialectNotes: string | null;
     isNativeVoice: boolean;
+    inRepeatAfterMe: boolean;
     /** Setting this true stamps approved_by/approved_at to this actor/now;
      * setting it false clears them — see the comment below. */
     nativeVerified: boolean;
@@ -403,6 +404,7 @@ export async function updateWordVariant(
       ...(patch.speakerName !== undefined && { speaker_name: patch.speakerName }),
       ...(patch.dialectNotes !== undefined && { dialect_notes: patch.dialectNotes }),
       ...(patch.isNativeVoice !== undefined && { is_native_voice: patch.isNativeVoice }),
+      ...(patch.inRepeatAfterMe !== undefined && { in_repeat_after_me: patch.inRepeatAfterMe }),
       // Stamped here (app layer) rather than a DB trigger, same reasoning as
       // created_by/updated_by — this is the one function that ever flips
       // native_verified, so there's a single point of truth either way.

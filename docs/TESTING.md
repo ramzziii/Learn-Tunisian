@@ -38,10 +38,11 @@ flags `@expo/config-plugins`, which is installed on purpose (see AGENTS.md).
 | Admin edits & Supabase rejections | `src/data/admin/__tests__/content.test.ts`, `src/lib/admin/__tests__/wordGroupValidation.test.ts` |
 | Audio upload → save path → delete old file | `src/lib/__tests__/audioPlayback.test.ts`, `src/components/admin/__tests__/AudioRecorderField.test.tsx` (what the admin sees on failure/success) |
 | Learner playback refresh after re-recording | `src/lib/__tests__/audioCacheResolution.test.ts` (native cache/download/fallback and web) |
+| Repeat After Me | `src/lib/__tests__/repeatAfterMeSession.test.ts` (3 attempts, missed → one review pass, 5-per-session free limit), `src/lib/__tests__/repeatAfterMeProgress.test.ts`, `src/data/__tests__/repeatAfterMe.test.ts`, `src/components/repeatAfterMe/__tests__/RepeatAfterMeExercise.test.tsx` (permissions, interrupted/failed recordings, learner audio deleted), `src/__tests__/routes/repeatAfterMe.test.tsx`, `src/__tests__/routes/adminRepeatAfterMe.test.tsx`, admin opt-in cases in `AudioRecorderField.test.tsx` |
 | Lesson/review/progress | `src/data/__tests__/progress.test.ts`, `src/hooks/__tests__/useExerciseQueue.test.ts`, plus the pure scheduling/mastery tests in `src/lib/__tests__/` |
 
 Component and route tests use `@testing-library/react-native` (v14 — note
-`render`/`renderHook` are async and must be awaited). Route tests live under
+`render`, `renderHook` and `fireEvent` are async and must all be awaited — an un-awaited `fireEvent` causes "overlapping act()" failures that only show up when tests run together). Route tests live under
 `src/__tests__/routes/`, never inside `app/`: Expo Router treats every file in
 `app/` as a route.
 
@@ -64,6 +65,8 @@ they can't prove the policies themselves are right. Check against a
 If these become automated, put them in `supabase/tests/` (pgTAP, run with
 `supabase test db`) as a separate workflow that only runs where a local
 Supabase stack is available — not in the ordinary PR job.
+
+- Repeat After Me needs `supabase/migrations/0012_repeat_after_me.sql` applied; until then the admin opt-in fails with a clear error and the learner section shows its load-error state.
 
 ### Device-level checks (needs a phone/simulator)
 Not reproducible in Jest: microphone permission + recording, actual audio

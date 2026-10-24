@@ -16,6 +16,7 @@ import {
   updateWordGroup,
   updateWordVariant,
 } from '@/data/admin/content';
+import { setRepeatAfterMeInclusion } from '@/data/repeatAfterMe';
 import { hasApprovedPrimaryOrGenderPair } from '@/lib/admin/wordGroupValidation';
 import { useAuth } from '@/lib/auth/AuthContext';
 import type { ContentStatus, VariantLabel, WordGroupWithVariants, WordVariant } from '@/types/models';
@@ -169,7 +170,12 @@ export default function AdminWordGroupDetail() {
           />
         ))}
 
-        <NewVariantForm wordGroupId={group.id} actorAccountId={actorAccountId} onCreated={handleVariantCreated} />
+        <NewVariantForm
+          wordGroupId={group.id}
+          actorAccountId={actorAccountId}
+          onCreated={handleVariantCreated}
+          onSaved={handleVariantSaved}
+        />
       </ScrollView>
     </ScreenContainer>
   );
@@ -283,6 +289,7 @@ function VariantRow({
           onSaved(updated);
           return updated.audioPath;
         }}
+        repeatAfterMe={repeatAfterMeOptions(variant, actorAccountId, onSaved)}
       />
 
       <View style={styles.variantHeaderRow}>
@@ -306,14 +313,31 @@ function VariantRow({
   );
 }
 
+/**
+ * The recorder's "Add this recording to Repeat After Me?" answer. Declining
+ * something that isn't included writes nothing; anything else is persisted
+ * (admin-only by RLS) and must succeed before the recorder confirms it.
+ */
+function repeatAfterMeOptions(variant: WordVariant, actorAccountId: string, onSaved: (variant: WordVariant) => void) {
+  return {
+    isIncluded: variant.inRepeatAfterMe,
+    onDecide: async (include: boolean) => {
+      if (!include && !variant.inRepeatAfterMe) return;
+      onSaved(await setRepeatAfterMeInclusion(variant.id, include, actorAccountId));
+    },
+  };
+}
+
 function NewVariantForm({
   wordGroupId,
   actorAccountId,
   onCreated,
+  onSaved,
 }: {
   wordGroupId: string;
   actorAccountId: string;
   onCreated: (variant: WordVariant) => void;
+  onSaved: (variant: WordVariant) => void;
 }) {
   const [variantLabel, setVariantLabel] = useState<VariantLabel>('primary');
   const [wordArabic, setWordArabic] = useState('');
@@ -322,6 +346,14 @@ function NewVariantForm({
   const [sortOrder, setSortOrder] = useState('0');
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  // The variant just added here — offered an "Add recording" step right away.
+  const [createdVariant, setCreatedVariant] = useState<WordVariant | null>(null);
+  const [isRecordingCreated, setIsRecordingCreated] = useState(false);
+
+  const handleCreatedSaved = (variant: WordVariant) => {
+    setCreatedVariant(variant);
+    onSaved(variant);
+  };
 
   const handleCreate = async () => {
     if (!wordArabic.trim() || !transliteration.trim()) {
@@ -345,6 +377,8 @@ function NewVariantForm({
         actorAccountId
       );
       onCreated(created);
+      setCreatedVariant(created);
+      setIsRecordingCreated(false);
       setWordArabic('');
       setTransliteration('');
       setNotes('');
@@ -362,14 +396,39 @@ function NewVariantForm({
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
       <PillSelect label="Label" options={VARIANT_LABEL_OPTIONS} value={variantLabel} onChange={(v) => setVariantLabel(v as VariantLabel)} />
       <Text style={styles.fieldLabel}>Arabic</Text>
-      <TextInput value={wordArabic} onChangeText={setWordArabic} style={styles.input} />
+      <TextInput value={wordArabic} onChangeText={setWordArabic} style={styles.input} placeholder="Arabic" />
       <Text style={styles.fieldLabel}>Transliteration</Text>
-      <TextInput value={transliteration} onChangeText={setTransliteration} style={styles.input} />
+      <TextInput value={transliteration} onChangeText={setTransliteration} style={styles.input} placeholder="Transliteration" />
       <Text style={styles.fieldLabel}>Notes</Text>
       <TextInput value={notes} onChangeText={setNotes} style={styles.input} />
       <Text style={styles.fieldLabel}>Sort order</Text>
       <TextInput value={sortOrder} onChangeText={setSortOrder} style={styles.input} keyboardType="number-pad" />
       <Button label="+ Add Variant" variant="secondary" onPress={handleCreate} loading={isSaving} style={{ marginTop: spacing.sm }} />
+
+      {createdVariant ? (
+        <View style={styles.addRecordingBox}>
+          <Text style={styles.addRecordingText}>
+            Added &ldquo;{createdVariant.transliteration}&rdquo;.
+            {createdVariant.audioPath ? '' : ' It has no recording yet.'}
+          </Text>
+          {isRecordingCreated ? (
+            <AudioRecorderField
+              wordGroupId={createdVariant.wordGroupId}
+              variantId={createdVariant.id}
+              currentAudioPath={createdVariant.audioPath}
+              updatedAt={createdVariant.updatedAt}
+              onUploaded={async (path) => {
+                const updated = await updateWordVariant(createdVariant.id, { audioPath: path }, actorAccountId);
+                handleCreatedSaved(updated);
+                return updated.audioPath;
+              }}
+              repeatAfterMe={repeatAfterMeOptions(createdVariant, actorAccountId, handleCreatedSaved)}
+            />
+          ) : (
+            <Button label="Add recording" onPress={() => setIsRecordingCreated(true)} />
+          )}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -392,6 +451,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   actionsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
+  addRecordingBox: { marginTop: spacing.md, gap: spacing.sm, padding: spacing.sm, borderRadius: radii.sm, backgroundColor: `${colors.primary}14` },
+  addRecordingText: { fontSize: 13, color: colors.textPrimary },
   noPrimaryWarning: {
     fontSize: 12,
     color: colors.error,

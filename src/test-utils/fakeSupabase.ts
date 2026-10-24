@@ -25,7 +25,7 @@ export interface RecordedQuery {
   calls: unknown[][];
 }
 
-const CHAIN_METHODS = ['eq', 'neq', 'in', 'or', 'gte', 'lte', 'order', 'limit', 'select', 'match', 'is'] as const;
+const CHAIN_METHODS = ['eq', 'neq', 'in', 'or', 'gte', 'lte', 'order', 'limit', 'select', 'match', 'is', 'not'] as const;
 
 export function createFakeSupabase() {
   const queries: RecordedQuery[] = [];

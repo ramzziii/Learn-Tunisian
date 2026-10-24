@@ -29,6 +29,7 @@ function variant(label: VariantLabel, transliteration: string, overrides: Partia
     speakerName: null,
     dialectNotes: null,
     isNativeVoice: false,
+    inRepeatAfterMe: false,
     approvedBy: null,
     approvedAt: null,
     ...overrides,

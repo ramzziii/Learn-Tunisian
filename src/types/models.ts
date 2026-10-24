@@ -120,6 +120,8 @@ export interface WordVariant {
   speakerName: string | null;
   dialectNotes: string | null;
   isNativeVoice: boolean;
+  /** Included in the learner-facing Repeat After Me section. */
+  inRepeatAfterMe: boolean;
   /** Stamped automatically when nativeVerified flips to true — see src/data/admin/content.ts. */
   approvedBy: string | null;
   approvedAt: string | null;
