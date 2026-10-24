@@ -198,7 +198,7 @@ export function PhraseDetailModal({ phrase, track, onClose }: PhraseDetailModalP
                 </Text>
               </PressableScale>
               <Text style={styles.sourceLabel}>
-                {wordPlayer.hasAudio ? '🎙️ Native recording' : '🤖 Generated voice'}
+                {wordPlayer.isFallbackVoice ? '🤖 Generated voice' : '🎙️ Native recording'}
               </Text>
             </Animated.View>
 

@@ -58,6 +58,7 @@ beforeEach(() => {
   mockDownload.mockReset();
   mockFetch.mockReset();
   jest.spyOn(console, 'error').mockImplementation(() => {});
+  jest.spyOn(console, 'warn').mockImplementation(() => {});
 });
 
 afterEach(() => jest.restoreAllMocks());
@@ -125,6 +126,24 @@ describe('ensureAudioCached on a device', () => {
     mockFetch.mockRejectedValue(new Error('offline'));
 
     await expect(cache.ensureAudioCached(variant('wg1/v1-2000.m4a'))).resolves.toBeNull();
+  });
+
+  // Regression: opening a lesson whose placeholder recordings were never
+  // uploaded (e.g. the Greetings phrasebook) showed a red ERROR per word —
+  // a missing file is a content gap the app handles, not an app error.
+  it('a never-uploaded file (Storage 400 "Object not found") → null, one warning, no errors', async () => {
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const consoleWarn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    mockDownload.mockRejectedValue(new Error('UnableToDownload: response has status 400'));
+    mockFetch.mockResolvedValue({ ok: false, status: 400, statusText: 'Bad Request' });
+    const missing = variant('greetings/pb_greet_peace_never_uploaded.m4a');
+
+    await expect(cache.ensureAudioCached(missing)).resolves.toBeNull();
+    await expect(cache.ensureAudioCached(missing)).resolves.toBeNull(); // e.g. prefetch, then the exercise
+
+    expect(consoleError).not.toHaveBeenCalled();
+    expect(consoleWarn).toHaveBeenCalledTimes(1);
+    expect(consoleWarn.mock.calls[0][0]).toMatch(/not found in Storage/);
   });
 
   it('the recording was deleted from Storage (404) → null', async () => {
