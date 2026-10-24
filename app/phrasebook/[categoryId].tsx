@@ -15,6 +15,7 @@ import { radii, spacing, type ThemeColors } from '@/constants/theme';
 import { fetchPhrasebookCategories } from '@/data/content';
 import { canAccessPhrasebookCategory, fetchAccessibleLessonWordGroups } from '@/data/premiumAccess';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
+import { usePremium } from '@/lib/premium/PremiumContext';
 import { getViewedPhraseIds, markPhraseViewed } from '@/lib/phrasebookProgress';
 import { useTheme } from '@/lib/theme/ThemeContext';
 import { getPrimaryVariant } from '@/lib/wordVariants';
@@ -34,12 +35,14 @@ export default function PhrasebookCategoryScreen() {
   const [data, setData] = useState<CategoryData | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [isPremiumLocked, setIsPremiumLocked] = useState(false);
+  const { isPremium, isResolved } = usePremium();
   const [viewedIds, setViewedIds] = useState<string[]>([]);
   const [selectedPhrase, setSelectedPhrase] = useState<WordGroupWithVariants | null>(null);
 
   const load = useCallback(async () => {
-    if (!categoryId || !activeProfile) return;
+    if (!categoryId || !activeProfile || !isResolved) return;
     setLoadError(false);
+    setIsPremiumLocked(false);
     try {
       const [categories, viewed] = await Promise.all([
         fetchPhrasebookCategories(),
@@ -59,18 +62,18 @@ export default function PhrasebookCategoryScreen() {
       }
       // Checked before the category's phrases are fetched, so a direct link
       // to a locked category never loads them.
-      if (!canAccessPhrasebookCategory(activeProfile.isPremium, category.unitId, categories)) {
+      if (!canAccessPhrasebookCategory(isPremium, category.unitId, categories)) {
         setIsPremiumLocked(true);
         return;
       }
-      const phrases = await fetchAccessibleLessonWordGroups(category.lessonId, activeProfile.isPremium);
+      const phrases = await fetchAccessibleLessonWordGroups(category.lessonId, isPremium);
       setData({ name: category.name, lessonId: category.lessonId, phrases });
       setViewedIds(viewed);
     } catch (error) {
       console.error('Failed to load phrasebook category', categoryId, error);
       setLoadError(true);
     }
-  }, [categoryId, activeProfile]);
+  }, [categoryId, activeProfile, isPremium, isResolved]);
 
   useFocusEffect(
     useCallback(() => {

@@ -11,6 +11,7 @@ import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { radii, shadows, spacing, type ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/lib/theme/ThemeContext';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
+import { usePremium } from '@/lib/premium/PremiumContext';
 import { ARABIC_LETTERS, buildMatchingGrid, getLetterById, type MatchingTile } from '@/lib/alphabet';
 import { markLettersPracticed } from '@/lib/alphabetProgress';
 import { accessibleLetters, canStartSpeedMatchRound, speedMatchPairCount } from '@/lib/premium/access';
@@ -28,7 +29,7 @@ export default function AlphabetMatchingScreen() {
   const { activeProfile } = useActiveProfile();
   const { playCorrect, playIncorrect } = useAnswerFeedback();
   const tileWidth = useColumnWidth(GRID_COLUMNS, spacing.lg, spacing.sm);
-  const isPremium = activeProfile?.isPremium ?? false;
+  const { isPremium, isResolved } = usePremium();
   // Free: one short sample round (fewer pairs, free letters only).
   const pairCount = speedMatchPairCount(isPremium, PAIR_COUNT);
   const letterPool = useMemo(() => accessibleLetters(isPremium, ARABIC_LETTERS), [isPremium]);
@@ -72,7 +73,7 @@ export default function AlphabetMatchingScreen() {
   };
 
   useEffect(() => {
-    if (!activeProfile) return;
+    if (!activeProfile || !isResolved) return;
     let cancelled = false;
     (async () => {
       const sampleUsed = isPremium ? false : await hasUsedSpeedMatchSample(activeProfile.id);
@@ -91,7 +92,7 @@ export default function AlphabetMatchingScreen() {
     };
     // Runs once per profile/entitlement — startRound is recreated every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeProfile?.id, isPremium]);
+  }, [activeProfile?.id, isPremium, isResolved]);
 
   const handlePlayAgain = () => {
     if (isPremium) startRound();

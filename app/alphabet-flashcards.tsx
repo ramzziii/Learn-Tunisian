@@ -10,7 +10,7 @@ import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { radii, shadows, spacing, type ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/lib/theme/ThemeContext';
 import { buildAlphabetSet, splitAtLetter } from '@/lib/alphabet';
-import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
+import { usePremium } from '@/lib/premium/PremiumContext';
 import { canAccessLetter, FREE_ALPHABET_LETTER_IDS } from '@/lib/premium/access';
 import { useFadeInOnChange } from '@/hooks/useFadeInOnChange';
 import { useLetterSpeech } from '@/hooks/useLetterSpeech';
@@ -24,7 +24,7 @@ export default function AlphabetFlashcardsScreen() {
   const { speak, isSpeaking } = useLetterSpeech();
   const fadeAnim = useFadeInOnChange(String(index));
 
-  const isPremium = useActiveProfile().activeProfile?.isPremium ?? false;
+  const { isPremium } = usePremium();
   const letter = letters[index];
   const isLocked = !canAccessLetter(isPremium, letter.id);
   const example = letter.examples[0];

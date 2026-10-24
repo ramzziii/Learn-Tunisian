@@ -13,6 +13,7 @@ import { useTheme } from '@/lib/theme/ThemeContext';
 import { fetchDailyGoalSettings } from '@/data/profiles';
 import { fetchReviewQueue } from '@/data/progress';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
+import { usePremium } from '@/lib/premium/PremiumContext';
 import { markReviewCompletedToday } from '@/lib/dailyChallengeProgress';
 import { prefetchLessonAudio } from '@/lib/offline/audioCache';
 import { canStartReview, FREE_REVIEW_WORD_LIMIT, limitReviewQueue } from '@/lib/premium/access';
@@ -32,12 +33,13 @@ export default function ReviewSession() {
   // Premium starts straight away (unchanged behavior); a free session waits
   // for an explicit Start on a screen that states the allowance first.
   const [hasStarted, setHasStarted] = useState(false);
+  const { isPremium, isResolved } = usePremium();
 
   useEffect(() => {
-    if (!activeProfile) return;
+    if (!activeProfile || !isResolved) return;
     let cancelled = false;
+    setIsAllowanceUsed(false);
     (async () => {
-      const { isPremium } = activeProfile;
       // Decided before the queue is even fetched — never mid-session.
       if (!canStartReview(isPremium, await hasUsedFreeReviewToday(activeProfile.id))) {
         if (!cancelled) setIsAllowanceUsed(true);
@@ -57,7 +59,7 @@ export default function ReviewSession() {
     return () => {
       cancelled = true;
     };
-  }, [activeProfile]);
+  }, [activeProfile, isPremium, isResolved]);
 
   if (isAllowanceUsed) {
     return (

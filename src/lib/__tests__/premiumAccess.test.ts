@@ -16,6 +16,7 @@ import {
   FREE_REVIEW_WORD_LIMIT,
   freePhrasebookUnitIds,
   limitReviewQueue,
+  resolveEffectivePremium,
   SPEED_MATCH_SAMPLE_PAIRS,
   speedMatchPairCount,
 } from '@/lib/premium/access';
@@ -131,5 +132,21 @@ describe('metered allowances', () => {
     const sample = buildMatchingGrid(speedMatchPairCount(false, 6), accessibleLetters(false, ARABIC_LETTERS));
     expect(sample).toHaveLength(SPEED_MATCH_SAMPLE_PAIRS * 2);
     expect(sample.every((tile) => FREE_ALPHABET_LETTER_IDS.includes(tile.letterId))).toBe(true);
+  });
+});
+
+describe('effective entitlement (admins always have Premium, with a free-plan preview)', () => {
+  it('admin: Premium by default even though their profile is not paid', () => {
+    expect(resolveEffectivePremium({ profileIsPremium: false, isAdmin: true, adminPreview: 'premium' })).toBe(true);
+  });
+
+  it('admin previewing the free plan is treated exactly like a free learner', () => {
+    expect(resolveEffectivePremium({ profileIsPremium: false, isAdmin: true, adminPreview: 'free' })).toBe(false);
+    expect(resolveEffectivePremium({ profileIsPremium: true, isAdmin: true, adminPreview: 'free' })).toBe(false);
+  });
+
+  it('non-admins get their profile flag; a stored preview can never grant them Premium', () => {
+    expect(resolveEffectivePremium({ profileIsPremium: false, isAdmin: false, adminPreview: 'premium' })).toBe(false);
+    expect(resolveEffectivePremium({ profileIsPremium: true, isAdmin: false, adminPreview: 'free' })).toBe(true);
   });
 });

@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/Button';
 import { radii, spacing, type ThemeColors } from '@/constants/theme';
 import { fetchPhrasebookCategories, type PhrasebookCategory } from '@/data/content';
 import { canAccessPhrasebookCategory } from '@/data/premiumAccess';
-import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
+import { usePremium } from '@/lib/premium/PremiumContext';
 import { useTheme } from '@/lib/theme/ThemeContext';
 
 /** Presentation-only metadata (icon + tile color) per phrasebook category —
@@ -40,7 +40,7 @@ const FALLBACK_META = { emoji: '💬', color: '#3E7CB1' };
 export default function PhrasebookScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const isPremium = useActiveProfile().activeProfile?.isPremium ?? false;
+  const { isPremium } = usePremium();
   const [categories, setCategories] = useState<PhrasebookCategory[] | null>(null);
   const [loadError, setLoadError] = useState(false);
 

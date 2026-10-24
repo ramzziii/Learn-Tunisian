@@ -7,6 +7,7 @@ import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { fetchAccessibleLessonWordGroups } from '@/data/premiumAccess';
 import { fetchDailyGoalSettings } from '@/data/profiles';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
+import { usePremium } from '@/lib/premium/PremiumContext';
 import { prefetchLessonAudio } from '@/lib/offline/audioCache';
 import { PremiumRequiredError } from '@/lib/premium/access';
 import type { DailyGoalMinutes, WordGroupWithVariants } from '@/types/models';
@@ -21,10 +22,12 @@ export default function LessonSession() {
   const [goalMinutes, setGoalMinutes] = useState<DailyGoalMinutes>(DEFAULT_GOAL_MINUTES);
   const [isReady, setIsReady] = useState(false);
   const [isPremiumLocked, setIsPremiumLocked] = useState(false);
+  const { isPremium, isResolved } = usePremium();
 
   useEffect(() => {
-    if (!activeProfile || !lessonId) return;
+    if (!activeProfile || !lessonId || !isResolved) return;
     let cancelled = false;
+    setIsPremiumLocked(false);
     (async () => {
       let lessonGroups: WordGroupWithVariants[];
       let dailyGoal: Awaited<ReturnType<typeof fetchDailyGoalSettings>>;
@@ -32,7 +35,7 @@ export default function LessonSession() {
         // Access is checked before any of the lesson's content is fetched,
         // so a direct link to a locked lesson never starts it.
         [lessonGroups, dailyGoal] = await Promise.all([
-          fetchAccessibleLessonWordGroups(lessonId, activeProfile.isPremium),
+          fetchAccessibleLessonWordGroups(lessonId, isPremium),
           fetchDailyGoalSettings(activeProfile.id),
         ]);
       } catch (error) {
@@ -52,7 +55,7 @@ export default function LessonSession() {
     return () => {
       cancelled = true;
     };
-  }, [activeProfile, lessonId]);
+  }, [activeProfile, lessonId, isPremium, isResolved]);
 
   if (isPremiumLocked) {
     return (

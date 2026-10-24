@@ -48,3 +48,15 @@ describe('Speed Match sample round', () => {
     expect(await allowance.hasUsedFreeReviewToday('p1')).toBe(true);
   });
 });
+
+describe('resetFreeAllowances (admin free-plan preview)', () => {
+  it('makes the sample round and today’s review available again', async () => {
+    await allowance.markFreeReviewStarted('p1');
+    await allowance.markSpeedMatchSampleUsed('p1');
+
+    await allowance.resetFreeAllowances('p1');
+
+    expect(await allowance.hasUsedFreeReviewToday('p1')).toBe(false);
+    expect(await allowance.hasUsedSpeedMatchSample('p1')).toBe(false);
+  });
+});

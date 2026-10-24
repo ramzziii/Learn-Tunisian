@@ -11,6 +11,7 @@ import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { radii, shadows, spacing, type ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/lib/theme/ThemeContext';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
+import { usePremium } from '@/lib/premium/PremiumContext';
 import { ARABIC_LETTERS, buildAlphabetExerciseQueue, type AlphabetExerciseItem } from '@/lib/alphabet';
 import { accessibleLetters } from '@/lib/premium/access';
 import { markLettersPracticed } from '@/lib/alphabetProgress';
@@ -28,8 +29,9 @@ export function AlphabetPracticeSession({ onExit }: AlphabetPracticeSessionProps
   const { activeProfile } = useActiveProfile();
   // A free profile's round only asks about the free letters (see
   // src/lib/premium/access.ts) — decided when the round is built.
+  const { isPremium } = usePremium();
   const [queue, setQueue] = useState<AlphabetExerciseItem[]>(() =>
-    buildAlphabetExerciseQueue(QUEUE_SIZE, accessibleLetters(activeProfile?.isPremium ?? false, ARABIC_LETTERS))
+    buildAlphabetExerciseQueue(QUEUE_SIZE, accessibleLetters(isPremium, ARABIC_LETTERS))
   );
   const [index, setIndex] = useState(0);
   const [missedLetterIds, setMissedLetterIds] = useState<string[]>([]);

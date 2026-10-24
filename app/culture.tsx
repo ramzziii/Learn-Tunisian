@@ -12,6 +12,7 @@ import { radii, shadows, spacing, type ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/lib/theme/ThemeContext';
 import { PROVERBS, type Proverb } from '@/constants/proverbs';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
+import { usePremium } from '@/lib/premium/PremiumContext';
 import { canAccessProverb } from '@/lib/premium/access';
 import { getViewedProverbIds, markProverbViewed } from '@/lib/proverbProgress';
 import { useColumnWidth } from '@/hooks/useColumnWidth';
@@ -42,7 +43,7 @@ export default function CultureScreen() {
     }, [activeProfile])
   );
 
-  const isPremium = activeProfile?.isPremium ?? false;
+  const { isPremium } = usePremium();
 
   const selectProverb = (proverb: Proverb) => {
     Haptics.selectionAsync();

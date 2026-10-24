@@ -17,6 +17,8 @@ import { fetchProgressSummary, type ProfileProgressSummary } from '@/data/progre
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
 import { useIsAdmin } from '@/lib/admin/AdminContext';
 import { useAuth } from '@/lib/auth/AuthContext';
+import { resetFreeAllowances } from '@/lib/premium/freeAllowance';
+import { usePremium } from '@/lib/premium/PremiumContext';
 import { cancelDailyReminder, requestNotificationPermission, scheduleDailyReminder } from '@/lib/notifications/reminders';
 import { useTheme, type ThemePreference } from '@/lib/theme/ThemeContext';
 import type { DailyGoalMinutes, DailyGoalSettings } from '@/types/models';
@@ -52,6 +54,7 @@ export default function ProfileScreen() {
   const { activeProfile, profiles } = useActiveProfile();
   const { signOut } = useAuth();
   const { isAdmin } = useIsAdmin();
+  const { isPremium, adminPreview, setAdminPreview } = usePremium();
   const { colors, preference, setPreference } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [goalSettings, setGoalSettings] = useState<DailyGoalSettings | null>(null);
@@ -249,6 +252,9 @@ export default function ProfileScreen() {
         />
 
         <Text style={styles.sectionTitle}>Premium</Text>
+        <Text style={styles.premiumStatus}>
+          {isPremium ? '⭐ Premium — everything is unlocked.' : 'Free plan — some content is marked 🔒 Premium.'}
+        </Text>
         <Button themed label="See plans & pricing" variant="secondary" onPress={() => router.push('/onboarding/plans')} />
 
         <Text style={styles.sectionTitle}>Account</Text>
@@ -258,6 +264,36 @@ export default function ProfileScreen() {
           <>
             <Text style={styles.sectionTitle}>Admin</Text>
             <Button themed label="Content Admin" variant="secondary" onPress={() => router.push('/admin')} />
+
+            {/* Admins always have Premium; this only changes what *they* see,
+                to check the free experience. Nothing is written to Supabase. */}
+            <View style={[styles.previewCard, adminPreview === 'premium' && styles.previewCardPremium]}>
+              <View style={styles.reminderHeader}>
+                <Text style={styles.previewTitle}>View app as Premium</Text>
+                <Switch
+                  accessibilityLabel="View app as Premium"
+                  value={adminPreview === 'premium'}
+                  onValueChange={(on) => setAdminPreview(on ? 'premium' : 'free')}
+                  trackColor={{ false: colors.border, true: colors.primary }}
+                />
+              </View>
+              <Text style={styles.previewBody}>
+                {adminPreview === 'premium'
+                  ? 'Showing the full Premium app. Switch off to see exactly what free learners see.'
+                  : 'Previewing the free plan — locked items, gates, and daily limits apply to you now.'}
+              </Text>
+              {adminPreview === 'free' ? (
+                <Button
+                  themed
+                  label="Reset free-plan limits"
+                  variant="ghost"
+                  onPress={async () => {
+                    await resetFreeAllowances(activeProfile.id);
+                    Alert.alert('Free-plan limits reset', 'The Speed Match sample round and today’s free review are available again.');
+                  }}
+                />
+              ) : null}
+            </View>
           </>
         ) : null}
       </ScrollView>
@@ -312,6 +348,19 @@ const makeStyles = (colors: ThemeColors) => {
     statEmoji: { fontSize: 20, marginBottom: 2 },
     statValue: { fontSize: 22, fontWeight: '800', color: colors.primary },
     statLabel: { fontSize: 12, color: colors.textSecondary, marginTop: 2, textAlign: 'center' },
+    premiumStatus: { fontSize: 14, color: colors.textSecondary, marginBottom: spacing.sm },
+    previewCard: {
+      marginTop: spacing.md,
+      padding: spacing.md,
+      borderRadius: radii.lg,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+      gap: spacing.xs,
+    },
+    previewCardPremium: { borderColor: '#D9A441' },
+    previewTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
+    previewBody: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
     reminderHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginRight: spacing.xs },
     errorContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
     errorEmoji: { fontSize: 48, marginBottom: spacing.sm },

@@ -12,6 +12,7 @@ import { radii, spacing, type ThemeColors } from '@/constants/theme';
 import { fetchLessonMap, type UnitWithLessons } from '@/data/content';
 import { fetchProgressSummary, type ProfileProgressSummary } from '@/data/progress';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
+import { usePremium } from '@/lib/premium/PremiumContext';
 import { canAccessLesson, computeFreeLessonIds } from '@/lib/premium/access';
 import { buildProgressInsights, type ProgressInsights } from '@/lib/progressInsights';
 import { useTheme } from '@/lib/theme/ThemeContext';
@@ -35,6 +36,7 @@ export default function LearnScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [data, setData] = useState<LearnData | null>(null);
+  const { isPremium } = usePremium();
   // Derived from the already-loaded lesson map (real sort_order columns), so
   // the map marks exactly the lessons /lesson/[lessonId] would gate.
   const freeLessonIds = useMemo(
@@ -117,7 +119,7 @@ export default function LearnScreen() {
                 isFirstUnit={index === 0}
                 onSelectLesson={(lessonId) => router.push(`/lesson/${lessonId}`)}
                 onBrowseWords={(lessonId) => router.push(`/words/${lessonId}`)}
-                isPremiumLocked={(lessonId) => !canAccessLesson(activeProfile.isPremium, lessonId, freeLessonIds)}
+                isPremiumLocked={(lessonId) => !canAccessLesson(isPremium, lessonId, freeLessonIds)}
                 onPremiumLockedPress={openUpgradeFlow}
               />
             ))

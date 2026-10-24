@@ -13,6 +13,7 @@ import { useTheme } from '@/lib/theme/ThemeContext';
 import { fetchAccessibleLessonWordGroups } from '@/data/premiumAccess';
 import { fetchFavoriteWordGroupIds } from '@/data/favorites';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
+import { usePremium } from '@/lib/premium/PremiumContext';
 import { PremiumRequiredError } from '@/lib/premium/access';
 import { getPrimaryVariant, getMasculineVariant } from '@/lib/wordVariants';
 import type { WordGroupWithVariants } from '@/types/models';
@@ -25,13 +26,15 @@ export default function LessonWordList() {
   const [groups, setGroups] = useState<WordGroupWithVariants[] | null>(null);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const [isPremiumLocked, setIsPremiumLocked] = useState(false);
+  const { isPremium, isResolved } = usePremium();
 
   useEffect(() => {
-    if (!activeProfile || !lessonId) return;
+    if (!activeProfile || !lessonId || !isResolved) return;
+    setIsPremiumLocked(false);
     (async () => {
       try {
         const [lessonGroups, favorites] = await Promise.all([
-          fetchAccessibleLessonWordGroups(lessonId, activeProfile.isPremium),
+          fetchAccessibleLessonWordGroups(lessonId, isPremium),
           fetchFavoriteWordGroupIds(activeProfile.id),
         ]);
         setGroups(lessonGroups);
@@ -41,7 +44,7 @@ export default function LessonWordList() {
         else throw error;
       }
     })();
-  }, [activeProfile, lessonId]);
+  }, [activeProfile, lessonId, isPremium, isResolved]);
 
   if (isPremiumLocked) {
     return (

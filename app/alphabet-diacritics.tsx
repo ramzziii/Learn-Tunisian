@@ -10,6 +10,7 @@ import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { radii, shadows, spacing, type ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/lib/theme/ThemeContext';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
+import { usePremium } from '@/lib/premium/PremiumContext';
 import { ARABIC_LETTERS, type ArabicLetter } from '@/lib/alphabet';
 import { getAlphabetProgress, markDiacriticLetterViewed } from '@/lib/alphabetProgress';
 import { canAccessLetter } from '@/lib/premium/access';
@@ -36,7 +37,7 @@ export default function AlphabetDiacriticsScreen() {
     getAlphabetProgress(activeProfile.id).then((data) => setViewedLetterIds(data.viewedDiacriticLetterIds));
   }, [activeProfile]);
 
-  const isPremium = activeProfile?.isPremium ?? false;
+  const { isPremium } = usePremium();
 
   const selectLetter = (letter: ArabicLetter) => {
     Haptics.selectionAsync();

@@ -60,3 +60,9 @@ export async function hasUsedSpeedMatchSample(profileId: string): Promise<boolea
 
 export const markSpeedMatchSampleUsed = (profileId: string): Promise<void> =>
   write(profileId, { speedMatchSampleUsed: true });
+
+/** Clears this profile's free-plan usage — used by the admin "preview free
+ * plan" tools so the sample round / daily review can be re-tested. */
+export async function resetFreeAllowances(profileId: string): Promise<void> {
+  await AsyncStorage.setItem(storageKey(profileId), JSON.stringify(EMPTY));
+}

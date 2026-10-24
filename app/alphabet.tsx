@@ -11,6 +11,7 @@ import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { radii, shadows, spacing, type ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/lib/theme/ThemeContext';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
+import { usePremium } from '@/lib/premium/PremiumContext';
 import { ARABIC_LETTERS, type ArabicLetter } from '@/lib/alphabet';
 import { getAlphabetProgress, markLetterViewed } from '@/lib/alphabetProgress';
 import { canAccessLetter } from '@/lib/premium/access';
@@ -55,7 +56,7 @@ export default function AlphabetScreen() {
   const progressPercent =
     ARABIC_LETTERS.length > 0 ? Math.round((accessedLetterIds.length / ARABIC_LETTERS.length) * 100) : 0;
 
-  const isPremium = activeProfile?.isPremium ?? false;
+  const { isPremium } = usePremium();
 
   const selectLetter = (letter: ArabicLetter) => {
     Haptics.selectionAsync();

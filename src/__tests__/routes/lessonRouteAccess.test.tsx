@@ -9,11 +9,16 @@ import { createFakeSupabase } from '@/test-utils/fakeSupabase';
 const mockDb = createFakeSupabase();
 let mockLessonId = 'lesson-1';
 let mockIsPremium = false;
+let mockIsAdmin = false;
+const mockStorage = new Map<string, string>();
 
 jest.mock('@/lib/supabase/client', () => ({ supabase: mockDb.client }));
 jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,
-  default: { getItem: jest.fn(async () => null), setItem: jest.fn(async () => undefined) },
+  default: {
+    getItem: jest.fn(async (key: string) => mockStorage.get(key) ?? null),
+    setItem: jest.fn(async (key: string, value: string) => void mockStorage.set(key, value)),
+  },
 }));
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => ({ lessonId: mockLessonId }),
@@ -28,6 +33,9 @@ const mockProfiles = {
 jest.mock('@/lib/account/ActiveProfileContext', () => ({
   useActiveProfile: () => ({ activeProfile: mockIsPremium ? mockProfiles.premium : mockProfiles.free }),
 }));
+jest.mock('@/lib/admin/AdminContext', () => ({
+  useIsAdmin: () => ({ isAdmin: mockIsAdmin, isLoading: false }),
+}));
 jest.mock('@/lib/offline/audioCache', () => ({ prefetchLessonAudio: jest.fn() }));
 jest.mock('@/components/session/SessionRunner', () => ({
   SessionRunner: ({ groups }: { groups: unknown[] }) => {
@@ -41,9 +49,13 @@ jest.mock('@/components/session/SessionRunner', () => ({
 const LessonSession = require('../../../app/lesson/[lessonId]').default;
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { ThemeProvider } = require('@/lib/theme/ThemeContext');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { PremiumProvider } = require('@/lib/premium/PremiumContext');
 
 beforeEach(() => {
   mockDb.reset();
+  mockStorage.clear();
+  mockIsAdmin = false;
   mockDb.respond('units.select', {
     data: [
       { id: 'u1', sort_order: 1, is_curriculum: true },
@@ -66,7 +78,9 @@ beforeEach(() => {
 const renderRoute = () =>
   render(
     <ThemeProvider>
-      <LessonSession />
+      <PremiumProvider>
+        <LessonSession />
+      </PremiumProvider>
     </ThemeProvider>
   );
 
@@ -100,4 +114,27 @@ it('Premium profile opens any lesson directly', async () => {
   await renderRoute();
 
   expect(await screen.findByText(/Session started/)).toBeOnTheScreen();
+});
+
+it('admin (not a paying profile) opens a locked lesson directly — full Premium access by default', async () => {
+  mockLessonId = 'lesson-2';
+  mockIsPremium = false;
+  mockIsAdmin = true;
+
+  await renderRoute();
+
+  expect(await screen.findByText(/Session started/)).toBeOnTheScreen();
+  expect(screen.queryByText('This lesson is part of Premium')).toBeNull();
+});
+
+it('admin previewing the free plan gets the same gate a free learner would', async () => {
+  mockLessonId = 'lesson-2';
+  mockIsPremium = false;
+  mockIsAdmin = true;
+  mockStorage.set('learn-tunisian.admin-premium-preview', 'free');
+
+  await renderRoute();
+
+  expect(await screen.findByText('This lesson is part of Premium')).toBeOnTheScreen();
+  expect(screen.queryByText(/Session started/)).toBeNull();
 });

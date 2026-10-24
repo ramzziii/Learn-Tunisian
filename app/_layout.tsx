@@ -8,6 +8,7 @@ import { ActiveProfileProvider } from '@/lib/account/ActiveProfileContext';
 import { AdminProvider } from '@/lib/admin/AdminContext';
 import { AuthProvider } from '@/lib/auth/AuthContext';
 import { OnboardingProvider } from '@/lib/onboarding/OnboardingContext';
+import { PremiumProvider } from '@/lib/premium/PremiumContext';
 import { ThemeProvider, useTheme } from '@/lib/theme/ThemeContext';
 
 export default function RootLayout() {
@@ -24,9 +25,11 @@ export default function RootLayout() {
         <AuthProvider>
           <AdminProvider>
             <ActiveProfileProvider>
-              <OnboardingProvider>
-                <RootNavigator />
-              </OnboardingProvider>
+              <PremiumProvider>
+                <OnboardingProvider>
+                  <RootNavigator />
+                </OnboardingProvider>
+              </PremiumProvider>
             </ActiveProfileProvider>
           </AdminProvider>
         </AuthProvider>

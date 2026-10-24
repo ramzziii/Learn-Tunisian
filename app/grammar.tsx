@@ -10,7 +10,7 @@ import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { radii, spacing, type ThemeColors } from '@/constants/theme';
 import { GRAMMAR_NOTES, type GrammarNote } from '@/constants/grammarNotes';
 import { useLetterSpeech } from '@/hooks/useLetterSpeech';
-import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
+import { usePremium } from '@/lib/premium/PremiumContext';
 import { canAccessGrammarNote } from '@/lib/premium/access';
 import { useTheme } from '@/lib/theme/ThemeContext';
 
@@ -49,7 +49,7 @@ export default function GrammarScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const groupedNotes = useMemo(() => groupGrammarNotes(), []);
-  const isPremium = useActiveProfile().activeProfile?.isPremium ?? false;
+  const { isPremium } = usePremium();
   const [expandedId, setExpandedId] = useState<string | null>(
     GRAMMAR_NOTES.find((note) => canAccessGrammarNote(isPremium, note.id))?.id ?? null
   );

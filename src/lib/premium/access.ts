@@ -4,7 +4,9 @@
  * locally, so a boundary can't drift between the list that shows an item
  * and the route that opens it.
  *
- * Entitlement comes solely from `profiles.is_premium` (Profile.isPremium).
+ * The `isPremium` these take is the *effective* entitlement from usePremium()
+ * (src/lib/premium/PremiumContext.tsx): admins always have Premium (with an
+ * optional free-plan preview), everyone else gets `profiles.is_premium`.
  * There is no purchase provider wired into the app yet (see
  * app/onboarding/plans.tsx), so nothing in the app ever flips that flag —
  * it's set server-side only.
@@ -38,6 +40,24 @@ export const FREE_REVIEW_WORD_LIMIT = 10;
 
 /** Speed Match: one lifetime sample round of this many pairs, drawn from the free letters. */
 export const SPEED_MATCH_SAMPLE_PAIRS = 3;
+
+export type AdminPremiumPreview = 'premium' | 'free';
+
+/**
+ * The entitlement every gate below is asked with. Admins (accounts.is_admin,
+ * which only another admin can grant — see 0009_admin_content_management.sql)
+ * always have full Premium access, and can switch to previewing the free
+ * plan from their profile to see exactly what free learners see. Everyone
+ * else gets their profile's is_premium.
+ */
+export function resolveEffectivePremium(input: {
+  profileIsPremium: boolean;
+  isAdmin: boolean;
+  adminPreview: AdminPremiumPreview;
+}): boolean {
+  if (input.isAdmin) return input.adminPreview === 'premium';
+  return input.profileIsPremium;
+}
 
 export const canAccessGrammarNote = (isPremium: boolean, noteId: string): boolean =>
   isPremium || FREE_GRAMMAR_NOTE_IDS.includes(noteId);

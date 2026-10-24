@@ -11,7 +11,7 @@ import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { radii, spacing, type ThemeColors } from '@/constants/theme';
 import { fetchPhrasebookCategories } from '@/data/content';
 import { canAccessPhrasebookCategory, fetchAccessibleLessonWordGroups } from '@/data/premiumAccess';
-import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
+import { usePremium } from '@/lib/premium/PremiumContext';
 import { useFadeInOnChange } from '@/hooks/useFadeInOnChange';
 import { useLetterSpeech } from '@/hooks/useLetterSpeech';
 import { useWordAudioPlayer } from '@/hooks/useWordAudioPlayer';
@@ -28,7 +28,7 @@ import type { WordGroupWithVariants } from '@/types/models';
 export default function PhrasebookFlashcardsScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const isPremium = useActiveProfile().activeProfile?.isPremium ?? false;
+  const { isPremium } = usePremium();
   const [cards, setCards] = useState<WordGroupWithVariants[] | null>(null);
   // Phrases in Premium categories — counted (from the category list) so the
   // deck can say what's locked, but never fetched for a free profile.
