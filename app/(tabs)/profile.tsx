@@ -1,11 +1,12 @@
 import { router } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { TimeWheelPicker } from '@/components/onboarding/TimeWheelPicker';
 import { Button } from '@/components/ui/Button';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { ParentGateModal } from '@/components/ui/ParentGateModal';
+import { PressableScale } from '@/components/ui/PressableScale';
 import { Reveal } from '@/components/ui/Reveal';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { SelectableCard } from '@/components/ui/SelectableCard';
@@ -17,6 +18,7 @@ import { fetchProgressSummary, type ProfileProgressSummary } from '@/data/progre
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
 import { useIsAdmin } from '@/lib/admin/AdminContext';
 import { useAuth } from '@/lib/auth/AuthContext';
+import { requestPasswordReset } from '@/lib/auth/passwordResetRequest';
 import { resetFreeAllowances } from '@/lib/premium/freeAllowance';
 import { usePremium } from '@/lib/premium/PremiumContext';
 import { cancelDailyReminder, requestNotificationPermission, scheduleDailyReminder } from '@/lib/notifications/reminders';
@@ -52,7 +54,13 @@ interface ProgressStats extends ProfileProgressSummary {
  */
 export default function ProfileScreen() {
   const { activeProfile, profiles } = useActiveProfile();
-  const { signOut } = useAuth();
+  const { signOut, session, sendPasswordReset } = useAuth();
+  // Change password reuses the existing reset flow: email the signed-in
+  // account a reset link (app/auth/reset-password.tsx sets the new one).
+  const [passwordReset, setPasswordReset] = useState<
+    { kind: 'idle' } | { kind: 'sending' } | { kind: 'sent'; email: string } | { kind: 'error'; message: string }
+  >({ kind: 'idle' });
+  const resetInFlightRef = useRef(false);
   const { isAdmin } = useIsAdmin();
   const { isPremium, adminPreview, setAdminPreview } = usePremium();
   const { colors, preference, setPreference } = useTheme();
@@ -130,6 +138,16 @@ export default function ProfileScreen() {
     setSaved(true);
   };
 
+  const handleChangePassword = async () => {
+    const outcome = await requestPasswordReset({
+      email: session?.user.email,
+      send: sendPasswordReset,
+      guard: resetInFlightRef,
+      onStart: () => setPasswordReset({ kind: 'sending' }),
+    });
+    if (outcome.kind !== 'busy') setPasswordReset(outcome);
+  };
+
   const handleSignOut = () => {
     Alert.alert('Sign out?', "You'll need to sign back in with your email and password.", [
       { text: 'Cancel', style: 'cancel' },
@@ -171,6 +189,24 @@ export default function ProfileScreen() {
       <ScrollView showsVerticalScrollIndicator={false}>
         <Text style={styles.eyebrow}>Profile</Text>
         <Text style={styles.title}>{activeProfile.name}&apos;s settings</Text>
+
+        {/* Admins only (accounts.is_admin — the /admin routes are gated the
+            same way). Up top so it's reachable without scrolling. */}
+        {isAdmin ? (
+          <PressableScale
+            haptic
+            accessibilityRole="button"
+            onPress={() => router.push('/admin')}
+            style={styles.adminEntry}
+          >
+            <Text style={styles.adminEntryIcon}>🛠️</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.adminEntryTitle}>Admin dashboard</Text>
+              <Text style={styles.adminEntryBody}>Analytics, content, recordings and reviews</Text>
+            </View>
+            <Text style={styles.adminEntryChevron}>›</Text>
+          </PressableScale>
+        ) : null}
 
         <Text style={styles.sectionTitle}>Appearance</Text>
         {THEME_OPTIONS.map((option) => (
@@ -258,12 +294,26 @@ export default function ProfileScreen() {
         <Button themed label="See plans & pricing" variant="secondary" onPress={() => router.push('/onboarding/plans')} />
 
         <Text style={styles.sectionTitle}>Account</Text>
-        <Button themed label="Sign out" variant="secondary" onPress={handleSignOut} />
+        <Button
+          themed
+          label="Change password"
+          variant="secondary"
+          onPress={handleChangePassword}
+          loading={passwordReset.kind === 'sending'}
+        />
+        {passwordReset.kind === 'sent' ? (
+          <Text style={styles.resetSent}>
+            📬 Check your email — we sent a password-reset link to {passwordReset.email}. Open the link in that email to
+            set a new password.
+          </Text>
+        ) : passwordReset.kind === 'error' ? (
+          <Text style={styles.resetError}>{passwordReset.message}</Text>
+        ) : null}
+        <Button themed label="Sign out" variant="secondary" onPress={handleSignOut} style={{ marginTop: spacing.sm }} />
 
         {isAdmin ? (
           <>
             <Text style={styles.sectionTitle}>Admin</Text>
-            <Button themed label="Content Admin" variant="secondary" onPress={() => router.push('/admin')} />
 
             {/* Admins always have Premium; this only changes what *they* see,
                 to check the free experience. Nothing is written to Supabase. */}
@@ -348,6 +398,23 @@ const makeStyles = (colors: ThemeColors) => {
     statEmoji: { fontSize: 20, marginBottom: 2 },
     statValue: { fontSize: 22, fontWeight: '800', color: colors.primary },
     statLabel: { fontSize: 12, color: colors.textSecondary, marginTop: 2, textAlign: 'center' },
+    adminEntry: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      marginBottom: spacing.md,
+      padding: spacing.md,
+      borderRadius: radii.lg,
+      borderWidth: 1.5,
+      borderColor: colors.primary,
+      backgroundColor: `${colors.primary}14`,
+    },
+    adminEntryIcon: { fontSize: 26 },
+    adminEntryTitle: { fontSize: 17, fontWeight: '800', color: colors.textPrimary },
+    adminEntryBody: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
+    adminEntryChevron: { fontSize: 24, fontWeight: '700', color: colors.primary },
+    resetSent: { fontSize: 14, color: colors.success, lineHeight: 20, marginTop: spacing.sm },
+    resetError: { fontSize: 14, color: colors.error, lineHeight: 20, marginTop: spacing.sm },
     premiumStatus: { fontSize: 14, color: colors.textSecondary, marginBottom: spacing.sm },
     previewCard: {
       marginTop: spacing.md,
