@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
 
@@ -24,20 +24,32 @@ const REASSURANCES = [
  * the plan/pricing shape is settled and ready for a real provider later,
  * and so pricing is visible before any payment is ever required. Also
  * reachable anytime afterward from Settings ("See plans & pricing").
+ *
+ * Also the upgrade flow every Premium-locked item opens (see
+ * openUpgradeFlow in src/components/premium/Premium.tsx), with
+ * `source=premium` — then both buttons return to where the learner was
+ * instead of continuing onboarding, and the copy doesn't promise a trial
+ * that nothing here can start.
  */
 export default function Plans() {
   const [selectedPlan, setSelectedPlan] = useState<PlanId>('yearly');
+  const { source } = useLocalSearchParams<{ source?: string }>();
+  const isUpgradeFlow = source === 'premium';
 
-  const goNext = () => router.push('/onboarding/consent');
+  const goNext = () => (isUpgradeFlow ? router.back() : router.push('/onboarding/consent'));
 
   return (
     <OnboardingStepLayout
-      title="Try Premium free for 7 days"
-      subtitle="See real progress before you ever pay anything."
+      title={isUpgradeFlow ? 'Unlock everything with Premium' : 'Try Premium free for 7 days'}
+      subtitle={
+        isUpgradeFlow
+          ? 'All lessons, phrasebook categories, grammar topics, letters, and unlimited review.'
+          : 'See real progress before you ever pay anything.'
+      }
       footer={
         <>
           <Button label="Start free trial" onPress={goNext} />
-          <Button label="Skip for now" variant="ghost" onPress={goNext} />
+          <Button label={isUpgradeFlow ? 'Not now' : 'Skip for now'} variant="ghost" onPress={goNext} />
         </>
       }
     >

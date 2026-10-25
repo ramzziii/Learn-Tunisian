@@ -2,11 +2,11 @@ import { ListenAndTap } from '@/components/exercises/kid/ListenAndTap';
 import { ReadingMatch } from '@/components/exercises/adult/ReadingMatch';
 import { SpeakingPractice } from '@/components/exercises/adult/SpeakingPractice';
 import { TypingSpelling } from '@/components/exercises/adult/TypingSpelling';
-import type { ExerciseItem } from '@/types/exercises';
+import type { ExerciseCompleteHandler, ExerciseItem } from '@/types/exercises';
 
 interface ExerciseRendererProps {
   exercise: ExerciseItem;
-  onComplete: (wasCorrect: boolean) => void;
+  onComplete: ExerciseCompleteHandler;
 }
 
 /** Picks the right exercise UI for `exercise.type`. Kid and adult components share word data but render entirely differently. */

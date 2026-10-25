@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { router } from 'expo-router';
 import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
 
@@ -6,7 +7,8 @@ import { Button } from '@/components/ui/Button';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Reveal } from '@/components/ui/Reveal';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
-import { colors, radii, spacing } from '@/constants/theme';
+import { radii, spacing, type ThemeColors } from '@/constants/theme';
+import { useTheme } from '@/lib/theme/ThemeContext';
 import { KIDS_SECTION_ENABLED } from '@/constants/features';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
 import { useAuth } from '@/lib/auth/AuthContext';
@@ -14,6 +16,8 @@ import { calculateAge } from '@/lib/age';
 import type { Profile } from '@/types/models';
 
 export default function ProfileSwitcher() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { profiles: allProfiles, setActiveProfileId } = useActiveProfile();
   const { signOut } = useAuth();
   // Kids section is hidden for now — don't list a kid profile as
@@ -40,8 +44,9 @@ export default function ProfileSwitcher() {
   };
 
   return (
-    <ScreenContainer>
-      <BackButton />
+    <ScreenContainer themed>
+      <BackButton themed />
+      <Text style={styles.eyebrow}>Profiles</Text>
       <Text style={styles.title}>Who&apos;s learning?</Text>
 
       <FlatList
@@ -63,25 +68,34 @@ export default function ProfileSwitcher() {
         )}
       />
 
-      <Button label="Add a profile" variant="secondary" onPress={() => router.push('/onboarding/goal-select')} />
-      <Button label="Sign out" variant="ghost" onPress={handleSignOut} style={{ marginTop: spacing.sm }} />
+      <Button themed label="Add a profile" variant="secondary" onPress={() => router.push('/onboarding/goal-select')} />
+      <Button themed label="Sign out" variant="ghost" onPress={handleSignOut} style={{ marginTop: spacing.sm }} />
     </ScreenContainer>
   );
 }
 
-const styles = StyleSheet.create({
-  title: { fontSize: 26, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md },
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    padding: spacing.md,
-    borderRadius: radii.lg,
-    backgroundColor: colors.surface,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-  },
-  avatar: { fontSize: 32 },
-  name: { fontSize: 17, fontWeight: '700', color: colors.textPrimary },
-  meta: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    eyebrow: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: colors.primary,
+      letterSpacing: 1,
+      textTransform: 'uppercase',
+      marginTop: spacing.md,
+    },
+    title: { fontSize: 30, fontWeight: '800', color: colors.textPrimary, marginTop: spacing.xs },
+    card: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      padding: spacing.md,
+      borderRadius: radii.lg,
+      backgroundColor: colors.surface,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+    },
+    avatar: { fontSize: 32 },
+    name: { fontSize: 17, fontWeight: '700', color: colors.textPrimary },
+    meta: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
+  });

@@ -1,33 +1,37 @@
 import { router, type Href } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Animated, StyleSheet, Text, View } from 'react-native';
 
 import { ExerciseRenderer } from '@/components/exercises/shared/ExerciseRenderer';
+import { RevisitIntro } from '@/components/session/RevisitIntro';
 import { SessionCompleteCard } from '@/components/session/SessionCompleteCard';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
-import { colors, radii, spacing } from '@/constants/theme';
+import { radii, spacing, type ThemeColors } from '@/constants/theme';
+import { useTheme } from '@/lib/theme/ThemeContext';
 import { fetchBadgeStats } from '@/data/badgeStats';
 import { fetchLessonMap } from '@/data/content';
 import { recordWordGroupResult } from '@/data/progress';
 import { recordSessionLog } from '@/data/sessionLogs';
 import { useExerciseQueue } from '@/hooks/useExerciseQueue';
-import { useFadeInOnChange } from '@/hooks/useFadeInOnChange';
+import { useSlideInOnChange } from '@/hooks/useSlideInOnChange';
 import { useSessionTimer } from '@/hooks/useSessionTimer';
 import { evaluateBadges, type Badge } from '@/lib/badges';
 import { getSeenBadgeIds, markBadgesSeen } from '@/lib/badgeProgress';
 import { masteryLabel, type MasteryLabel } from '@/lib/masteryStatus';
 import { recommendNextStep } from '@/lib/nextStepRecommendation';
+import { buildRevisitExercises, updateRevisitList } from '@/lib/speakingRevisit';
+import type { ExerciseItem, ExerciseOutcome } from '@/types/exercises';
 import type { DailyGoalMinutes, LessonWithState, SessionType, Track, WordGroupWithVariants } from '@/types/models';
 
-const MASTERY_BADGE_COLOR: Record<MasteryLabel, string> = {
+const masteryBadgeColors = (colors: ThemeColors): Record<MasteryLabel, string> => ({
   New: colors.textSecondary,
   Learning: colors.accent,
   'Almost there': colors.primaryDark,
   Mastered: colors.success,
-};
+});
 
 interface SessionRunnerProps {
   groups: WordGroupWithVariants[];
@@ -65,8 +69,26 @@ export function SessionRunner({
   currentLessonId,
   onComplete,
 }: SessionRunnerProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const timer = useSessionTimer(goalMinutes);
-  const { currentExercise, next } = useExerciseQueue(groups, track);
+  const { currentExercise: queuedExercise, next } = useExerciseQueue(groups, track);
+
+  // Words left mispronounced in speaking exercises are replayed once the time
+  // goal is reached, before the summary — see src/lib/speakingRevisit.ts.
+  const [revisitIds, setRevisitIds] = useState<string[]>([]);
+  const [phase, setPhase] = useState<'main' | 'revisit-intro' | 'revisit' | 'done'>('main');
+  const [revisitQueue, setRevisitQueue] = useState<ExerciseItem[]>([]);
+  const [revisitIndex, setRevisitIndex] = useState(0);
+
+  useEffect(() => {
+    if (timer.isComplete && phase === 'main') setPhase(revisitIds.length > 0 ? 'revisit-intro' : 'done');
+    // Only the goal being reached moves on from 'main'; revisitIds is read at that moment.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timer.isComplete, phase]);
+
+  const currentExercise = phase === 'revisit' ? (revisitQueue[revisitIndex] ?? null) : queuedExercise;
+  const showComplete = phase === 'done';
 
   useEffect(() => {
     if (timer.isComplete) onComplete?.();
@@ -76,7 +98,7 @@ export function SessionRunner({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timer.isComplete]);
   const destination = exitHref ?? '/home';
-  const fadeAnim = useFadeInOnChange(currentExercise?.key);
+  const slideIn = useSlideInOnChange(currentExercise?.key);
 
   const [stats, setStats] = useState({ correct: 0, incorrect: 0 });
   const practicedGroupIds = useRef(new Set<string>());
@@ -154,8 +176,18 @@ export function SessionRunner({
     [badgeAnim]
   );
 
-  const handleAnswer = (wasCorrect: boolean) => {
+  const startRevisit = () => {
+    setRevisitQueue(buildRevisitExercises(revisitIds, groups));
+    setRevisitIds([]); // one second chance per word, not a loop
+    setRevisitIndex(0);
+    setPhase('revisit');
+  };
+
+  const handleAnswer = (wasCorrect: boolean, outcome?: ExerciseOutcome) => {
     if (!currentExercise) return;
+    if (phase === 'main') {
+      setRevisitIds((prev) => updateRevisitList(prev, currentExercise.targetGroup.id, currentExercise, outcome));
+    }
     practicedGroupIds.current.add(currentExercise.targetGroup.id);
     setStats((prev) => ({
       correct: prev.correct + (wasCorrect ? 1 : 0),
@@ -166,6 +198,11 @@ export function SessionRunner({
       .catch(() => {
         // Progress is best-effort in v1; a failed write shouldn't block the session.
       });
+    if (phase === 'revisit') {
+      if (revisitIndex + 1 >= revisitQueue.length) setPhase('done');
+      else setRevisitIndex((i) => i + 1);
+      return;
+    }
     next();
   };
 
@@ -195,20 +232,20 @@ export function SessionRunner({
 
   if (groups.length === 0) {
     return (
-      <ScreenContainer>
+      <ScreenContainer themed>
         <Text style={styles.emptyText}>{emptyMessage}</Text>
       </ScreenContainer>
     );
   }
 
   return (
-    <ScreenContainer>
+    <ScreenContainer themed>
       <View style={styles.header}>
         <PressableScale haptic onPress={handleExitPress} accessibilityLabel="Exit session" style={styles.closeButton}>
           <Text style={styles.closeIcon}>✕</Text>
         </PressableScale>
         <View style={{ flex: 1 }}>
-          <ProgressBar progress={timer.goalSeconds > 0 ? timer.elapsedSeconds / timer.goalSeconds : 0} />
+          <ProgressBar themed progress={timer.goalSeconds > 0 ? timer.elapsedSeconds / timer.goalSeconds : 0} />
         </View>
       </View>
 
@@ -226,21 +263,25 @@ export function SessionRunner({
         ]}
       >
         {masteryBadge ? (
-          <View style={[styles.masteryBadge, { backgroundColor: MASTERY_BADGE_COLOR[masteryBadge] }]}>
+          <View style={[styles.masteryBadge, { backgroundColor: masteryBadgeColors(colors)[masteryBadge] }]}>
             <Text style={styles.masteryBadgeText}>{masteryBadge}</Text>
           </View>
         ) : null}
       </Animated.View>
 
-      {currentExercise ? (
-        <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
+      {phase === 'revisit' ? <Text style={styles.revisitLabel}>🔁 Revisiting tricky words</Text> : null}
+
+      {phase === 'revisit-intro' ? (
+        <RevisitIntro count={revisitIds.length} onStart={startRevisit} onSkip={() => setPhase('done')} />
+      ) : currentExercise ? (
+        <Animated.View style={[{ flex: 1 }, slideIn]}>
           <ExerciseRenderer exercise={currentExercise} onComplete={handleAnswer} />
         </Animated.View>
       ) : (
-        <LoadingScreen />
+        <LoadingScreen themed />
       )}
 
-      {timer.isComplete ? (
+      {showComplete ? (
         <SessionCompleteCard
           minutesLearned={Math.max(1, Math.round(timer.elapsedSeconds / 60))}
           wordsCount={practicedGroupIds.current.size}
@@ -249,7 +290,10 @@ export function SessionRunner({
           sessionType={sessionType}
           track={track}
           onClose={() => logAndExit()}
-          onAddMore={(minutes) => timer.addMinutes(minutes)}
+          onAddMore={(minutes) => {
+            timer.addMinutes(minutes);
+            setPhase('main');
+          }}
           onReviewWeakWords={
             sessionType !== 'review' && stats.incorrect > 0 ? () => logAndExit('/review') : undefined
           }
@@ -262,21 +306,23 @@ export function SessionRunner({
   );
 }
 
-const styles = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.lg },
-  closeButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.surface,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-  },
-  closeIcon: { fontSize: 16, color: colors.textSecondary },
-  masteryBadgeWrap: { position: 'absolute', top: 56, right: spacing.lg, zIndex: 1 },
-  masteryBadge: { borderRadius: radii.pill, paddingVertical: 4, paddingHorizontal: spacing.sm },
-  masteryBadgeText: { fontSize: 11, fontWeight: '700', color: colors.textOnPrimary },
-  emptyText: { fontSize: 16, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.xxl },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    revisitLabel: { fontSize: 12, fontWeight: '700', color: colors.primary, marginBottom: spacing.sm },
+    header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.lg },
+    closeButton: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surface,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+    },
+    closeIcon: { fontSize: 16, color: colors.textSecondary },
+    masteryBadgeWrap: { position: 'absolute', top: 56, right: spacing.lg, zIndex: 1 },
+    masteryBadge: { borderRadius: radii.pill, paddingVertical: 4, paddingHorizontal: spacing.sm },
+    masteryBadgeText: { fontSize: 11, fontWeight: '700', color: colors.textOnPrimary },
+    emptyText: { fontSize: 16, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.xxl },
+  });

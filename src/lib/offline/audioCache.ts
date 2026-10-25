@@ -101,6 +101,32 @@ function isValidAudioFile(file: File): boolean {
 }
 
 /**
+ * Supabase Storage answers a missing object with HTTP 400 (body:
+ * "Object not found" / NoSuchKey), not 404 — so a 400/404 here means the
+ * variant's audio_path points at a file that was never uploaded (e.g. seeded
+ * placeholder content), which is a content gap rather than an app error.
+ * Callers fall back to the on-device voice either way.
+ */
+const warnedUrls = new Set<string>();
+
+/** Warns once per URL per app session — a lesson prefetches every word's
+ * audio and each exercise resolves it again, so one missing file would
+ * otherwise repeat the same line many times. */
+function warnOnce(remoteUrl: string, message: string): void {
+  if (warnedUrls.has(remoteUrl)) return;
+  warnedUrls.add(remoteUrl);
+  console.warn(message);
+}
+
+function logUnreachable(remoteUrl: string, status: number, statusText: string): void {
+  if (status === 400 || status === 404) {
+    warnOnce(remoteUrl, `[audioCache] audio file not found in Storage (${status}) — using the on-device voice: ${remoteUrl}`);
+  } else {
+    console.error(`[audioCache] HEAD ${remoteUrl} -> ${status} ${statusText}`);
+  }
+}
+
+/**
  * Returns a playable URI for a variant's audio, preferring the local cache.
  * If not cached yet, attempts a download so future plays work offline. On
  * failure, this distinguishes two cases rather than treating them the same:
@@ -130,12 +156,12 @@ export async function ensureAudioCached(variant: Pick<WordVariant, 'audioPath' |
     try {
       const response = await fetch(remoteUrl, { method: 'HEAD' });
       if (!response.ok) {
-        console.error(`[audioCache] HEAD ${remoteUrl} -> ${response.status} ${response.statusText}`);
+        logUnreachable(remoteUrl, response.status, response.statusText);
         return null;
       }
       return remoteUrl;
     } catch (err) {
-      console.error(`[audioCache] HEAD ${remoteUrl} failed`, err);
+      warnOnce(remoteUrl, `[audioCache] couldn't reach ${remoteUrl} (offline?) — using the on-device voice. ${String(err)}`);
       return null;
     }
   }
@@ -165,22 +191,25 @@ export async function ensureAudioCached(variant: Pick<WordVariant, 'audioPath' |
     }
     const response = await fetch(remoteUrl, { method: 'HEAD' });
     if (!response.ok) {
-      console.error(`[audioCache] HEAD ${remoteUrl} -> ${response.status} ${response.statusText}`);
+      logUnreachable(remoteUrl, response.status, response.statusText);
       return null;
     }
     return remoteUrl;
   } catch (downloadErr) {
-    console.error(`[audioCache] downloadFileAsync ${remoteUrl} failed, falling back to HEAD check`, downloadErr);
+    // Expected for a missing file (downloadFileAsync rejects on any non-2xx,
+    // e.g. Storage's 400 "Object not found") and when offline — not an error
+    // in itself. The HEAD check below decides which, and logs accordingly.
+    void downloadErr;
     try {
       const response = await fetch(remoteUrl, { method: 'HEAD' });
       if (!response.ok) {
-        console.error(`[audioCache] HEAD ${remoteUrl} -> ${response.status} ${response.statusText}`);
+        logUnreachable(remoteUrl, response.status, response.statusText);
         return null;
       }
       return remoteUrl;
     } catch (headErr) {
       // Genuinely offline with nothing cached — no audio available right now.
-      console.error(`[audioCache] HEAD ${remoteUrl} also failed — treating as offline/unreachable`, headErr);
+      warnOnce(remoteUrl, `[audioCache] couldn't reach ${remoteUrl} (offline?) — using the on-device voice. ${String(headErr)}`);
       return null;
     }
   }

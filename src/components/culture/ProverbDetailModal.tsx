@@ -1,9 +1,10 @@
 import * as Haptics from 'expo-haptics';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { PressableScale } from '@/components/ui/PressableScale';
-import { colors, radii, shadows, spacing } from '@/constants/theme';
+import { radii, shadows, spacing, type ThemeColors } from '@/constants/theme';
+import { useTheme } from '@/lib/theme/ThemeContext';
 import type { Proverb } from '@/constants/proverbs';
 import { useLetterSpeech } from '@/hooks/useLetterSpeech';
 
@@ -21,6 +22,8 @@ const CATEGORY_LABEL: Record<Proverb['category'], string> = {
 };
 
 export function ProverbDetailModal({ proverb, onClose }: ProverbDetailModalProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { speak, isSpeaking } = useLetterSpeech();
   const backdropAnim = useRef(new Animated.Value(0)).current;
   const contentAnim = useRef(new Animated.Value(0)).current;
@@ -95,76 +98,77 @@ export function ProverbDetailModal({ proverb, onClose }: ProverbDetailModalProps
   );
 }
 
-const styles = StyleSheet.create({
-  overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(36, 32, 33, 0.45)' },
-  sheet: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: radii.lg,
-    borderTopRightRadius: radii.lg,
-    padding: spacing.lg,
-    maxHeight: '80%',
-  },
-  closeButton: {
-    alignSelf: 'flex-end',
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  closeIcon: { fontSize: 18, color: colors.textPrimary },
-  emoji: { fontSize: 56, textAlign: 'center', marginTop: spacing.sm },
-  categoryBadge: {
-    alignSelf: 'center',
-    backgroundColor: colors.background,
-    borderRadius: radii.pill,
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.md,
-    marginTop: spacing.sm,
-  },
-  categoryText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.primaryDark,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  arabic: {
-    fontSize: 28,
-    lineHeight: 42,
-    textAlign: 'center',
-    color: colors.textPrimary,
-    marginTop: spacing.lg,
-    paddingHorizontal: spacing.sm,
-  },
-  transliteration: {
-    fontSize: 15,
-    color: colors.textSecondary,
-    fontStyle: 'italic',
-    textAlign: 'center',
-    marginTop: spacing.sm,
-  },
-  playButton: {
-    alignSelf: 'center',
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: spacing.md,
-    marginBottom: spacing.lg,
-    ...shadows.card,
-  },
-  playButtonActive: { backgroundColor: colors.primaryDark },
-  playIcon: { fontSize: 22, color: colors.textOnPrimary },
-  sectionLabel: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.sm },
-  card: {
-    backgroundColor: colors.background,
-    borderRadius: radii.md,
-    padding: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  cardText: { fontSize: 15, lineHeight: 22, color: colors.textPrimary },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(36, 32, 33, 0.45)' },
+    sheet: {
+      backgroundColor: colors.surface,
+      borderTopLeftRadius: radii.lg,
+      borderTopRightRadius: radii.lg,
+      padding: spacing.lg,
+      maxHeight: '80%',
+    },
+    closeButton: {
+      alignSelf: 'flex-end',
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: colors.background,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    closeIcon: { fontSize: 18, color: colors.textPrimary },
+    emoji: { fontSize: 56, textAlign: 'center', marginTop: spacing.sm },
+    categoryBadge: {
+      alignSelf: 'center',
+      backgroundColor: colors.background,
+      borderRadius: radii.pill,
+      paddingVertical: spacing.xs,
+      paddingHorizontal: spacing.md,
+      marginTop: spacing.sm,
+    },
+    categoryText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: colors.primary,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    arabic: {
+      fontSize: 28,
+      lineHeight: 42,
+      textAlign: 'center',
+      color: colors.textPrimary,
+      marginTop: spacing.lg,
+      paddingHorizontal: spacing.sm,
+    },
+    transliteration: {
+      fontSize: 15,
+      color: colors.textSecondary,
+      fontStyle: 'italic',
+      textAlign: 'center',
+      marginTop: spacing.sm,
+    },
+    playButton: {
+      alignSelf: 'center',
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: spacing.md,
+      marginBottom: spacing.lg,
+      ...shadows.card,
+    },
+    playButtonActive: { backgroundColor: colors.primaryDark },
+    playIcon: { fontSize: 22, color: colors.textOnPrimary },
+    sectionLabel: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.sm },
+    card: {
+      backgroundColor: colors.background,
+      borderRadius: radii.md,
+      padding: spacing.md,
+      marginBottom: spacing.lg,
+    },
+    cardText: { fontSize: 15, lineHeight: 22, color: colors.textPrimary },
+  });

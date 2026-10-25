@@ -46,7 +46,8 @@ export function useTutorSpeech(): TutorSpeech {
       try {
         lastFileRef.current?.delete();
         const file = new File(Paths.cache, `tutor-speech-${Date.now()}.mp3`);
-        file.write(result.bytes);
+        // Async as of SDK 58 — must finish before the player reads the file.
+        await file.write(result.bytes);
         lastFileRef.current = file;
         player.replace({ uri: file.uri });
         await player.seekTo(0);

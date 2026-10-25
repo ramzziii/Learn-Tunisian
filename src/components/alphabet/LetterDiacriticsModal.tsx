@@ -1,9 +1,10 @@
 import * as Haptics from 'expo-haptics';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { PressableScale } from '@/components/ui/PressableScale';
-import { colors, radii, shadows, spacing } from '@/constants/theme';
+import { radii, shadows, spacing, type ThemeColors } from '@/constants/theme';
+import { useTheme } from '@/lib/theme/ThemeContext';
 import { getVocalizedForms, splitAtLetter, type ArabicLetter, type DiacriticId } from '@/lib/alphabet';
 import { useLetterSpeech } from '@/hooks/useLetterSpeech';
 
@@ -14,11 +15,11 @@ interface LetterDiacriticsModalProps {
 
 // Reuses the app's existing palette rather than introducing new colors — one
 // accent per vowel so the three rows stay easy to tell apart at a glance.
-const ACCENT_BY_DIACRITIC: Record<DiacriticId, string> = {
+const accentByDiacritic = (colors: ThemeColors): Record<DiacriticId, string> => ({
   fatha: colors.primary,
   damma: colors.accent,
   kasra: colors.success,
-};
+});
 
 type PlaybackTarget = 'glyph' | 'word';
 
@@ -31,6 +32,8 @@ const CARD_ROW_HEIGHT = 84;
 
 /** For a selected letter, shows its three short-vowel forms (fatha/damma/kasra) — each tappable to hear it, with an example word demonstrating that vowel. */
 export function LetterDiacriticsModal({ letter, onClose }: LetterDiacriticsModalProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { speak, isSpeaking } = useLetterSpeech();
   const backdropAnim = useRef(new Animated.Value(0)).current;
   const cardAnims = useRef([new Animated.Value(0), new Animated.Value(0), new Animated.Value(0)]).current;
@@ -98,7 +101,7 @@ export function LetterDiacriticsModal({ letter, onClose }: LetterDiacriticsModal
               {forms.map(({ diacritic, glyph, reading, example }, index) => {
                 const diacriticId = diacritic.id as DiacriticId;
                 const highlighted = letter ? splitAtLetter(example.arabic, letter) : null;
-                const accent = ACCENT_BY_DIACRITIC[diacriticId];
+                const accent = accentByDiacritic(colors)[diacriticId];
                 const isGlyphActive = activeKey === `${diacriticId}-glyph`;
                 const isWordActive = activeKey === `${diacriticId}-word`;
                 const cardAnim = cardAnims[index];
@@ -170,95 +173,96 @@ export function LetterDiacriticsModal({ letter, onClose }: LetterDiacriticsModal
   );
 }
 
-const styles = StyleSheet.create({
-  overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(36, 32, 33, 0.45)' },
-  sheet: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: radii.lg,
-    borderTopRightRadius: radii.lg,
-    padding: spacing.lg,
-    maxHeight: '80%',
-  },
-  closeButton: {
-    alignSelf: 'flex-end',
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  closeIcon: { fontSize: 18, color: colors.textPrimary },
-  headingLetter: { fontSize: 64, textAlign: 'center', color: colors.textPrimary, marginTop: spacing.sm },
-  title: { fontSize: 22, fontWeight: '800', color: colors.textPrimary, textAlign: 'center' },
-  playButton: {
-    alignSelf: 'center',
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: spacing.md,
-    ...shadows.card,
-  },
-  playButtonActive: { backgroundColor: colors.primaryDark },
-  playIcon: { fontSize: 22, color: colors.textOnPrimary },
-  subtitle: { fontSize: 13, color: colors.textSecondary },
-  sectionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: spacing.lg,
-    marginBottom: spacing.sm,
-  },
-  sectionLabel: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.background,
-    borderRadius: radii.md,
-    borderLeftWidth: 4,
-    padding: spacing.sm,
-    marginBottom: spacing.sm,
-  },
-  glyphButton: {
-    width: 76,
-    height: CARD_ROW_HEIGHT,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: radii.md,
-    borderWidth: 2,
-    borderColor: 'transparent',
-    ...shadows.card,
-  },
-  glyph: { fontSize: 30 },
-  reading: { fontSize: 13, fontWeight: '700', color: colors.primaryDark, marginTop: 2 },
-  diacriticName: { fontSize: 10, color: colors.textSecondary, marginTop: 1 },
-  contentBlock: { flex: 1, minWidth: 0 },
-  pictureRow: {
-    height: CARD_ROW_HEIGHT,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    backgroundColor: colors.surface,
-    borderRadius: radii.md,
-    borderWidth: 2,
-    borderColor: 'transparent',
-    paddingHorizontal: spacing.sm,
-    ...shadows.card,
-  },
-  pictureBox: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
-  pictureEmoji: { fontSize: 24 },
-  pictureTextColumn: { flexShrink: 1, minWidth: 0 },
-  pictureCaption: { fontSize: 18, color: colors.textPrimary },
-  // No bold weight, explicit matching fontSize — a heavier weight renders
-  // visibly larger for this Arabic glyph shape even at an identical
-  // fontSize, which reads as "bigger" rather than just "different color"
-  // (same fix already applied on the Flashcards screen and Letters modal).
-  pictureCaptionHighlight: { fontSize: 18, fontWeight: '400' },
-  meaningText: { fontSize: 12, color: colors.textSecondary, textTransform: 'capitalize', marginTop: 1 },
-  pictureAudioHint: { fontSize: 13, marginLeft: 'auto', opacity: 0.6 },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(36, 32, 33, 0.45)' },
+    sheet: {
+      backgroundColor: colors.surface,
+      borderTopLeftRadius: radii.lg,
+      borderTopRightRadius: radii.lg,
+      padding: spacing.lg,
+      maxHeight: '80%',
+    },
+    closeButton: {
+      alignSelf: 'flex-end',
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: colors.background,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    closeIcon: { fontSize: 18, color: colors.textPrimary },
+    headingLetter: { fontSize: 64, textAlign: 'center', color: colors.textPrimary, marginTop: spacing.sm },
+    title: { fontSize: 22, fontWeight: '800', color: colors.textPrimary, textAlign: 'center' },
+    playButton: {
+      alignSelf: 'center',
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: spacing.md,
+      ...shadows.card,
+    },
+    playButtonActive: { backgroundColor: colors.primaryDark },
+    playIcon: { fontSize: 22, color: colors.textOnPrimary },
+    subtitle: { fontSize: 13, color: colors.textSecondary },
+    sectionRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginTop: spacing.lg,
+      marginBottom: spacing.sm,
+    },
+    sectionLabel: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+    card: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      backgroundColor: colors.background,
+      borderRadius: radii.md,
+      borderLeftWidth: 4,
+      padding: spacing.sm,
+      marginBottom: spacing.sm,
+    },
+    glyphButton: {
+      width: 76,
+      height: CARD_ROW_HEIGHT,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surface,
+      borderRadius: radii.md,
+      borderWidth: 2,
+      borderColor: 'transparent',
+      ...shadows.card,
+    },
+    glyph: { fontSize: 30 },
+    reading: { fontSize: 13, fontWeight: '700', color: colors.primary, marginTop: 2 },
+    diacriticName: { fontSize: 10, color: colors.textSecondary, marginTop: 1 },
+    contentBlock: { flex: 1, minWidth: 0 },
+    pictureRow: {
+      height: CARD_ROW_HEIGHT,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      backgroundColor: colors.surface,
+      borderRadius: radii.md,
+      borderWidth: 2,
+      borderColor: 'transparent',
+      paddingHorizontal: spacing.sm,
+      ...shadows.card,
+    },
+    pictureBox: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
+    pictureEmoji: { fontSize: 24 },
+    pictureTextColumn: { flexShrink: 1, minWidth: 0 },
+    pictureCaption: { fontSize: 18, color: colors.textPrimary },
+    // No bold weight, explicit matching fontSize — a heavier weight renders
+    // visibly larger for this Arabic glyph shape even at an identical
+    // fontSize, which reads as "bigger" rather than just "different color"
+    // (same fix already applied on the Flashcards screen and Letters modal).
+    pictureCaptionHighlight: { fontSize: 18, fontWeight: '400' },
+    meaningText: { fontSize: 12, color: colors.textSecondary, textTransform: 'capitalize', marginTop: 1 },
+    pictureAudioHint: { fontSize: 13, marginLeft: 'auto', opacity: 0.6 },
+  });

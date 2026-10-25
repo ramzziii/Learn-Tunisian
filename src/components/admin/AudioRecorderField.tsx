@@ -23,6 +23,13 @@ interface AudioRecorderFieldProps {
    * The previous audio file is only deleted once this resolves with the new
    * path, so an old (but working) file is never removed prematurely. */
   onUploaded: (audioPath: string) => Promise<string | null>;
+  /** When given, every successful recording is followed by "Add this
+   * recording to Repeat After Me?". `onDecide` must persist the answer and
+   * reject if it couldn't — nothing is confirmed until it resolves. */
+  repeatAfterMe?: {
+    isIncluded: boolean;
+    onDecide: (include: boolean) => Promise<void>;
+  };
 }
 
 /**
@@ -32,13 +39,24 @@ interface AudioRecorderFieldProps {
  * turns — see that hook's own comment for why reusing it here caused a
  * stale-timer crash.
  */
-export function AudioRecorderField({ wordGroupId, variantId, currentAudioPath, updatedAt, onUploaded }: AudioRecorderFieldProps) {
+export function AudioRecorderField({
+  wordGroupId,
+  variantId,
+  currentAudioPath,
+  updatedAt,
+  onUploaded,
+  repeatAfterMe,
+}: AudioRecorderFieldProps) {
   const recorder = useAdminAudioRecorder();
   const [recordedUri, setRecordedUri] = useState<string | null>(null);
   const [savedAudioPath, setSavedAudioPath] = useState<string | null>(currentAudioPath);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [isAskingRepeatAfterMe, setIsAskingRepeatAfterMe] = useState(false);
+  const [repeatAfterMeDeciding, setRepeatAfterMeDeciding] = useState<boolean | null>(null);
+  const [repeatAfterMeMessage, setRepeatAfterMeMessage] = useState<string | null>(null);
+  const [repeatAfterMeError, setRepeatAfterMeError] = useState<string | null>(null);
   // Starts in sync with the real updatedAt from the DB; bumped to Date.now()
   // immediately on a successful save (below) so the preview doesn't wait on
   // the round-trip that updates the `updatedAt` prop, then re-syncs to the
@@ -63,7 +81,31 @@ export function AudioRecorderField({ wordGroupId, variantId, currentAudioPath, u
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const decideRepeatAfterMe = async (include: boolean) => {
+    if (!repeatAfterMe || repeatAfterMeDeciding !== null) return;
+    setRepeatAfterMeError(null);
+    setRepeatAfterMeDeciding(include);
+    try {
+      await repeatAfterMe.onDecide(include);
+      setIsAskingRepeatAfterMe(false);
+      setRepeatAfterMeMessage(
+        include
+          ? 'Added to Repeat After Me — learners see it once this word is approved.'
+          : repeatAfterMe.isIncluded
+            ? 'Removed from Repeat After Me.'
+            : 'Not in Repeat After Me.'
+      );
+    } catch (err) {
+      // Keep the question up so the admin can retry; never show success.
+      setRepeatAfterMeError(`Couldn't update Repeat After Me: ${err instanceof Error ? err.message : 'unknown error'}`);
+    } finally {
+      setRepeatAfterMeDeciding(null);
+    }
+  };
+
   const handleRecordPress = async () => {
+    setRepeatAfterMeMessage(null);
+    setRepeatAfterMeError(null);
     setError(null);
     if (recorder.permission !== 'ready') {
       await recorder.requestPermission();
@@ -104,6 +146,8 @@ export function AudioRecorderField({ wordGroupId, variantId, currentAudioPath, u
       setPreviewVersion(Date.now());
       setRecordedUri(null);
       setSuccessMessage('Audio saved successfully.');
+      // Only asked after the new recording is durably saved.
+      if (repeatAfterMe) setIsAskingRepeatAfterMe(true);
       if (previousPath && previousPath !== path) invalidateCachedAudio(previousPath);
     } catch (err) {
       // recordedUri is kept so the admin can retry without re-recording.
@@ -121,6 +165,31 @@ export function AudioRecorderField({ wordGroupId, variantId, currentAudioPath, u
     <View style={styles.container}>
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
       {successMessage ? <Text style={styles.successText}>{successMessage}</Text> : null}
+
+      {repeatAfterMe && isAskingRepeatAfterMe ? (
+        <View style={styles.repeatAfterMePrompt}>
+          <Text style={styles.repeatAfterMeQuestion}>Add this recording to Repeat After Me?</Text>
+          {repeatAfterMeError ? <Text style={styles.errorText}>{repeatAfterMeError}</Text> : null}
+          <View style={styles.row}>
+            <Button
+              label={repeatAfterMe.isIncluded ? 'Remove from Repeat After Me' : 'Not now'}
+              variant="ghost"
+              onPress={() => decideRepeatAfterMe(false)}
+              loading={repeatAfterMeDeciding === false}
+              disabled={repeatAfterMeDeciding !== null}
+              style={{ flex: 1 }}
+            />
+            <Button
+              label="Add to Repeat After Me"
+              onPress={() => decideRepeatAfterMe(true)}
+              loading={repeatAfterMeDeciding === true}
+              disabled={repeatAfterMeDeciding !== null}
+              style={{ flex: 1 }}
+            />
+          </View>
+        </View>
+      ) : null}
+      {repeatAfterMeMessage ? <Text style={styles.successText}>{repeatAfterMeMessage}</Text> : null}
 
       {savedAudioPath && !recordedUri ? <Text style={styles.currentPath}>Current: {savedAudioPath}</Text> : null}
       {recordedUri ? <Text style={styles.currentPath}>New recording ready — preview, then save.</Text> : null}
@@ -153,6 +222,13 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: spacing.sm },
   currentPath: { fontSize: 11, color: colors.textSecondary },
   successText: { fontSize: 12, color: colors.success },
+  repeatAfterMePrompt: {
+    gap: spacing.xs,
+    padding: spacing.sm,
+    borderRadius: radii.sm,
+    backgroundColor: `${colors.primary}14`,
+  },
+  repeatAfterMeQuestion: { fontSize: 13, fontWeight: '700', color: colors.textPrimary },
   errorText: { fontSize: 12, color: colors.error },
   deniedText: {
     fontSize: 12,

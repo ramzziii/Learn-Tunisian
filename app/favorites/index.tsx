@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 
 import { BackButton } from '@/components/ui/BackButton';
@@ -7,13 +7,16 @@ import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Reveal } from '@/components/ui/Reveal';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
-import { colors, radii, shadows, spacing } from '@/constants/theme';
+import { radii, shadows, spacing, type ThemeColors } from '@/constants/theme';
+import { useTheme } from '@/lib/theme/ThemeContext';
 import { fetchFavoriteWordGroups } from '@/data/favorites';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
 import { getPromptVariant } from '@/lib/wordVariants';
 import type { WordGroupWithVariants } from '@/types/models';
 
 export default function Favorites() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { activeProfile } = useActiveProfile();
   const [groups, setGroups] = useState<WordGroupWithVariants[] | null>(null);
 
@@ -22,11 +25,12 @@ export default function Favorites() {
     fetchFavoriteWordGroups(activeProfile.id).then(setGroups);
   }, [activeProfile]);
 
-  if (!groups) return <LoadingScreen />;
+  if (!groups) return <LoadingScreen themed />;
 
   return (
-    <ScreenContainer>
-      <BackButton />
+    <ScreenContainer themed>
+      <BackButton themed />
+      <Text style={styles.eyebrow}>Saved for later</Text>
       <Text style={styles.title}>Favorites</Text>
 
       {groups.length === 0 ? (
@@ -64,21 +68,30 @@ export default function Favorites() {
   );
 }
 
-const styles = StyleSheet.create({
-  title: { fontSize: 24, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    padding: spacing.md,
-    borderRadius: radii.md,
-    backgroundColor: colors.surface,
-  },
-  arabic: { fontSize: 20, color: colors.textPrimary, fontWeight: '600' },
-  meaning: { fontSize: 13, color: colors.textSecondary, marginTop: 2, textTransform: 'capitalize' },
-  star: { fontSize: 18 },
-  emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
-  emptyEmoji: { fontSize: 48, marginBottom: spacing.sm, color: colors.textSecondary },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
-  emptyBody: { fontSize: 14, color: colors.textSecondary, textAlign: 'center' },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    eyebrow: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: colors.primary,
+      letterSpacing: 1,
+      textTransform: 'uppercase',
+      marginTop: spacing.md,
+    },
+    title: { fontSize: 30, fontWeight: '800', color: colors.textPrimary, marginTop: spacing.xs },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      padding: spacing.md,
+      borderRadius: radii.md,
+      backgroundColor: colors.surface,
+    },
+    arabic: { fontSize: 20, color: colors.textPrimary, fontWeight: '600' },
+    meaning: { fontSize: 13, color: colors.textSecondary, marginTop: 2, textTransform: 'capitalize' },
+    star: { fontSize: 18 },
+    emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
+    emptyEmoji: { fontSize: 48, marginBottom: spacing.sm, color: colors.textSecondary },
+    emptyTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
+    emptyBody: { fontSize: 14, color: colors.textSecondary, textAlign: 'center' },
+  });

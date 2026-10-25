@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AlphabetChooseSoundExercise } from '@/components/alphabet/AlphabetChooseSoundExercise';
@@ -8,9 +8,12 @@ import { AlphabetTrueFalseExercise } from '@/components/alphabet/AlphabetTrueFal
 import { Button } from '@/components/ui/Button';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
-import { colors, radii, shadows, spacing } from '@/constants/theme';
+import { radii, shadows, spacing, type ThemeColors } from '@/constants/theme';
+import { useTheme } from '@/lib/theme/ThemeContext';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
-import { buildAlphabetExerciseQueue, type AlphabetExerciseItem } from '@/lib/alphabet';
+import { usePremium } from '@/lib/premium/PremiumContext';
+import { ARABIC_LETTERS, buildAlphabetExerciseQueue, type AlphabetExerciseItem } from '@/lib/alphabet';
+import { accessibleLetters } from '@/lib/premium/access';
 import { markLettersPracticed } from '@/lib/alphabetProgress';
 import { useFadeInOnChange } from '@/hooks/useFadeInOnChange';
 
@@ -21,8 +24,15 @@ interface AlphabetPracticeSessionProps {
 }
 
 export function AlphabetPracticeSession({ onExit }: AlphabetPracticeSessionProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { activeProfile } = useActiveProfile();
-  const [queue, setQueue] = useState<AlphabetExerciseItem[]>(() => buildAlphabetExerciseQueue(QUEUE_SIZE));
+  // A free profile's round only asks about the free letters (see
+  // src/lib/premium/access.ts) — decided when the round is built.
+  const { isPremium } = usePremium();
+  const [queue, setQueue] = useState<AlphabetExerciseItem[]>(() =>
+    buildAlphabetExerciseQueue(QUEUE_SIZE, accessibleLetters(isPremium, ARABIC_LETTERS))
+  );
   const [index, setIndex] = useState(0);
   const [missedLetterIds, setMissedLetterIds] = useState<string[]>([]);
   const [correctLetterIds, setCorrectLetterIds] = useState<string[]>([]);
@@ -73,13 +83,13 @@ export function AlphabetPracticeSession({ onExit }: AlphabetPracticeSessionProps
   };
 
   return (
-    <ScreenContainer style={styles.screen}>
+    <ScreenContainer themed style={styles.screen}>
       <View style={styles.topbar}>
         <Pressable onPress={onExit} style={styles.closeButton}>
           <Text style={styles.closeIcon}>✕</Text>
         </Pressable>
         <View style={styles.progressTrack}>
-          <ProgressBar progress={progress} />
+          <ProgressBar themed progress={progress} />
         </View>
       </View>
 
@@ -130,6 +140,8 @@ function SummaryCard({
   onReviewMistakes: () => void;
   onSkip: () => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const pop = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -148,7 +160,7 @@ function SummaryCard({
           <Text style={styles.summaryEmoji}>🎉</Text>
           <Text style={styles.summaryTitle}>Nice work!</Text>
           <Text style={styles.summaryBody}>You got every letter right this round.</Text>
-          <Button label="Close" onPress={onSkip} style={styles.summaryCta} />
+          <Button themed label="Close" onPress={onSkip} style={styles.summaryCta} />
         </Animated.View>
       </View>
     );
@@ -163,7 +175,7 @@ function SummaryCard({
           Would you like to review the {missedCount} {missedCount === 1 ? 'letter' : 'letters'} you missed before
           moving on?
         </Text>
-        <Button label="Review Mistakes" onPress={onReviewMistakes} style={styles.summaryCta} />
+        <Button themed label="Review Mistakes" onPress={onReviewMistakes} style={styles.summaryCta} />
         <Pressable onPress={onSkip} style={styles.skipButton}>
           <Text style={styles.skipText}>Skip</Text>
         </Pressable>
@@ -172,30 +184,31 @@ function SummaryCard({
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { backgroundColor: '#F7F5F2', paddingHorizontal: spacing.lg },
-  topbar: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.md },
-  closeButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  closeIcon: { fontSize: 26, color: colors.textPrimary },
-  progressTrack: { flex: 1, marginLeft: spacing.md },
-  summary: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.lg },
-  summaryCard: {
-    width: '100%',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-    padding: spacing.xl,
-  },
-  summaryEmoji: { fontSize: 64, marginBottom: spacing.md },
-  summaryTitle: { fontSize: 24, fontWeight: '800', color: colors.textPrimary, textAlign: 'center' },
-  summaryBody: {
-    fontSize: 15,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    marginTop: spacing.sm,
-    marginBottom: spacing.xl,
-  },
-  summaryCta: { width: '100%' },
-  skipButton: { marginTop: spacing.lg, padding: spacing.sm },
-  skipText: { fontSize: 15, color: colors.textSecondary, fontWeight: '600' },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    screen: { backgroundColor: colors.background, paddingHorizontal: spacing.lg },
+    topbar: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.md },
+    closeButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+    closeIcon: { fontSize: 26, color: colors.textPrimary },
+    progressTrack: { flex: 1, marginLeft: spacing.md },
+    summary: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.lg },
+    summaryCard: {
+      width: '100%',
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderRadius: radii.lg,
+      padding: spacing.xl,
+    },
+    summaryEmoji: { fontSize: 64, marginBottom: spacing.md },
+    summaryTitle: { fontSize: 24, fontWeight: '800', color: colors.textPrimary, textAlign: 'center' },
+    summaryBody: {
+      fontSize: 15,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      marginTop: spacing.sm,
+      marginBottom: spacing.xl,
+    },
+    summaryCta: { width: '100%' },
+    skipButton: { marginTop: spacing.lg, padding: spacing.sm },
+    skipText: { fontSize: 15, color: colors.textSecondary, fontWeight: '600' },
+  });

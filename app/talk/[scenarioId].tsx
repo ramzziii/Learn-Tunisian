@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { File } from 'expo-file-system';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { BackButton } from '@/components/ui/BackButton';
@@ -10,7 +10,8 @@ import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { findTalkScenario } from '@/constants/talkScenarios';
-import { colors, radii, shadows, spacing } from '@/constants/theme';
+import { radii, shadows, spacing, type ThemeColors } from '@/constants/theme';
+import { useTheme } from '@/lib/theme/ThemeContext';
 import { type ConversationMessage, useConversation } from '@/hooks/useConversation';
 import { useTutorSpeech } from '@/hooks/useTutorSpeech';
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
@@ -37,6 +38,8 @@ const ERROR_MESSAGES: Record<string, string> = {
 const VOICE_INPUT_AVAILABLE = !isUsingMockAiProvider;
 
 export default function TalkConversation() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { scenarioId } = useLocalSearchParams<{ scenarioId: string }>();
   const { activeProfile } = useActiveProfile();
   const [input, setInput] = useState('');
@@ -78,14 +81,14 @@ export default function TalkConversation() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages]);
 
-  if (!activeProfile) return <LoadingScreen />;
+  if (!activeProfile) return <LoadingScreen themed />;
 
   // Same defense-in-depth as the scenario picker — a kid profile reaching
   // this route directly (e.g. a stale deep link) never sees the feature.
   if (!canAccessTalkFeature(activeProfile.track)) {
     return (
-      <ScreenContainer>
-        <BackButton />
+      <ScreenContainer themed>
+        <BackButton themed />
         <View style={styles.centered}>
           <Text style={styles.centeredEmoji}>🌱</Text>
           <Text style={styles.centeredTitle}>Coming soon!</Text>
@@ -96,11 +99,11 @@ export default function TalkConversation() {
 
   if (!scenario) {
     return (
-      <ScreenContainer>
-        <BackButton />
+      <ScreenContainer themed>
+        <BackButton themed />
         <View style={styles.centered}>
           <Text style={styles.centeredTitle}>We couldn&apos;t find that conversation.</Text>
-          <Button label="Back to situations" variant="secondary" onPress={() => router.replace('/talk')} />
+          <Button themed label="Back to situations" variant="secondary" onPress={() => router.replace('/talk')} />
         </View>
       </ScreenContainer>
     );
@@ -157,9 +160,9 @@ export default function TalkConversation() {
   const isBusy = status === 'sending' || status === 'loading' || isTranscribing;
 
   return (
-    <ScreenContainer>
+    <ScreenContainer themed>
       <View style={styles.header}>
-        <BackButton />
+        <BackButton themed />
         <Text style={styles.headerTitle}>
           {scenario.emoji} {scenario.title}
         </Text>
@@ -191,9 +194,9 @@ export default function TalkConversation() {
           <View style={styles.errorBanner}>
             <Text style={styles.errorText}>{ERROR_MESSAGES[error.kind] ?? ERROR_MESSAGES.provider_error}</Text>
             {error.kind === 'daily_limit_reached' ? (
-              <Button label="Back to situations" variant="secondary" onPress={() => router.replace('/talk')} />
+              <Button themed label="Back to situations" variant="secondary" onPress={() => router.replace('/talk')} />
             ) : (
-              <Button label="Try again" variant="secondary" onPress={retry} />
+              <Button themed label="Try again" variant="secondary" onPress={retry} />
             )}
           </View>
         ) : null}
@@ -205,7 +208,7 @@ export default function TalkConversation() {
             <Text style={styles.finishedBody}>
               You practiced {vocabulary.length > 0 ? `${vocabulary.length} words` : 'this conversation'} in {scenario.title.toLowerCase()}.
             </Text>
-            <Button label="Done" onPress={() => router.replace('/talk')} />
+            <Button themed label="Done" onPress={() => router.replace('/talk')} />
           </View>
         ) : null}
       </ScrollView>
@@ -302,6 +305,8 @@ function TutorBubble({
   isSpeaking: boolean;
   speechError: boolean;
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const wordHelp = buildWordHelp(response.tunisian, vocabulary);
 
   return (
@@ -362,6 +367,8 @@ function TutorBubble({
 }
 
 function LearnerBubble({ text }: { text: string }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <View style={[styles.bubble, styles.learnerBubble]}>
       <Text style={styles.learnerLabel}>You</Text>
@@ -381,6 +388,8 @@ function SuggestedReplyChip({
   onPress: () => void;
   onSpeak: () => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <View style={[styles.chip, disabled && styles.chipDisabled]}>
       <PressableScale onPress={onSpeak} accessibilityLabel="Hear this phrase" style={styles.chipSpeakButton}>
@@ -419,6 +428,8 @@ function ListeningBar({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   // Each bar hops to its own random height on its own random cadence
   // (rather than one shared fixed oscillation), so the waveform reads as
   // reacting to live audio instead of visibly looping.
@@ -495,147 +506,148 @@ function ListeningBar({
   );
 }
 
-const styles = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md },
-  messages: { flex: 1 },
-  messagesContent: { paddingBottom: spacing.md, gap: spacing.sm },
-  bubble: { borderRadius: radii.lg, padding: spacing.md, maxWidth: '90%' },
-  tutorBubble: { backgroundColor: colors.surface, alignSelf: 'flex-start' },
-  tutorHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  tutorLabel: { fontSize: 11, fontWeight: '700', color: colors.textSecondary },
-  replayButton: { padding: spacing.xs },
-  replayIcon: { fontSize: 16 },
-  tunisianText: { fontSize: 20, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.xs },
-  transliterationText: { fontSize: 13, color: colors.textSecondary, fontStyle: 'italic', marginTop: 2 },
-  englishText: { fontSize: 14, color: colors.textSecondary, marginTop: spacing.xs },
-  correctionBox: { backgroundColor: '#FFF8E7', borderRadius: radii.sm, padding: spacing.sm, marginTop: spacing.sm },
-  correctionLabel: { fontSize: 11, fontWeight: '700', color: colors.accent, marginBottom: 2 },
-  correctionText: { fontSize: 14, color: colors.textPrimary },
-  correctionExplanation: { fontSize: 12, color: colors.textSecondary, fontStyle: 'italic' },
-  helpButton: { marginTop: spacing.sm, alignSelf: 'flex-start' },
-  helpButtonText: { fontSize: 12, fontWeight: '600', color: colors.primary },
-  helpPanel: { marginTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.sm, gap: 2 },
-  helpLine: { fontSize: 13, color: colors.textPrimary },
-  helpLineLabel: { fontWeight: '700' },
-  helpWordLine: { fontSize: 13, color: colors.textSecondary },
-  learnerBubble: { backgroundColor: colors.primary, alignSelf: 'flex-end' },
-  learnerLabel: { fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.75)', marginBottom: 2 },
-  learnerText: { fontSize: 16, color: colors.textOnPrimary },
-  typingIndicator: { fontSize: 13, color: colors.textSecondary, fontStyle: 'italic', marginTop: spacing.xs },
-  micErrorText: { fontSize: 12, color: colors.error, textAlign: 'center', marginTop: spacing.xs },
-  errorBanner: {
-    backgroundColor: '#FBEAE6',
-    borderRadius: radii.md,
-    padding: spacing.md,
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginTop: spacing.sm,
-  },
-  errorText: { fontSize: 14, color: colors.textPrimary, textAlign: 'center' },
-  finishedBanner: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-    padding: spacing.lg,
-    alignItems: 'center',
-    marginTop: spacing.md,
-    gap: spacing.xs,
-  },
-  finishedEmoji: { fontSize: 40 },
-  finishedTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
-  finishedBody: { fontSize: 13, color: colors.textSecondary, textAlign: 'center', marginBottom: spacing.sm },
-  suggestedRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, paddingVertical: spacing.sm },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    borderRadius: radii.pill,
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-    backgroundColor: colors.surface,
-    overflow: 'hidden',
-  },
-  chipDisabled: { opacity: 0.5 },
-  chipSpeakButton: {
-    justifyContent: 'center',
-    paddingHorizontal: spacing.sm,
-    borderRightWidth: 1,
-    borderRightColor: colors.border,
-  },
-  chipSpeakIcon: { fontSize: 14 },
-  chipTextButton: { paddingVertical: spacing.xs, paddingHorizontal: spacing.sm },
-  chipTunisian: { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
-  chipEnglish: { fontSize: 11, color: colors.textSecondary },
-  // Both the idle composer and the listening bar occupy this same box —
-  // whichever is visible sets the height (the other stays laid out but
-  // invisible/non-interactive), which is what lets them crossfade in place
-  // instead of the layout jumping.
-  composerWrap: { position: 'relative', paddingTop: spacing.sm },
-  composer: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center' },
-  micButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  input: {
-    flex: 1,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: radii.pill,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    fontSize: 15,
-    color: colors.textPrimary,
-    backgroundColor: colors.surface,
-  },
-  sendButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sendButtonDisabled: { opacity: 0.4 },
-  sendIcon: { fontSize: 18, color: colors.textOnPrimary },
-  listeningBar: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: spacing.sm,
-    height: 52,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    backgroundColor: '#1C1C1E',
-    borderRadius: radii.pill,
-    paddingLeft: spacing.md,
-    paddingRight: spacing.xs,
-  },
-  listeningSideButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  listeningCenter: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
-  recDot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: colors.error },
-  waveform: { flexDirection: 'row', alignItems: 'center', gap: 3, height: 18 },
-  waveformBar: { width: 3, height: 18, borderRadius: 2, backgroundColor: colors.accent },
-  listeningText: { fontSize: 15, fontWeight: '600', color: '#FFFFFF', fontVariant: ['tabular-nums'] },
-  listeningConfirmButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
-  centeredEmoji: { fontSize: 48 },
-  centeredTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    header: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
+    headerTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md },
+    messages: { flex: 1 },
+    messagesContent: { paddingBottom: spacing.md, gap: spacing.sm },
+    bubble: { borderRadius: radii.lg, padding: spacing.md, maxWidth: '90%' },
+    tutorBubble: { backgroundColor: colors.surface, alignSelf: 'flex-start' },
+    tutorHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    tutorLabel: { fontSize: 11, fontWeight: '700', color: colors.textSecondary },
+    replayButton: { padding: spacing.xs },
+    replayIcon: { fontSize: 16 },
+    tunisianText: { fontSize: 20, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.xs },
+    transliterationText: { fontSize: 13, color: colors.textSecondary, fontStyle: 'italic', marginTop: 2 },
+    englishText: { fontSize: 14, color: colors.textSecondary, marginTop: spacing.xs },
+    correctionBox: { backgroundColor: `${colors.accent}26`, borderRadius: radii.sm, padding: spacing.sm, marginTop: spacing.sm },
+    correctionLabel: { fontSize: 11, fontWeight: '700', color: colors.accent, marginBottom: 2 },
+    correctionText: { fontSize: 14, color: colors.textPrimary },
+    correctionExplanation: { fontSize: 12, color: colors.textSecondary, fontStyle: 'italic' },
+    helpButton: { marginTop: spacing.sm, alignSelf: 'flex-start' },
+    helpButtonText: { fontSize: 12, fontWeight: '600', color: colors.primary },
+    helpPanel: { marginTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.sm, gap: 2 },
+    helpLine: { fontSize: 13, color: colors.textPrimary },
+    helpLineLabel: { fontWeight: '700' },
+    helpWordLine: { fontSize: 13, color: colors.textSecondary },
+    learnerBubble: { backgroundColor: colors.primary, alignSelf: 'flex-end' },
+    learnerLabel: { fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.75)', marginBottom: 2 },
+    learnerText: { fontSize: 16, color: colors.textOnPrimary },
+    typingIndicator: { fontSize: 13, color: colors.textSecondary, fontStyle: 'italic', marginTop: spacing.xs },
+    micErrorText: { fontSize: 12, color: colors.error, textAlign: 'center', marginTop: spacing.xs },
+    errorBanner: {
+      backgroundColor: `${colors.error}1F`,
+      borderRadius: radii.md,
+      padding: spacing.md,
+      alignItems: 'center',
+      gap: spacing.sm,
+      marginTop: spacing.sm,
+    },
+    errorText: { fontSize: 14, color: colors.textPrimary, textAlign: 'center' },
+    finishedBanner: {
+      backgroundColor: colors.surface,
+      borderRadius: radii.lg,
+      padding: spacing.lg,
+      alignItems: 'center',
+      marginTop: spacing.md,
+      gap: spacing.xs,
+    },
+    finishedEmoji: { fontSize: 40 },
+    finishedTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
+    finishedBody: { fontSize: 13, color: colors.textSecondary, textAlign: 'center', marginBottom: spacing.sm },
+    suggestedRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, paddingVertical: spacing.sm },
+    chip: {
+      flexDirection: 'row',
+      alignItems: 'stretch',
+      borderRadius: radii.pill,
+      borderWidth: 1.5,
+      borderColor: colors.primary,
+      backgroundColor: colors.surface,
+      overflow: 'hidden',
+    },
+    chipDisabled: { opacity: 0.5 },
+    chipSpeakButton: {
+      justifyContent: 'center',
+      paddingHorizontal: spacing.sm,
+      borderRightWidth: 1,
+      borderRightColor: colors.border,
+    },
+    chipSpeakIcon: { fontSize: 14 },
+    chipTextButton: { paddingVertical: spacing.xs, paddingHorizontal: spacing.sm },
+    chipTunisian: { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
+    chipEnglish: { fontSize: 11, color: colors.textSecondary },
+    // Both the idle composer and the listening bar occupy this same box —
+    // whichever is visible sets the height (the other stays laid out but
+    // invisible/non-interactive), which is what lets them crossfade in place
+    // instead of the layout jumping.
+    composerWrap: { position: 'relative', paddingTop: spacing.sm },
+    composer: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center' },
+    micButton: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: colors.accent,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    input: {
+      flex: 1,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      borderRadius: radii.pill,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      fontSize: 15,
+      color: colors.textPrimary,
+      backgroundColor: colors.surface,
+    },
+    sendButton: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    sendButtonDisabled: { opacity: 0.4 },
+    sendIcon: { fontSize: 18, color: colors.textOnPrimary },
+    listeningBar: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      top: spacing.sm,
+      height: 52,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      backgroundColor: '#1C1C1E',
+      borderRadius: radii.pill,
+      paddingLeft: spacing.md,
+      paddingRight: spacing.xs,
+    },
+    listeningSideButton: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: 'rgba(255,255,255,0.12)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    listeningCenter: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
+    recDot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: colors.error },
+    waveform: { flexDirection: 'row', alignItems: 'center', gap: 3, height: 18 },
+    waveformBar: { width: 3, height: 18, borderRadius: 2, backgroundColor: colors.accent },
+    listeningText: { fontSize: 15, fontWeight: '600', color: '#FFFFFF', fontVariant: ['tabular-nums'] },
+    listeningConfirmButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
+    centeredEmoji: { fontSize: 48 },
+    centeredTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
+  });

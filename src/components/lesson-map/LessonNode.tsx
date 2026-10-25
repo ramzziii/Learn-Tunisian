@@ -2,6 +2,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useMemo, useRef } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
 
+import { PremiumBadge } from '@/components/premium/Premium';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { adultTrackSizing, kidTrackSizing, shadows, spacing, type ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/lib/theme/ThemeContext';
@@ -11,19 +12,22 @@ interface LessonNodeProps {
   lesson: LessonWithState;
   track: Track;
   onPress: () => void;
+  /** Beyond the free plan — stays visible and tappable (onPress should open
+   * the upgrade flow), marked Premium instead of as progress-locked. */
+  premiumLocked?: boolean;
 }
 
 // This component's only consumer is app/(tabs)/learn.tsx (also converted to
 // the theme system), so unlike most shared UI components it can react to
 // the live theme unconditionally — no risk of an unconverted screen
 // suddenly rendering it in the wrong palette.
-export function LessonNode({ lesson, track, onPress }: LessonNodeProps) {
+export function LessonNode({ lesson, track, onPress, premiumLocked = false }: LessonNodeProps) {
   const { colors, gradients } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const sizing = track === 'kid' ? kidTrackSizing : adultTrackSizing;
-  const isLocked = lesson.state === 'locked';
+  const isLocked = lesson.state === 'locked' && !premiumLocked;
   const isCompleted = lesson.state === 'completed';
-  const isUnlocked = lesson.state === 'unlocked';
+  const isUnlocked = lesson.state === 'unlocked' && !premiumLocked;
   const size = sizing.touchTarget;
 
   // A slow breathing pulse on the next lesson to tap — an inviting nudge
@@ -63,7 +67,12 @@ export function LessonNode({ lesson, track, onPress }: LessonNodeProps) {
           !isLocked && shadows.card,
         ]}
       >
-        {isLocked ? (
+        {premiumLocked ? (
+          <View style={[styles.node, { width: size, height: size, borderRadius: size / 2 }, styles.premium]}>
+            <Text style={styles.emoji}>🔒</Text>
+            <PremiumBadge compact style={styles.premiumBadge} />
+          </View>
+        ) : isLocked ? (
           <View style={[styles.node, { width: size, height: size, borderRadius: size / 2 }, styles.locked]}>
             <Text style={styles.emoji}>🔒</Text>
           </View>
@@ -91,6 +100,8 @@ const makeStyles = (colors: ThemeColors) =>
   StyleSheet.create({
     node: { alignItems: 'center', justifyContent: 'center' },
     locked: { backgroundColor: colors.background, borderWidth: 3, borderColor: colors.locked },
+    premium: { backgroundColor: colors.surface, borderWidth: 3, borderColor: '#D9A441' },
+    premiumBadge: { position: 'absolute', top: -6, right: -6, backgroundColor: colors.surface },
     emoji: { fontSize: 28 },
     labelWrap: { position: 'absolute', bottom: -spacing.lg, width: 120, alignItems: 'center', alignSelf: 'center' },
     label: { fontWeight: '600', color: colors.textPrimary, textAlign: 'center' },

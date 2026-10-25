@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
 
 import { AnswerFeedback } from '@/components/exercises/shared/AnswerFeedback';
@@ -7,14 +7,13 @@ import { WordPicture } from '@/components/exercises/shared/WordPicture';
 import { AudioPlayButton } from '@/components/ui/AudioPlayButton';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Reveal } from '@/components/ui/Reveal';
-import { colors, kidTrackSizing, radii, spacing } from '@/constants/theme';
+import { kidTrackSizing, radii, spacing, type ThemeColors } from '@/constants/theme';
+import { useTheme } from '@/lib/theme/ThemeContext';
 import { useAnswerFeedback } from '@/hooks/useAnswerFeedback';
 import { useShake } from '@/hooks/useShake';
 import { useWordAudioPlayer } from '@/hooks/useWordAudioPlayer';
 import type { ExerciseItem } from '@/types/exercises';
 
-const CORRECT_FEEDBACK_DELAY_MS = 900;
-const INCORRECT_FEEDBACK_DELAY_MS = 1800; // a little longer so there's time to hear the replay
 const PICTURE_SIZE = 120;
 
 interface ListenAndTapProps {
@@ -24,6 +23,8 @@ interface ListenAndTapProps {
 
 /** Kid track: listen to a word, tap the matching picture. No reading required to answer. */
 export function ListenAndTap({ exercise, onComplete }: ListenAndTapProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { play, hasAudio, isResolving, hasError, retry } = useWordAudioPlayer(exercise.promptVariant, { autoPlay: true });
   const { playCorrect, playIncorrect } = useAnswerFeedback();
   const { shake, shakeStyle } = useShake();
@@ -41,14 +42,6 @@ export function ListenAndTap({ exercise, onComplete }: ListenAndTapProps) {
       shake();
     }
   };
-
-  useEffect(() => {
-    if (!selectedGroupId) return;
-    const delay = isCorrectSelection ? CORRECT_FEEDBACK_DELAY_MS : INCORRECT_FEEDBACK_DELAY_MS;
-    const timer = setTimeout(() => onComplete(isCorrectSelection), delay);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedGroupId]);
 
   return (
     <View style={styles.container}>
@@ -93,7 +86,7 @@ export function ListenAndTap({ exercise, onComplete }: ListenAndTapProps) {
         <AnswerFeedback
           isCorrect={isCorrectSelection}
           correctWordArabic={exercise.promptVariant.wordArabic}
-          onListenAgain={play}
+          onNext={() => onComplete(isCorrectSelection)}
           kidFriendly
         />
       ) : null}
@@ -101,18 +94,19 @@ export function ListenAndTap({ exercise, onComplete }: ListenAndTapProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, alignItems: 'center' },
-  instructions: { fontSize: kidTrackSizing.bodyFontSize, fontWeight: '600', color: colors.textPrimary, marginTop: spacing.md, marginBottom: spacing.xl },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: spacing.lg },
-  card: {
-    alignItems: 'center',
-    padding: spacing.sm,
-    borderRadius: radii.lg,
-    borderWidth: 3,
-    borderColor: 'transparent',
-  },
-  cardCorrect: { borderColor: colors.success, backgroundColor: '#E3F5EA' },
-  cardIncorrect: { borderColor: colors.error, backgroundColor: '#FBEAE6' },
-  arabicScript: { fontSize: 22, marginTop: spacing.xs, color: colors.textPrimary },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    container: { flex: 1, alignItems: 'center' },
+    instructions: { fontSize: kidTrackSizing.bodyFontSize, fontWeight: '600', color: colors.textPrimary, marginTop: spacing.md, marginBottom: spacing.xl },
+    grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: spacing.lg },
+    card: {
+      alignItems: 'center',
+      padding: spacing.sm,
+      borderRadius: radii.lg,
+      borderWidth: 3,
+      borderColor: 'transparent',
+    },
+    cardCorrect: { borderColor: colors.success, backgroundColor: `${colors.success}1F` },
+    cardIncorrect: { borderColor: colors.error, backgroundColor: `${colors.error}1F` },
+    arabicScript: { fontSize: 22, marginTop: spacing.xs, color: colors.textPrimary },
+  });

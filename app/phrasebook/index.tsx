@@ -2,6 +2,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { openUpgradeFlow, PremiumBadge } from '@/components/premium/Premium';
 import { BackButton } from '@/components/ui/BackButton';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { PressableScale } from '@/components/ui/PressableScale';
@@ -10,6 +11,8 @@ import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { Button } from '@/components/ui/Button';
 import { radii, spacing, type ThemeColors } from '@/constants/theme';
 import { fetchPhrasebookCategories, type PhrasebookCategory } from '@/data/content';
+import { canAccessPhrasebookCategory } from '@/data/premiumAccess';
+import { usePremium } from '@/lib/premium/PremiumContext';
 import { useTheme } from '@/lib/theme/ThemeContext';
 
 /** Presentation-only metadata (icon + tile color) per phrasebook category —
@@ -37,6 +40,7 @@ const FALLBACK_META = { emoji: '💬', color: '#3E7CB1' };
 export default function PhrasebookScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { isPremium } = usePremium();
   const [categories, setCategories] = useState<PhrasebookCategory[] | null>(null);
   const [loadError, setLoadError] = useState(false);
 
@@ -82,18 +86,26 @@ export default function PhrasebookScreen() {
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.list}>
           {categories.map((category, index) => {
             const meta = CATEGORY_META[category.name] ?? FALLBACK_META;
+            const isLocked = !canAccessPhrasebookCategory(isPremium, category.unitId, categories);
             return (
               <Reveal key={category.unitId} delay={Math.min(index * 50, 400)}>
                 <PressableScale
                   haptic
-                  onPress={() => router.push({ pathname: '/phrasebook/[categoryId]', params: { categoryId: category.unitId } })}
+                  onPress={() =>
+                    isLocked
+                      ? openUpgradeFlow()
+                      : router.push({ pathname: '/phrasebook/[categoryId]', params: { categoryId: category.unitId } })
+                  }
                   style={[styles.card, styles.shadowCard]}
                 >
                   <View style={[styles.iconTile, { backgroundColor: `${meta.color}26` }]}>
                     <Text style={styles.iconEmoji}>{meta.emoji}</Text>
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.cardTitle}>{category.name}</Text>
+                    <View style={styles.titleRow}>
+                      <Text style={styles.cardTitle}>{category.name}</Text>
+                      {isLocked ? <PremiumBadge /> : null}
+                    </View>
                     <View style={styles.countRow}>
                       <View style={[styles.countDot, { backgroundColor: meta.color }]} />
                       <Text style={styles.cardSubtitle}>
@@ -150,6 +162,7 @@ const makeStyles = (colors: ThemeColors) =>
       justifyContent: 'center',
     },
     iconEmoji: { fontSize: 26 },
+    titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
     cardTitle: { fontSize: 17, fontWeight: '700', color: colors.textPrimary },
     countRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
     countDot: { width: 6, height: 6, borderRadius: 3 },

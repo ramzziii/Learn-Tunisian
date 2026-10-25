@@ -1,10 +1,11 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '@/components/ui/Button';
 import { PressableScale } from '@/components/ui/PressableScale';
-import { colors, gradients, radii, shadows, spacing } from '@/constants/theme';
+import { radii, shadows, spacing, type ThemeColors } from '@/constants/theme';
+import { useTheme } from '@/lib/theme/ThemeContext';
 import type { Badge } from '@/lib/badges';
 import type { DailyGoalMinutes, SessionType, Track } from '@/types/models';
 
@@ -55,6 +56,8 @@ export function SessionCompleteCard({
   continueLessonReason,
   newlyEarnedBadges = [],
 }: SessionCompleteCardProps) {
+  const { colors, gradients } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const pop = useRef(new Animated.Value(0)).current;
   const isReview = sessionType === 'review';
   const isKid = track === 'kid';
@@ -139,10 +142,10 @@ export function SessionCompleteCard({
           </>
         )}
 
-        <Button label="Back to home" onPress={onClose} style={{ marginTop: spacing.xl, width: '100%' }} />
+        <Button themed label="Back to home" onPress={onClose} style={{ marginTop: spacing.xl, width: '100%' }} />
         {onContinueLesson ? (
           <>
-            <Button
+            <Button themed
               label="Continue to next lesson"
               variant="secondary"
               onPress={onContinueLesson}
@@ -152,7 +155,7 @@ export function SessionCompleteCard({
           </>
         ) : null}
         {onReviewWeakWords ? (
-          <Button
+          <Button themed
             label="Review weak words"
             variant="secondary"
             onPress={onReviewWeakWords}
@@ -174,6 +177,8 @@ export function SessionCompleteCard({
 }
 
 function Stat({ value, label }: { value: number | string; label: string }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <View style={styles.stat}>
       <Text style={styles.statValue}>{value}</Text>
@@ -182,51 +187,52 @@ function Stat({ value, label }: { value: number | string; label: string }) {
   );
 }
 
-const styles = StyleSheet.create({
-  overlay: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(36, 32, 33, 0.45)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.lg,
-  },
-  card: {
-    width: '100%',
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-    padding: spacing.xl,
-    alignItems: 'center',
-  },
-  badge: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.sm,
-  },
-  emoji: { fontSize: 48 },
-  title: { fontSize: 26, fontWeight: '800', color: colors.textPrimary, marginTop: spacing.sm },
-  subtitle: { fontSize: 15, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.sm },
-  improvingText: { fontSize: 13, fontWeight: '600', color: colors.success, textAlign: 'center', marginTop: spacing.xs },
-  starsRow: { flexDirection: 'row', gap: spacing.xs, marginTop: spacing.md },
-  star: { fontSize: 36 },
-  newBadges: { marginTop: spacing.md, alignItems: 'center', gap: spacing.xs },
-  newBadgeText: { fontSize: 14, fontWeight: '700', color: colors.primaryDark, textAlign: 'center' },
-  continueReasonText: { fontSize: 12, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.xs },
-  statsRow: { flexDirection: 'row', gap: spacing.lg, marginTop: spacing.lg },
-  stat: { alignItems: 'center', minWidth: 56 },
-  statValue: { fontSize: 22, fontWeight: '800', color: colors.primaryDark },
-  statLabel: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
-  needsPractice: { fontSize: 12, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.md },
-  addMoreLabel: { fontSize: 13, color: colors.textSecondary, marginTop: spacing.xl, marginBottom: spacing.sm },
-  addMoreRow: { flexDirection: 'row', gap: spacing.sm },
-  addMoreButton: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.pill,
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-  },
-  addMoreButtonText: { color: colors.primary, fontWeight: '700', fontSize: 14 },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    overlay: {
+      ...StyleSheet.absoluteFill,
+      backgroundColor: 'rgba(36, 32, 33, 0.45)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: spacing.lg,
+    },
+    card: {
+      width: '100%',
+      backgroundColor: colors.surface,
+      borderRadius: radii.lg,
+      padding: spacing.xl,
+      alignItems: 'center',
+    },
+    badge: {
+      width: 96,
+      height: 96,
+      borderRadius: 48,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: spacing.sm,
+    },
+    emoji: { fontSize: 48 },
+    title: { fontSize: 26, fontWeight: '800', color: colors.textPrimary, marginTop: spacing.sm },
+    subtitle: { fontSize: 15, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.sm },
+    improvingText: { fontSize: 13, fontWeight: '600', color: colors.success, textAlign: 'center', marginTop: spacing.xs },
+    starsRow: { flexDirection: 'row', gap: spacing.xs, marginTop: spacing.md },
+    star: { fontSize: 36 },
+    newBadges: { marginTop: spacing.md, alignItems: 'center', gap: spacing.xs },
+    newBadgeText: { fontSize: 14, fontWeight: '700', color: colors.primary, textAlign: 'center' },
+    continueReasonText: { fontSize: 12, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.xs },
+    statsRow: { flexDirection: 'row', gap: spacing.lg, marginTop: spacing.lg },
+    stat: { alignItems: 'center', minWidth: 56 },
+    statValue: { fontSize: 22, fontWeight: '800', color: colors.primary },
+    statLabel: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+    needsPractice: { fontSize: 12, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.md },
+    addMoreLabel: { fontSize: 13, color: colors.textSecondary, marginTop: spacing.xl, marginBottom: spacing.sm },
+    addMoreRow: { flexDirection: 'row', gap: spacing.sm },
+    addMoreButton: {
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.md,
+      borderRadius: radii.pill,
+      borderWidth: 1.5,
+      borderColor: colors.primary,
+    },
+    addMoreButtonText: { color: colors.primary, fontWeight: '700', fontSize: 14 },
+  });

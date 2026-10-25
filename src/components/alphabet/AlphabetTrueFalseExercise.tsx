@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { AlphabetAudioPrompt } from '@/components/alphabet/AlphabetAudioPrompt';
 import { AlphabetExerciseFooter } from '@/components/alphabet/AlphabetExerciseFooter';
 import { AnimatedAnswerCard, type AnswerCardState } from '@/components/alphabet/AnimatedAnswerCard';
-import { colors, radii, spacing } from '@/constants/theme';
+import { radii, spacing, type ThemeColors } from '@/constants/theme';
+import { useTheme } from '@/lib/theme/ThemeContext';
 import { buildTrueFalseQuestion, getLetterById } from '@/lib/alphabet';
 import { useLetterSpeech } from '@/hooks/useLetterSpeech';
 
@@ -15,6 +16,8 @@ interface AlphabetTrueFalseExerciseProps {
 
 /** "Listen and choose" — hear a letter's sound, then say whether the letter shown on screen is the one that was spoken. */
 export function AlphabetTrueFalseExercise({ letterId, onComplete }: AlphabetTrueFalseExerciseProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [question] = useState(() => buildTrueFalseQuestion(letterId));
   const [selected, setSelected] = useState<boolean | null>(null);
   const [checked, setChecked] = useState(false);
@@ -73,20 +76,21 @@ export function AlphabetTrueFalseExercise({ letterId, onComplete }: AlphabetTrue
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  currentLetter: { fontSize: 90, color: colors.textPrimary, textAlign: 'center', marginVertical: spacing.lg },
-  optionList: { gap: spacing.sm, marginBottom: spacing.lg },
-  option: {
-    borderWidth: 2,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    paddingVertical: spacing.md,
-    borderRadius: radii.md,
-    alignItems: 'center',
-  },
-  optionSelected: { borderColor: colors.accent, backgroundColor: '#FDF3E4' },
-  optionCorrect: { borderColor: '#4FBF76', backgroundColor: '#DFF4E7' },
-  optionWrong: { borderColor: '#E76B60', backgroundColor: '#F9E0DD' },
-  optionText: { fontSize: 18, fontWeight: '600', color: colors.textPrimary },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    container: { flex: 1 },
+    currentLetter: { fontSize: 90, color: colors.textPrimary, textAlign: 'center', marginVertical: spacing.lg },
+    optionList: { gap: spacing.sm, marginBottom: spacing.lg },
+    option: {
+      borderWidth: 2,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+      paddingVertical: spacing.md,
+      borderRadius: radii.md,
+      alignItems: 'center',
+    },
+    optionSelected: { borderColor: colors.accent, backgroundColor: `${colors.accent}26` },
+    optionCorrect: { borderColor: colors.success, backgroundColor: `${colors.success}1F` },
+    optionWrong: { borderColor: colors.error, backgroundColor: `${colors.error}1F` },
+    optionText: { fontSize: 18, fontWeight: '600', color: colors.textPrimary },
+  });

@@ -1,15 +1,21 @@
 import { router } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AnimatedAnswerCard, type AnswerCardState } from '@/components/alphabet/AnimatedAnswerCard';
+import { PremiumBadge, PremiumGate } from '@/components/premium/Premium';
 import { Button } from '@/components/ui/Button';
+import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
-import { colors, radii, shadows, spacing } from '@/constants/theme';
+import { radii, shadows, spacing, type ThemeColors } from '@/constants/theme';
+import { useTheme } from '@/lib/theme/ThemeContext';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
-import { buildMatchingGrid, getLetterById, type MatchingTile } from '@/lib/alphabet';
+import { usePremium } from '@/lib/premium/PremiumContext';
+import { ARABIC_LETTERS, buildMatchingGrid, getLetterById, type MatchingTile } from '@/lib/alphabet';
 import { markLettersPracticed } from '@/lib/alphabetProgress';
+import { accessibleLetters, canStartSpeedMatchRound, speedMatchPairCount } from '@/lib/premium/access';
+import { hasUsedSpeedMatchSample, markSpeedMatchSampleUsed } from '@/lib/premium/freeAllowance';
 import { useAnswerFeedback } from '@/hooks/useAnswerFeedback';
 import { useColumnWidth } from '@/hooks/useColumnWidth';
 
@@ -18,10 +24,19 @@ const MISMATCH_FLASH_MS = 500;
 const GRID_COLUMNS = 3;
 
 export default function AlphabetMatchingScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { activeProfile } = useActiveProfile();
   const { playCorrect, playIncorrect } = useAnswerFeedback();
   const tileWidth = useColumnWidth(GRID_COLUMNS, spacing.lg, spacing.sm);
-  const [tiles, setTiles] = useState<MatchingTile[]>(() => buildMatchingGrid(PAIR_COUNT));
+  const { isPremium, isResolved } = usePremium();
+  // Free: one short sample round (fewer pairs, free letters only).
+  const pairCount = speedMatchPairCount(isPremium, PAIR_COUNT);
+  const letterPool = useMemo(() => accessibleLetters(isPremium, ARABIC_LETTERS), [isPremium]);
+  // null while checking — a round (and its timer) only starts once allowed,
+  // so a locked round is gated before it begins, never part-way through.
+  const [roundAllowed, setRoundAllowed] = useState<boolean | null>(null);
+  const [tiles, setTiles] = useState<MatchingTile[]>([]);
   const [selectedTileIds, setSelectedTileIds] = useState<string[]>([]);
   const [matchedTileIds, setMatchedTileIds] = useState<string[]>([]);
   const [wrongTileIds, setWrongTileIds] = useState<string[]>([]);
@@ -31,7 +46,7 @@ export default function AlphabetMatchingScreen() {
   const persistedRef = useRef(false);
 
   const matchedPairCount = matchedTileIds.length / 2;
-  const isComplete = matchedPairCount === PAIR_COUNT;
+  const isComplete = tiles.length > 0 && matchedPairCount === pairCount;
 
   useEffect(() => {
     if (isComplete) return;
@@ -46,8 +61,8 @@ export default function AlphabetMatchingScreen() {
     markLettersPracticed(activeProfile.id, letterIds);
   }, [isComplete, activeProfile, tiles]);
 
-  const handleReset = () => {
-    setTiles(buildMatchingGrid(PAIR_COUNT));
+  const startRound = () => {
+    setTiles(buildMatchingGrid(pairCount, letterPool));
     setSelectedTileIds([]);
     setMatchedTileIds([]);
     setWrongTileIds([]);
@@ -55,6 +70,33 @@ export default function AlphabetMatchingScreen() {
     setElapsedMs(0);
     startedAtRef.current = Date.now();
     persistedRef.current = false;
+  };
+
+  useEffect(() => {
+    if (!activeProfile || !isResolved) return;
+    let cancelled = false;
+    (async () => {
+      const sampleUsed = isPremium ? false : await hasUsedSpeedMatchSample(activeProfile.id);
+      if (cancelled) return;
+      if (!canStartSpeedMatchRound(isPremium, sampleUsed)) {
+        setRoundAllowed(false);
+        return;
+      }
+      // Recorded as the round starts, so backing out can't replay the sample.
+      if (!isPremium) markSpeedMatchSampleUsed(activeProfile.id);
+      startRound();
+      setRoundAllowed(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // Runs once per profile/entitlement — startRound is recreated every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeProfile?.id, isPremium, isResolved]);
+
+  const handlePlayAgain = () => {
+    if (isPremium) startRound();
+    else setRoundAllowed(false);
   };
 
   const handleTilePress = (tile: MatchingTile) => {
@@ -89,8 +131,19 @@ export default function AlphabetMatchingScreen() {
     }
   };
 
+  if (roundAllowed === false) {
+    return (
+      <PremiumGate
+        title="Keep playing with Premium"
+        message="You've played your free Speed Match sample round. Upgrade for unlimited rounds with all the letters."
+      />
+    );
+  }
+
+  if (roundAllowed === null) return <LoadingScreen themed />;
+
   return (
-    <ScreenContainer style={styles.screen}>
+    <ScreenContainer themed style={styles.screen}>
       <View style={styles.topbar}>
         <Text style={styles.timer}>⏱ {(elapsedMs / 1000).toFixed(1)} seconds</Text>
         <Pressable onPress={() => router.back()} style={styles.closeButton}>
@@ -99,8 +152,15 @@ export default function AlphabetMatchingScreen() {
       </View>
 
       <View style={styles.progressTrack}>
-        <ProgressBar progress={matchedPairCount / PAIR_COUNT} gradientColors={['#7ED99A', colors.success]} />
+        <ProgressBar themed progress={matchedPairCount / pairCount} gradientColors={[colors.successLight, colors.success]} />
       </View>
+
+      {!isPremium ? (
+        <View style={styles.sampleRow}>
+          <PremiumBadge />
+          <Text style={styles.sampleText}>Free sample round · {pairCount} pairs</Text>
+        </View>
+      ) : null}
 
       <View style={styles.grid}>
         {tiles.map((tile) => {
@@ -133,7 +193,13 @@ export default function AlphabetMatchingScreen() {
       </View>
 
       {isComplete ? (
-        <CompleteCard seconds={elapsedMs / 1000} onPlayAgain={handleReset} onDone={() => router.back()} />
+        <CompleteCard
+          seconds={elapsedMs / 1000}
+          pairCount={pairCount}
+          isSample={!isPremium}
+          onPlayAgain={handlePlayAgain}
+          onDone={() => router.back()}
+        />
       ) : null}
     </ScreenContainer>
   );
@@ -141,13 +207,19 @@ export default function AlphabetMatchingScreen() {
 
 function CompleteCard({
   seconds,
+  pairCount,
+  isSample,
   onPlayAgain,
   onDone,
 }: {
   seconds: number;
+  pairCount: number;
+  isSample: boolean;
   onPlayAgain: () => void;
   onDone: () => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const pop = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -167,47 +239,59 @@ function CompleteCard({
     >
       <Text style={styles.completeEmoji}>🎉</Text>
       <Text style={styles.completeTitle}>Well done!</Text>
-      <Text style={styles.completeBody}>Matched {PAIR_COUNT} pairs in {seconds.toFixed(1)} seconds.</Text>
+      <Text style={styles.completeBody}>Matched {pairCount} pairs in {seconds.toFixed(1)} seconds.</Text>
+      {isSample ? (
+        <Text style={styles.completeBody}>That was your free sample round — more rounds are part of Premium.</Text>
+      ) : null}
       <View style={styles.completeActions}>
-        <Button label="Play again" variant="secondary" onPress={onPlayAgain} style={styles.completeButton} />
-        <Button label="Done" onPress={onDone} style={styles.completeButton} />
+        <Button
+          themed
+          label={isSample ? 'Play again 🔒' : 'Play again'}
+          variant="secondary"
+          onPress={onPlayAgain}
+          style={styles.completeButton}
+        />
+        <Button themed label="Done" onPress={onDone} style={styles.completeButton} />
       </View>
     </Animated.View>
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { backgroundColor: '#F7F5F2', paddingHorizontal: spacing.lg },
-  topbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.md },
-  timer: { fontSize: 15, color: colors.textSecondary, fontWeight: '600' },
-  closeButton: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  closeIcon: { fontSize: 22, color: colors.textPrimary },
-  progressTrack: { marginTop: spacing.sm, marginBottom: spacing.lg },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  tile: {
-    minHeight: 84,
-    borderRadius: radii.md,
-    borderWidth: 2,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tileSelected: { borderColor: colors.accent, backgroundColor: '#FDF3E4' },
-  tileMatched: { borderColor: '#4FBF76', backgroundColor: '#DFF4E7' },
-  tileWrong: { borderColor: '#E76B60', backgroundColor: '#F9E0DD' },
-  tileGlyph: { fontSize: 30, color: colors.textPrimary },
-  tileName: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
-  completeCard: {
-    marginTop: spacing.xl,
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-    padding: spacing.lg,
-  },
-  completeEmoji: { fontSize: 40, marginBottom: spacing.xs },
-  completeTitle: { fontSize: 22, fontWeight: '800', color: colors.textPrimary },
-  completeBody: { fontSize: 14, color: colors.textSecondary, marginTop: spacing.xs, textAlign: 'center' },
-  completeActions: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg, width: '100%' },
-  completeButton: { flex: 1 },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    sampleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
+    sampleText: { fontSize: 13, color: colors.textSecondary },
+    screen: { backgroundColor: colors.background, paddingHorizontal: spacing.lg },
+    topbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.md },
+    timer: { fontSize: 15, color: colors.textSecondary, fontWeight: '600' },
+    closeButton: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+    closeIcon: { fontSize: 22, color: colors.textPrimary },
+    progressTrack: { marginTop: spacing.sm, marginBottom: spacing.lg },
+    grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+    tile: {
+      minHeight: 84,
+      borderRadius: radii.md,
+      borderWidth: 2,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    tileSelected: { borderColor: colors.accent, backgroundColor: `${colors.accent}26` },
+    tileMatched: { borderColor: colors.success, backgroundColor: `${colors.success}1F` },
+    tileWrong: { borderColor: colors.error, backgroundColor: `${colors.error}1F` },
+    tileGlyph: { fontSize: 30, color: colors.textPrimary },
+    tileName: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+    completeCard: {
+      marginTop: spacing.xl,
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderRadius: radii.lg,
+      padding: spacing.lg,
+    },
+    completeEmoji: { fontSize: 40, marginBottom: spacing.xs },
+    completeTitle: { fontSize: 22, fontWeight: '800', color: colors.textPrimary },
+    completeBody: { fontSize: 14, color: colors.textSecondary, marginTop: spacing.xs, textAlign: 'center' },
+    completeActions: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg, width: '100%' },
+    completeButton: { flex: 1 },
+  });

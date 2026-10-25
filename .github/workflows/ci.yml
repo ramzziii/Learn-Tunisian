@@ -1,0 +1,64 @@
+# Continuous integration — no secrets, no Supabase credentials, no builds
+# published. See docs/TESTING.md for what each step covers and what still
+# needs a manual / credentialed check.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Typecheck, tests, web bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Matches the version the lockfile is generated with locally.
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript
+        run: npm run typecheck
+
+      - name: Jest
+        run: npm run test:ci
+
+      # Smoke check: the whole app (every route) bundles for web. Catches
+      # broken imports/route files that tsc and unit tests don't load. No
+      # .env needed — EXPO_PUBLIC_* values are only read at runtime.
+      - name: Web bundle (smoke)
+        run: npx expo export --platform web
+
+  expo-doctor:
+    name: Expo project health (advisory)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Advisory, not a gate: expo-doctor compares against the *latest* SDK 57
+    # patch releases fetched from the network, so it starts failing whenever
+    # Expo publishes a patch — not because of anything in the PR. It also
+    # flags @expo/config-plugins, which is installed deliberately (AGENTS.md).
+    # Read its output; don't let it block merges.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx expo-doctor

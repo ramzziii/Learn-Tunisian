@@ -228,6 +228,10 @@ function AdultHomeContent({ data }: { data: HomeData }) {
         </View>
       </Reveal>
 
+      <Reveal delay={15}>
+        <TodaysPracticeCard reviewDueCount={reviewDueCount} />
+      </Reveal>
+
       <Reveal delay={30}>
         <RecommendedNextCard recommendation={recommendation} isFirstLesson={progressSummary.totalWordsSeen === 0} />
       </Reveal>
@@ -410,6 +414,24 @@ function DailyChallengesCard({ challenges }: { challenges: DailyChallenge[] }) {
  * For a learner with zero progress anywhere, this becomes their "Start
  * Here" moment instead of generic "pick up where you left off" copy that
  * makes no sense before they've started anything. */
+/** One clear entry point to a short guided session (app/todays-practice.tsx).
+ * Activities are still browsed and launched individually from the Practice tab. */
+function TodaysPracticeCard({ reviewDueCount }: { reviewDueCount: number }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  return (
+    <View style={[styles.todaysPracticeCard, styles.shadowCard]}>
+      <Text style={styles.todaysPracticeTitle}>Today’s Practice</Text>
+      <Text style={styles.todaysPracticeBody}>
+        {reviewDueCount > 0
+          ? `${reviewDueCount} ${reviewDueCount === 1 ? 'word' : 'words'} due for review, plus a little new practice.`
+          : 'A few minutes of new words and Repeat After Me.'}
+      </Text>
+      <Button themed label="Start today’s practice" onPress={() => router.push('/todays-practice')} />
+    </View>
+  );
+}
+
 function RecommendedNextCard({
   recommendation,
   isFirstLesson,
@@ -490,13 +512,22 @@ const makeStyles = (colors: ThemeColors) => {
     greeting: { fontSize: 24, fontWeight: '700', color: colors.textOnPrimary },
     subGreeting: { fontSize: 14, color: colors.textOnPrimary, opacity: 0.85, marginTop: 2 },
     scrollContent: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.xxl },
+    todaysPracticeCard: {
+      backgroundColor: colors.surface,
+      borderRadius: radii.lg,
+      padding: spacing.md,
+      marginBottom: spacing.lg,
+      gap: spacing.sm,
+    },
+    todaysPracticeTitle: { fontSize: 17, fontWeight: '800', color: colors.textPrimary },
+    todaysPracticeBody: { fontSize: 14, color: colors.textSecondary, lineHeight: 20 },
     goalCard: { backgroundColor: colors.surface, borderRadius: radii.lg, padding: spacing.md, marginBottom: spacing.lg },
     goalHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
     goalLabel: { fontSize: 14, fontWeight: '700', color: colors.textSecondary },
     goalHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
     streakBadge: { backgroundColor: `${colors.accent}26`, borderRadius: radii.pill, paddingVertical: 2, paddingHorizontal: spacing.xs },
     streakBadgeText: { fontSize: 13, fontWeight: '700', color: colors.accent },
-    goalValue: { fontSize: 14, fontWeight: '700', color: colors.primaryDark },
+    goalValue: { fontSize: 14, fontWeight: '700', color: colors.primary },
     goalReachedBanner: {
       backgroundColor: `${colors.success}1F`,
       borderRadius: radii.md,

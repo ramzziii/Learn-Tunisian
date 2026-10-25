@@ -1,6 +1,7 @@
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { useCallback, useEffect, useState } from 'react';
 
+import { useLetterSpeech } from '@/hooks/useLetterSpeech';
 import { ensureAudioCached } from '@/lib/offline/audioCache';
 import type { WordVariant } from '@/types/models';
 
@@ -8,16 +9,21 @@ export interface WordAudioPlayer {
   play: () => void;
   isPlaying: boolean;
   isResolving: boolean;
-  /** False when the variant has no audio yet (placeholder content) — UI should disable the play control. */
+  /** True whenever tapping play will produce sound — a real recording, or
+   * the on-device voice fallback. False only for a variant with no Arabic
+   * text to speak at all. */
   hasAudio: boolean;
+  /** True when play() will use the on-device voice because no recording is
+   * playable (none uploaded yet, the file is missing from Storage, or
+   * offline with nothing cached). */
+  isFallbackVoice: boolean;
   /**
-   * True when this word does have an audio_path but resolving it failed
-   * this time (e.g. offline with nothing cached yet) — distinct from
-   * hasAudio=false, since this is a transient state worth retrying rather
-   * than "there's genuinely nothing here."
+   * True only when there's a recording to try, it failed to resolve, *and*
+   * there's no fallback voice — the one case where retrying is the only
+   * option.
    */
   hasError: boolean;
-  /** Re-attempts resolving audio for the current variant. */
+  /** Re-attempts resolving the recording for the current variant. */
   retry: () => void;
 }
 
@@ -25,23 +31,38 @@ export interface WordAudioPlayer {
  * Wraps expo-audio's player for one word variant at a time: resolves the
  * best available source (offline cache first, remote fallback) whenever the
  * variant changes, and optionally plays it as soon as it's ready.
+ *
+ * When no recording is playable it falls back to on-device TTS of the
+ * variant's Arabic — so every exercise ("Listen, then record yourself saying
+ * it", listen-and-tap, …) stays usable for placeholder content, the same
+ * fallback the phrasebook screens already used on their own.
  */
 export function useWordAudioPlayer(
   variant: WordVariant | null,
-  options?: { autoPlay?: boolean }
+  options?: {
+    autoPlay?: boolean;
+    /** Default true. False where only the real recording makes sense (Repeat
+     * After Me plays *the admin's* recording to imitate) — a missing
+     * recording is then an error to retry, never the device voice. */
+    fallbackVoice?: boolean;
+  }
 ): WordAudioPlayer {
   const autoPlay = options?.autoPlay ?? false;
+  const allowFallbackVoice = options?.fallbackVoice ?? true;
   const player = useAudioPlayer(null);
   const status = useAudioPlayerStatus(player);
+  const { speak, isSpeaking } = useLetterSpeech();
   const [isResolving, setIsResolving] = useState(false);
-  const [hasAudio, setHasAudio] = useState(false);
-  const [hasError, setHasError] = useState(false);
+  const [hasRecording, setHasRecording] = useState(false);
+  const [recordingFailed, setRecordingFailed] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+
+  const fallbackText = allowFallbackVoice ? variant?.wordArabic?.trim() || null : null;
 
   useEffect(() => {
     let cancelled = false;
-    setHasAudio(false);
-    setHasError(false);
+    setHasRecording(false);
+    setRecordingFailed(false);
     if (!variant) return;
 
     setIsResolving(true);
@@ -49,9 +70,8 @@ export function useWordAudioPlayer(
       .then(async (uri) => {
         if (cancelled) return;
         if (uri) {
-          console.log(`[useWordAudioPlayer] variant ${variant.id} (audioPath=${variant.audioPath}) resolved to: ${uri}`);
           player.replace({ uri });
-          setHasAudio(true);
+          setHasRecording(true);
           if (autoPlay) {
             await player.seekTo(0);
             // Re-check after the await — if the effect's cleanup already ran
@@ -62,13 +82,14 @@ export function useWordAudioPlayer(
             if (cancelled) return;
             player.play();
           }
-        } else if (variant.audioPath) {
-          // Had a path to try but resolution failed (vs. never having one at all) — worth a retry.
-          console.error(
-            `[useWordAudioPlayer] variant ${variant.id} has audioPath=${variant.audioPath} but ensureAudioCached returned null — see [audioCache] logs above for why`
-          );
-          setHasError(true);
+          return;
         }
+        if (variant.audioPath) {
+          // Had a path to try but resolution failed (missing file / offline) —
+          // ensureAudioCached already logged why, once per file.
+          setRecordingFailed(true);
+        }
+        if (autoPlay && allowFallbackVoice && variant.wordArabic) speak(variant.wordArabic);
       })
       .finally(() => {
         if (!cancelled) setIsResolving(false);
@@ -91,17 +112,30 @@ export function useWordAudioPlayer(
   }, [variant?.id, variant?.audioPath, retryCount]);
 
   const play = useCallback(() => {
-    if (!hasAudio) return;
-    // Same class of race as the autoPlay path above: if the screen unmounts
-    // between the tap and seekTo resolving, `player` may already be
-    // released — swallow that instead of crashing on a fire-and-forget play.
-    player
-      .seekTo(0)
-      .then(() => player.play())
-      .catch(() => {});
-  }, [player, hasAudio]);
+    if (hasRecording) {
+      // Same class of race as the autoPlay path above: if the screen unmounts
+      // between the tap and seekTo resolving, `player` may already be
+      // released — swallow that instead of crashing on a fire-and-forget play.
+      player
+        .seekTo(0)
+        .then(() => player.play())
+        .catch(() => {});
+      return;
+    }
+    if (fallbackText) speak(fallbackText);
+  }, [player, hasRecording, fallbackText, speak]);
 
   const retry = useCallback(() => setRetryCount((count) => count + 1), []);
 
-  return { play, isPlaying: status.playing, isResolving, hasAudio, hasError, retry };
+  const isFallbackVoice = !hasRecording && !isResolving && !!fallbackText;
+
+  return {
+    play,
+    isPlaying: status.playing || isSpeaking,
+    isResolving,
+    hasAudio: hasRecording || !!fallbackText,
+    isFallbackVoice,
+    hasError: recordingFailed && !fallbackText,
+    retry,
+  };
 }

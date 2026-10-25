@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { PhraseDetailModal } from '@/components/phrasebook/PhraseDetailModal';
+import { PremiumGate } from '@/components/premium/Premium';
 import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
@@ -11,8 +12,10 @@ import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Reveal } from '@/components/ui/Reveal';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { radii, spacing, type ThemeColors } from '@/constants/theme';
-import { fetchPhrasebookCategories, fetchWordGroupsForLesson } from '@/data/content';
+import { fetchPhrasebookCategories } from '@/data/content';
+import { canAccessPhrasebookCategory, fetchAccessibleLessonWordGroups } from '@/data/premiumAccess';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
+import { usePremium } from '@/lib/premium/PremiumContext';
 import { getViewedPhraseIds, markPhraseViewed } from '@/lib/phrasebookProgress';
 import { useTheme } from '@/lib/theme/ThemeContext';
 import { getPrimaryVariant } from '@/lib/wordVariants';
@@ -31,12 +34,15 @@ export default function PhrasebookCategoryScreen() {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [data, setData] = useState<CategoryData | null>(null);
   const [loadError, setLoadError] = useState(false);
+  const [isPremiumLocked, setIsPremiumLocked] = useState(false);
+  const { isPremium, isResolved } = usePremium();
   const [viewedIds, setViewedIds] = useState<string[]>([]);
   const [selectedPhrase, setSelectedPhrase] = useState<WordGroupWithVariants | null>(null);
 
   const load = useCallback(async () => {
-    if (!categoryId || !activeProfile) return;
+    if (!categoryId || !activeProfile || !isResolved) return;
     setLoadError(false);
+    setIsPremiumLocked(false);
     try {
       const [categories, viewed] = await Promise.all([
         fetchPhrasebookCategories(),
@@ -54,14 +60,20 @@ export default function PhrasebookCategoryScreen() {
         setLoadError(true);
         return;
       }
-      const phrases = await fetchWordGroupsForLesson(category.lessonId);
+      // Checked before the category's phrases are fetched, so a direct link
+      // to a locked category never loads them.
+      if (!canAccessPhrasebookCategory(isPremium, category.unitId, categories)) {
+        setIsPremiumLocked(true);
+        return;
+      }
+      const phrases = await fetchAccessibleLessonWordGroups(category.lessonId, isPremium);
       setData({ name: category.name, lessonId: category.lessonId, phrases });
       setViewedIds(viewed);
     } catch (error) {
       console.error('Failed to load phrasebook category', categoryId, error);
       setLoadError(true);
     }
-  }, [categoryId, activeProfile]);
+  }, [categoryId, activeProfile, isPremium, isResolved]);
 
   useFocusEffect(
     useCallback(() => {
@@ -75,6 +87,15 @@ export default function PhrasebookCategoryScreen() {
     setViewedIds((prev) => [...prev, phrase.id]);
     markPhraseViewed(activeProfile.id, phrase.id);
   };
+
+  if (isPremiumLocked) {
+    return (
+      <PremiumGate
+        title="This category is part of Premium"
+        message="Your free plan includes the Greetings phrasebook. Upgrade to unlock every category."
+      />
+    );
+  }
 
   if (!activeProfile || (data === null && !loadError)) return <LoadingScreen themed />;
 

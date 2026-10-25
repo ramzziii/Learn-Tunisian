@@ -1,7 +1,8 @@
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { AnalyticsOverview } from '@/components/admin/AnalyticsOverview';
 import { SelectableCard } from '@/components/ui/SelectableCard';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { colors, radii, shadows, spacing } from '@/constants/theme';
@@ -26,35 +27,54 @@ export default function AdminDashboard() {
 
   return (
     <ScreenContainer>
-      <Text style={styles.title}>Admin</Text>
-      <Text style={styles.subtitle}>Content management — curriculum and review.</Text>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+        <Text style={styles.title}>Admin</Text>
+        <Text style={styles.subtitle}>How the app is doing, and the content work waiting for you.</Text>
 
-      {metrics ? (
-        <View style={styles.metricsGrid}>
-          <MetricCard label="Units" value={metrics.unitCount} />
-          <MetricCard label="Lessons" value={metrics.lessonCount} />
-          <MetricCard label="Word groups" value={metrics.wordGroupCount} />
-          <MetricCard label="Variants" value={metrics.wordVariantCount} />
-          <MetricCard label="Needs attention" value={needingAttention} accent />
-          <MetricCard label="Corrections pending" value={metrics.pendingCorrectionsCount} accent />
-        </View>
-      ) : metricsError ? (
-        <Text style={styles.metricsError}>Couldn&apos;t load metrics.</Text>
-      ) : (
-        <ActivityIndicator style={styles.metricsLoading} color={colors.primary} />
-      )}
+        {/* Analytics (read-only, aggregate) is kept apart from the content
+            operations below, so each can grow — Learners, Learning, Revenue and
+            Marketing sections live in src/lib/admin/analyticsDefinitions.ts. */}
+        <Text style={styles.sectionHeading}>Analytics</Text>
+        <AnalyticsOverview />
 
-      <SelectableCard title="Content" subtitle="Units, lessons, and word groups" onPress={() => router.push('/admin/units')} />
-      <SelectableCard
-        title="Approval Queue"
-        subtitle={`${needingAttention} word group${needingAttention === 1 ? '' : 's'} awaiting review`}
-        onPress={() => router.push('/admin/queue')}
-      />
-      <SelectableCard
-        title="Correction Review"
-        subtitle="Pending AI-generated phrases/sentences"
-        onPress={() => router.push('/admin/corrections')}
-      />
+        <Text style={styles.sectionHeading}>Content operations</Text>
+        {metrics ? (
+          <View style={styles.metricsGrid}>
+            <MetricCard label="Units" value={metrics.unitCount} />
+            <MetricCard label="Lessons" value={metrics.lessonCount} />
+            <MetricCard label="Word groups" value={metrics.wordGroupCount} />
+            <MetricCard label="Variants" value={metrics.wordVariantCount} />
+            <MetricCard label="Needs attention" value={needingAttention} accent />
+            <MetricCard label="Corrections pending" value={metrics.pendingCorrectionsCount} accent />
+          </View>
+        ) : metricsError ? (
+          <Text style={styles.metricsError}>Couldn&apos;t load metrics.</Text>
+        ) : (
+          <ActivityIndicator style={styles.metricsLoading} color={colors.primary} />
+        )}
+
+        <SelectableCard title="Content" subtitle="Units, lessons, and word groups" onPress={() => router.push('/admin/units')} />
+        <SelectableCard
+          title="Approval Queue"
+          subtitle={`${needingAttention} word group${needingAttention === 1 ? '' : 's'} awaiting review`}
+          onPress={() => router.push('/admin/queue')}
+        />
+        <SelectableCard
+          title="Native Recordings"
+          subtitle="Record every word that doesn't have a native voice yet"
+          onPress={() => router.push('/admin/recordings')}
+        />
+        <SelectableCard
+          title="Skipped Recordings"
+          subtitle="Words you skipped — record them or put them back"
+          onPress={() => router.push('/admin/recordings-skipped')}
+        />
+        <SelectableCard
+          title="Correction Review"
+          subtitle="Pending AI-generated phrases/sentences"
+          onPress={() => router.push('/admin/corrections')}
+        />
+      </ScrollView>
     </ScreenContainer>
   );
 }
@@ -69,6 +89,14 @@ function MetricCard({ label, value, accent }: { label: string; value: number; ac
 }
 
 const styles = StyleSheet.create({
+  scroll: { paddingBottom: spacing.xxl },
+  sectionHeading: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: colors.textPrimary,
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
+  },
   title: { fontSize: 26, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md },
   subtitle: { fontSize: 14, color: colors.textSecondary, marginTop: spacing.xs, marginBottom: spacing.lg },
   metricsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg },

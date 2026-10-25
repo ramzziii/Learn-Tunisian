@@ -13,6 +13,9 @@ interface UnitSectionProps {
   track: Track;
   onSelectLesson: (lessonId: string) => void;
   onBrowseWords: (lessonId: string) => void;
+  /** True for lessons beyond the free plan — see src/lib/premium/access.ts. */
+  isPremiumLocked?: (lessonId: string) => boolean;
+  onPremiumLockedPress?: () => void;
   /** True for the very first unit in the map — tagged so a brand-new
    * learner can see at a glance where to begin, instead of the map reading
    * as an undifferentiated list. */
@@ -21,11 +24,19 @@ interface UnitSectionProps {
 
 // Like LessonNode, this component's only consumer is app/(tabs)/learn.tsx,
 // so it reacts to the live theme unconditionally.
-export function UnitSection({ unitWithLessons, track, onSelectLesson, onBrowseWords, isFirstUnit }: UnitSectionProps) {
+export function UnitSection({
+  unitWithLessons,
+  track,
+  onSelectLesson,
+  onBrowseWords,
+  isFirstUnit,
+  isPremiumLocked = () => false,
+  onPremiumLockedPress,
+}: UnitSectionProps) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { unit, lessons } = unitWithLessons;
-  const browsableLesson = lessons.find((lesson) => lesson.state !== 'locked');
+  const browsableLesson = lessons.find((lesson) => lesson.state !== 'locked' && !isPremiumLocked(lesson.id));
 
   return (
     <View style={styles.section}>
@@ -47,7 +58,11 @@ export function UnitSection({ unitWithLessons, track, onSelectLesson, onBrowseWo
       <View style={styles.lessonRow}>
         {lessons.map((lesson, index) => (
           <Reveal key={lesson.id} delay={Math.min(index * 40, 400)}>
-            <LessonNode lesson={lesson} track={track} onPress={() => onSelectLesson(lesson.id)} />
+            {isPremiumLocked(lesson.id) ? (
+              <LessonNode lesson={lesson} track={track} premiumLocked onPress={() => onPremiumLockedPress?.()} />
+            ) : (
+              <LessonNode lesson={lesson} track={track} onPress={() => onSelectLesson(lesson.id)} />
+            )}
           </Reveal>
         ))}
       </View>
@@ -62,7 +77,7 @@ const makeStyles = (colors: ThemeColors) =>
     headerLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
     unitTitle: { fontSize: 15, fontWeight: '700', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 },
     startHereBadge: { backgroundColor: colors.accentLight, borderRadius: radii.pill, paddingVertical: 2, paddingHorizontal: spacing.sm },
-    startHereText: { fontSize: 11, fontWeight: '700', color: colors.primaryDark, textTransform: 'none', letterSpacing: 0 },
+    startHereText: { fontSize: 11, fontWeight: '700', color: colors.primary, textTransform: 'none', letterSpacing: 0 },
     browseLink: { fontSize: 13, fontWeight: '600', color: colors.primary },
     lessonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xl, paddingBottom: spacing.md },
   });

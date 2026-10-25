@@ -1,5 +1,5 @@
 import { useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { ExerciseRenderer } from '@/components/exercises/shared/ExerciseRenderer';
@@ -12,7 +12,8 @@ import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Reveal } from '@/components/ui/Reveal';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
-import { colors, radii, shadows, spacing } from '@/constants/theme';
+import { radii, shadows, spacing, type ThemeColors } from '@/constants/theme';
+import { useTheme } from '@/lib/theme/ThemeContext';
 import { fetchWordGroupWithSiblings } from '@/data/content';
 import { addFavorite, fetchFavoriteWordGroupIds, removeFavorite } from '@/data/favorites';
 import { fetchProgressForWordGroup, recordWordGroupResult } from '@/data/progress';
@@ -38,6 +39,8 @@ const PROGRESS_STATUS_LABEL: Record<Progress['status'], string> = {
 };
 
 export default function WordDetail() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { wordGroupId } = useLocalSearchParams<{ wordGroupId: string }>();
   const { activeProfile } = useActiveProfile();
 
@@ -66,7 +69,7 @@ export default function WordDetail() {
   const displayVariant = group ? getPromptVariant(group, 0) : null;
   const { play, hasAudio, isResolving, hasError, retry } = useWordAudioPlayer(displayVariant);
 
-  if (!activeProfile || !group || !displayVariant) return <LoadingScreen />;
+  if (!activeProfile || !group || !displayVariant) return <LoadingScreen themed />;
 
   const toggleFavorite = async () => {
     setIsFavorite((prev) => !prev); // optimistic
@@ -109,17 +112,17 @@ export default function WordDetail() {
 
   if (practiceExercise) {
     return (
-      <ScreenContainer>
+      <ScreenContainer themed>
         <ExerciseRenderer exercise={practiceExercise} onComplete={handlePracticeComplete} />
       </ScreenContainer>
     );
   }
 
   return (
-    <ScreenContainer>
+    <ScreenContainer themed>
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.headerRow}>
-          <BackButton />
+          <BackButton themed />
           <PressableScale haptic onPress={toggleFavorite} style={styles.favoriteButton}>
             <Text style={styles.favoriteIcon}>{isFavorite ? '⭐' : '☆'}</Text>
           </PressableScale>
@@ -158,7 +161,7 @@ export default function WordDetail() {
 
           {justPracticed ? <Text style={styles.practicedNote}>Nice — progress updated!</Text> : null}
 
-          <Button
+          <Button themed
             label="Practice this word"
             onPress={startPractice}
             disabled={siblings.length < 3}
@@ -173,41 +176,42 @@ export default function WordDetail() {
   );
 }
 
-const styles = StyleSheet.create({
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  favoriteButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: spacing.md,
-  },
-  favoriteIcon: { fontSize: 24 },
-  heroCard: {
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-    padding: spacing.xl,
-    marginTop: spacing.md,
-  },
-  arabic: { fontSize: 40, fontWeight: '700', color: colors.textPrimary },
-  transliteration: { fontSize: 16, color: colors.textSecondary, fontStyle: 'italic', marginTop: spacing.xs },
-  meaning: { fontSize: 18, color: colors.textPrimary, marginTop: spacing.sm, textTransform: 'capitalize' },
-  verificationBadge: { fontSize: 12, color: colors.accent, marginTop: spacing.md, fontWeight: '600' },
-  verificationBadgeVerified: { color: colors.success },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.textSecondary,
-    marginTop: spacing.xl,
-    marginBottom: spacing.sm,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  progressCard: { backgroundColor: colors.surface, borderRadius: radii.md, padding: spacing.md },
-  progressStatus: { fontSize: 17, fontWeight: '700', color: colors.primaryDark },
-  progressDetail: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
-  practicedNote: { fontSize: 13, color: colors.success, marginTop: spacing.md, textAlign: 'center', fontWeight: '600' },
-  practiceUnavailable: { fontSize: 12, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.sm },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    favoriteButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: spacing.md,
+    },
+    favoriteIcon: { fontSize: 24 },
+    heroCard: {
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderRadius: radii.lg,
+      padding: spacing.xl,
+      marginTop: spacing.md,
+    },
+    arabic: { fontSize: 40, fontWeight: '700', color: colors.textPrimary },
+    transliteration: { fontSize: 16, color: colors.textSecondary, fontStyle: 'italic', marginTop: spacing.xs },
+    meaning: { fontSize: 18, color: colors.textPrimary, marginTop: spacing.sm, textTransform: 'capitalize' },
+    verificationBadge: { fontSize: 12, color: colors.accent, marginTop: spacing.md, fontWeight: '600' },
+    verificationBadgeVerified: { color: colors.success },
+    sectionTitle: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: colors.textSecondary,
+      marginTop: spacing.xl,
+      marginBottom: spacing.sm,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    progressCard: { backgroundColor: colors.surface, borderRadius: radii.md, padding: spacing.md },
+    progressStatus: { fontSize: 17, fontWeight: '700', color: colors.primary },
+    progressDetail: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
+    practicedNote: { fontSize: 13, color: colors.success, marginTop: spacing.md, textAlign: 'center', fontWeight: '600' },
+    practiceUnavailable: { fontSize: 12, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.sm },
+  });

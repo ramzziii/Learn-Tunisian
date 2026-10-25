@@ -1,7 +1,9 @@
+import { useMemo } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { placeholderEmojiFor } from '@/constants/placeholderVisuals';
-import { colors, radii } from '@/constants/theme';
+import { radii, type ThemeColors } from '@/constants/theme';
+import { useTheme } from '@/lib/theme/ThemeContext';
 import { getImageUrl } from '@/lib/supabase/client';
 import type { WordGroup } from '@/types/models';
 
@@ -11,6 +13,8 @@ interface WordPictureProps {
 }
 
 export function WordPicture({ group, size }: WordPictureProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const imageUrl = getImageUrl(group.imagePath);
   return (
     <View style={[styles.container, { width: size, height: size, borderRadius: radii.md }]}>
@@ -23,10 +27,11 @@ export function WordPicture({ group, size }: WordPictureProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    container: {
+      backgroundColor: colors.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+  });
