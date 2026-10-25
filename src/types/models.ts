@@ -122,6 +122,8 @@ export interface WordVariant {
   isNativeVoice: boolean;
   /** Included in the learner-facing Repeat After Me section. */
   inRepeatAfterMe: boolean;
+  /** Set when an admin permanently skipped recording this form. */
+  recordingSkippedAt: string | null;
   /** Stamped automatically when nativeVerified flips to true — see src/data/admin/content.ts. */
   approvedBy: string | null;
   approvedAt: string | null;

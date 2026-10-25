@@ -71,8 +71,22 @@ export function createFakeSupabase() {
     };
   }
 
+  const storageLists: string[] = [];
+
   return {
-    client: { from: (table: string) => builder(table) },
+    client: {
+      from: (table: string) => builder(table),
+      // Storage folder listings, scripted as "storage.list:<folder>".
+      storage: {
+        from: () => ({
+          list: (folder: string) => {
+            storageLists.push(folder);
+            return Promise.resolve(nextResult(`storage.list:${folder}`));
+          },
+        }),
+      },
+    },
+    storageLists,
     /** Script the result(s) for "table.operation"; called in order, the last one repeats. */
     respond(key: string, ...results: FakeResult[]) {
       scripts.set(key, results);
@@ -81,6 +95,7 @@ export function createFakeSupabase() {
     writes: () => queries.filter((q) => q.operation !== 'select'),
     reset() {
       queries.length = 0;
+      storageLists.length = 0;
       scripts.clear();
     },
   };

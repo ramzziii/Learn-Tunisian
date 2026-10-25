@@ -102,6 +102,9 @@ export interface WordVariantRow {
   is_native_voice: boolean;
   /** 0012_repeat_after_me.sql — admin opted this recording into Repeat After Me. */
   in_repeat_after_me: boolean;
+  /** 0013_recording_skips.sql — admin skipped recording this form. */
+  recording_skipped_at: string | null;
+  recording_skipped_by: string | null;
   approved_by: string | null;
   approved_at: string | null;
 }

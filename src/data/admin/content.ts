@@ -385,6 +385,8 @@ export async function updateWordVariant(
     dialectNotes: string | null;
     isNativeVoice: boolean;
     inRepeatAfterMe: boolean;
+    /** true stamps recording_skipped_at/by (now, this admin); false clears them. */
+    recordingSkipped: boolean;
     /** Setting this true stamps approved_by/approved_at to this actor/now;
      * setting it false clears them — see the comment below. */
     nativeVerified: boolean;
@@ -405,6 +407,10 @@ export async function updateWordVariant(
       ...(patch.dialectNotes !== undefined && { dialect_notes: patch.dialectNotes }),
       ...(patch.isNativeVoice !== undefined && { is_native_voice: patch.isNativeVoice }),
       ...(patch.inRepeatAfterMe !== undefined && { in_repeat_after_me: patch.inRepeatAfterMe }),
+      ...(patch.recordingSkipped !== undefined && {
+        recording_skipped_at: patch.recordingSkipped ? new Date().toISOString() : null,
+        recording_skipped_by: patch.recordingSkipped ? actorAccountId : null,
+      }),
       // Stamped here (app layer) rather than a DB trigger, same reasoning as
       // created_by/updated_by — this is the one function that ever flips
       // native_verified, so there's a single point of truth either way.

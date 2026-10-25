@@ -38,7 +38,12 @@ flags `@expo/config-plugins`, which is installed on purpose (see AGENTS.md).
 | Admin edits & Supabase rejections | `src/data/admin/__tests__/content.test.ts`, `src/lib/admin/__tests__/wordGroupValidation.test.ts` |
 | Audio upload → save path → delete old file | `src/lib/__tests__/audioPlayback.test.ts`, `src/components/admin/__tests__/AudioRecorderField.test.tsx` (what the admin sees on failure/success) |
 | Learner playback refresh after re-recording | `src/lib/__tests__/audioCacheResolution.test.ts` (native cache/download/fallback and web) |
+| Pronunciation practice (everywhere a learner records) | `src/components/pronunciation/__tests__/PronunciationPractice.test.tsx` (existing transcription check, Good job / Not quite right yet, compare both recordings, 3 tries + revisit, self-assess fallback, mic/recording failures, learner audio deleted); hosts: `SpeakingPractice.test.tsx`, `RepeatAfterMeExercise.test.tsx`, `PhraseDetailModal.test.tsx` |
+| Result pop-ups (after every answer) | `src/components/ui/__tests__/FeedbackSheet.test.tsx` (Next, countdown from 3, auto-advance once, pause, choice mode), `src/components/exercises/shared/__tests__/AnswerFeedback.test.tsx`, `src/components/exercises/adult/__tests__/ReadingMatch.test.tsx` (moves on only via Next/countdown) |
+| Admin Native Recordings / Skipped | `src/data/admin/__tests__/recordingQueue.test.ts` (no audio / missing file / not native, order, skip/restore, safe save + Repeat After Me box), `src/components/admin/__tests__/RecordingStation.test.tsx`, `src/__tests__/routes/adminRecordings.test.tsx` (next word pops up, skip, all-done, skipped list) |
+| Admin analytics overview | `src/data/admin/__tests__/analytics.test.ts` (periods, mapping, no fake zeros, access denied), `src/__tests__/migrations/adminAnalytics.test.ts` (admin-only SECURITY DEFINER function, UTC day boundaries, aggregates only), `src/components/admin/__tests__/AnalyticsOverview.test.tsx` (loading/error/denied/not-deployed/unavailable states), `src/__tests__/routes/adminDashboard.test.tsx` (existing links + metrics) |
 | Repeat After Me | `src/lib/__tests__/repeatAfterMeSession.test.ts` (3 attempts, missed → one review pass, 5-per-session free limit), `src/lib/__tests__/repeatAfterMeProgress.test.ts`, `src/data/__tests__/repeatAfterMe.test.ts`, `src/components/repeatAfterMe/__tests__/RepeatAfterMeExercise.test.tsx` (permissions, interrupted/failed recordings, learner audio deleted), `src/__tests__/routes/repeatAfterMe.test.tsx`, `src/__tests__/routes/adminRepeatAfterMe.test.tsx`, admin opt-in cases in `AudioRecorderField.test.tsx` |
+| Today's Practice (Home) | `src/lib/__tests__/todaysPractice.test.ts` (composition, order, caps, de-duplication, free review allowance), `src/data/__tests__/todaysPractice.test.ts` (sources + access rules, partial failures), `src/__tests__/routes/todaysPractice.test.tsx` (session flow, progress, one daily-goal log), `src/__tests__/routes/homeTodaysPractice.test.tsx` (card placement/start, Practice tab unchanged) |
 | Lesson/review/progress | `src/data/__tests__/progress.test.ts`, `src/hooks/__tests__/useExerciseQueue.test.ts`, plus the pure scheduling/mastery tests in `src/lib/__tests__/` |
 
 Component and route tests use `@testing-library/react-native` (v14 — note
@@ -66,6 +71,8 @@ If these become automated, put them in `supabase/tests/` (pgTAP, run with
 `supabase test db`) as a separate workflow that only runs where a local
 Supabase stack is available — not in the ordinary PR job.
 
+- Admin analytics needs `supabase/migrations/0014_admin_analytics.sql` applied. Against a test project, check `select admin_analytics_overview(30)` as an admin returns the counts, and as a non-admin raises `not authorized` (42501).
+- Native Recordings' Skip needs `supabase/migrations/0013_recording_skips.sql` applied (and saving there needs 0012 too).
 - Repeat After Me needs `supabase/migrations/0012_repeat_after_me.sql` applied; until then the admin opt-in fails with a clear error and the learner section shows its load-error state.
 
 ### Device-level checks (needs a phone/simulator)
