@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Animated, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { AnswerFeedback } from '@/components/exercises/shared/AnswerFeedback';
@@ -13,8 +13,6 @@ import { useWordAudioPlayer } from '@/hooks/useWordAudioPlayer';
 import { isAnyVariantTransliterationMatch } from '@/lib/wordVariants';
 import type { ExerciseItem } from '@/types/exercises';
 
-const CORRECT_FEEDBACK_DELAY_MS = 900;
-const INCORRECT_FEEDBACK_DELAY_MS = 1800; // a little longer so there's time to read/hear the replay
 
 interface TypingSpellingProps {
   exercise: ExerciseItem;
@@ -43,13 +41,6 @@ export function TypingSpelling({ exercise, onComplete }: TypingSpellingProps) {
     }
   };
 
-  useEffect(() => {
-    if (!submitted) return;
-    const delay = isCorrect ? CORRECT_FEEDBACK_DELAY_MS : INCORRECT_FEEDBACK_DELAY_MS;
-    const timer = setTimeout(() => onComplete(isCorrect), delay);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [submitted]);
 
   return (
     <View style={styles.container}>
@@ -80,24 +71,25 @@ export function TypingSpelling({ exercise, onComplete }: TypingSpellingProps) {
         />
       </Animated.View>
 
-      <PressableScale
-        haptic
-        onPress={submit}
-        disabled={submitted || input.trim().length === 0}
-        style={[styles.submitButton, (submitted || input.trim().length === 0) && styles.submitButtonDisabled]}
-      >
-        <Text style={styles.submitLabel}>Check</Text>
-      </PressableScale>
-
-      {submitted ? (
+      {/* Once checked, the feedback card takes the button's place. */}
+      {!submitted ? (
+        <PressableScale
+          haptic
+          onPress={submit}
+          disabled={input.trim().length === 0}
+          style={[styles.submitButton, input.trim().length === 0 && styles.submitButtonDisabled]}
+        >
+          <Text style={styles.submitLabel}>Check</Text>
+        </PressableScale>
+      ) : (
         <AnswerFeedback
           isCorrect={isCorrect}
           correctWordArabic={exercise.promptVariant.wordArabic}
           correctTransliteration={exercise.promptVariant.transliteration}
           correctMeaning={exercise.targetGroup.englishMeaning}
-          onListenAgain={play}
+          onNext={() => onComplete(isCorrect)}
         />
-      ) : null}
+      )}
     </View>
   );
 }

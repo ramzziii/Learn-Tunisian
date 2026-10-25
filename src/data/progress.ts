@@ -18,6 +18,19 @@ export async function fetchProgressForWordGroup(profileId: string, wordGroupId: 
   return data ? mapProgress(data) : null;
 }
 
+/** Which of `wordGroupIds` this profile already has a progress row for —
+ * i.e. has practiced at least once. */
+export async function fetchSeenWordGroupIds(profileId: string, wordGroupIds: string[]): Promise<Set<string>> {
+  if (wordGroupIds.length === 0) return new Set();
+  const { data, error } = await supabase
+    .from('progress')
+    .select('word_group_id')
+    .eq('profile_id', profileId)
+    .in('word_group_id', wordGroupIds);
+  if (error) throw error;
+  return new Set(((data ?? []) as { word_group_id: string }[]).map((row) => row.word_group_id));
+}
+
 type SpacedRepetitionRow = Pick<
   ProgressRow,
   'correct_count' | 'incorrect_count' | 'review_interval_days' | 'ease_factor' | 'consecutive_correct' | 'consecutive_incorrect'

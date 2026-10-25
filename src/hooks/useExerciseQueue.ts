@@ -17,7 +17,7 @@ function shuffled<T>(items: T[]): T[] {
 }
 
 /** Distractor options always come from different word_groups than the target — never another variant of the same group. */
-function buildOptions(
+export function buildOptions(
   targetGroup: WordGroupWithVariants,
   targetPromptVariant: ExerciseOption,
   allGroups: WordGroupWithVariants[],

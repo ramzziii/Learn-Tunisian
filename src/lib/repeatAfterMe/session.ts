@@ -119,6 +119,34 @@ export function assessAttempt<T extends { id: string }>(state: RamSessionState<T
   return { ...state, attemptsOnCurrent: attempts };
 }
 
+/**
+ * The shared practice flow finished the current item (it owns the attempts,
+ * the result screens and the out-of-tries message): record the result and
+ * move on. Not right → needs review, and queued for the end review pass.
+ */
+export function finishItem<T extends { id: string }>(
+  state: RamSessionState<T>,
+  result: { correct: boolean; attempts: number }
+): RamSessionState<T> {
+  const item = currentItem(state);
+  if (!item) return state;
+  const outcome: RamResult = result.correct ? 'correct' : 'needs_review';
+
+  if (state.phase === 'review') {
+    const previous = state.results[item.id];
+    const results = { ...state.results, [item.id]: { attempts: (previous?.attempts ?? 0) + result.attempts, result: outcome } };
+    const next = state.index + 1;
+    return next >= state.missedIds.length ? { ...state, results, phase: 'done', index: 0 } : { ...state, results, index: next };
+  }
+
+  return nextPracticeItem({
+    ...state,
+    notice: null,
+    results: { ...state.results, [item.id]: { attempts: result.attempts, result: outcome } },
+    missedIds: result.correct ? state.missedIds : [...state.missedIds, item.id],
+  });
+}
+
 /** Continues after the "we'll revisit this later" notice. */
 export function advanceAfterNotice<T extends { id: string }>(state: RamSessionState<T>): RamSessionState<T> {
   if (state.notice !== 'missed') return state;

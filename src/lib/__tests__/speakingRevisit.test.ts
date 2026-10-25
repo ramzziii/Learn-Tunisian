@@ -1,4 +1,4 @@
-import { buildRevisitExercises, SPEAKING_MISSES_BEFORE_REVISIT, updateRevisitList } from '@/lib/speakingRevisit';
+import { buildRevisitExercises, updateRevisitList } from '@/lib/speakingRevisit';
 import type { WordGroupWithVariants } from '@/types/models';
 
 const speaking = { type: 'speaking' as const };
@@ -10,10 +10,6 @@ const group = (id: string) =>
     englishMeaning: id,
     variants: [{ id: `${id}-v`, variantLabel: 'primary', wordArabic: 'كلمة', transliteration: id }],
   }) as unknown as WordGroupWithVariants;
-
-it('moves on by itself after 4 misses', () => {
-  expect(SPEAKING_MISSES_BEFORE_REVISIT).toBe(4);
-});
 
 describe('updateRevisitList', () => {
   it('queues a word left mispronounced, once, in the order missed', () => {

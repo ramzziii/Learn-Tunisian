@@ -7,7 +7,7 @@ const mockDb = createFakeSupabase();
 jest.mock('@/lib/supabase/client', () => ({ supabase: mockDb.client }));
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const { recordWordGroupResult, fetchReviewQueue } = require('@/data/progress');
+const { recordWordGroupResult, fetchReviewQueue, fetchSeenWordGroupIds } = require('@/data/progress');
 
 const groupRow = (id: string) => ({
   id,
@@ -168,5 +168,27 @@ describe('fetchReviewQueue (Review screen)', () => {
 
     const queue = await fetchReviewQueue('p1');
     expect(queue.map((g: { id: string }) => g.id)).toEqual(['kept']);
+  });
+});
+
+describe('fetchSeenWordGroupIds (Today’s Practice "new words")', () => {
+  it('returns which of the given words this profile already has progress for', async () => {
+    mockDb.respond('progress.select', { data: [{ word_group_id: 'a' }], error: null });
+
+    const seen = await fetchSeenWordGroupIds('p1', ['a', 'b']);
+
+    expect([...seen]).toEqual(['a']);
+    expect(mockDb.queries[0].calls).toContainEqual(['eq', 'profile_id', 'p1']);
+    expect(mockDb.queries[0].calls).toContainEqual(['in', 'word_group_id', ['a', 'b']]);
+  });
+
+  it('asks nothing for an empty list', async () => {
+    await expect(fetchSeenWordGroupIds('p1', [])).resolves.toEqual(new Set());
+    expect(mockDb.queries).toHaveLength(0);
+  });
+
+  it('surfaces a read failure', async () => {
+    mockDb.respond('progress.select', { data: null, error: { message: 'permission denied', code: '42501' } });
+    await expect(fetchSeenWordGroupIds('p1', ['a'])).rejects.toMatchObject({ code: '42501' });
   });
 });

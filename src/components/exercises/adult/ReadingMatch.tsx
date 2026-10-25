@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
 
 import { AnswerFeedback } from '@/components/exercises/shared/AnswerFeedback';
@@ -13,8 +13,6 @@ import { useShake } from '@/hooks/useShake';
 import { useWordAudioPlayer } from '@/hooks/useWordAudioPlayer';
 import type { ExerciseItem } from '@/types/exercises';
 
-const CORRECT_FEEDBACK_DELAY_MS = 900;
-const INCORRECT_FEEDBACK_DELAY_MS = 1800; // a little longer so there's time to read/hear the replay
 
 interface ReadingMatchProps {
   exercise: ExerciseItem;
@@ -43,13 +41,6 @@ export function ReadingMatch({ exercise, onComplete }: ReadingMatchProps) {
     }
   };
 
-  useEffect(() => {
-    if (!selectedGroupId) return;
-    const delay = isCorrectSelection ? CORRECT_FEEDBACK_DELAY_MS : INCORRECT_FEEDBACK_DELAY_MS;
-    const timer = setTimeout(() => onComplete(isCorrectSelection), delay);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedGroupId]);
 
   return (
     <View style={styles.container}>
@@ -96,7 +87,7 @@ export function ReadingMatch({ exercise, onComplete }: ReadingMatchProps) {
           correctWordArabic={exercise.promptVariant.wordArabic}
           correctTransliteration={exercise.promptVariant.transliteration}
           correctMeaning={exercise.targetGroup.englishMeaning}
-          onListenAgain={play}
+          onNext={() => onComplete(isCorrectSelection)}
         />
       ) : null}
     </View>

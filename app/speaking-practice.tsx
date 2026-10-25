@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Animated, StyleSheet, Text, View } from 'react-native';
 
 import { ExerciseRenderer } from '@/components/exercises/shared/ExerciseRenderer';
 import { RevisitIntro } from '@/components/session/RevisitIntro';
@@ -15,6 +15,7 @@ import { useTheme } from '@/lib/theme/ThemeContext';
 import { fetchLessonMap, fetchWordGroupsForLesson } from '@/data/content';
 import { fetchFavoriteWordGroups } from '@/data/favorites';
 import { fetchWeakestWordGroups } from '@/data/progress';
+import { useSlideInOnChange } from '@/hooks/useSlideInOnChange';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
 import { markSpeakingCompletedToday } from '@/lib/dailyChallengeProgress';
 import { buildRevisitExercises, updateRevisitList } from '@/lib/speakingRevisit';
@@ -59,6 +60,7 @@ export default function SpeakingPracticeScreen() {
   const [revisitIds, setRevisitIds] = useState<string[]>([]);
   const [phase, setPhase] = useState<'main' | 'revisit-intro' | 'revisit' | 'done'>('main');
   const isDone = phase === 'done';
+  const slideIn = useSlideInOnChange(`${phase}-${index}`);
 
   useEffect(() => {
     if (!activeProfile) return;
@@ -179,7 +181,9 @@ export default function SpeakingPracticeScreen() {
         </Text>
       </View>
 
-      <ExerciseRenderer exercise={queue[index]} onComplete={handleComplete} />
+      <Animated.View style={[{ flex: 1 }, slideIn]}>
+        <ExerciseRenderer exercise={queue[index]} onComplete={handleComplete} />
+      </Animated.View>
     </ScreenContainer>
   );
 }

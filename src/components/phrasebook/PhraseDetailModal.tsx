@@ -1,19 +1,14 @@
-import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
-import { File } from 'expo-file-system';
 import * as Haptics from 'expo-haptics';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { Button } from '@/components/ui/Button';
+import { PRONUNCIATION_MAX_ATTEMPTS, PronunciationPractice } from '@/components/pronunciation/PronunciationPractice';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { radii, spacing, type ThemeColors } from '@/constants/theme';
 import { useLetterSpeech } from '@/hooks/useLetterSpeech';
-import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
 import { useWordAudioPlayer } from '@/hooks/useWordAudioPlayer';
-import { isUsingMockAiProvider } from '@/lib/ai';
-import { transcribeAudio } from '@/lib/ai/functionsClient';
 import { useTheme } from '@/lib/theme/ThemeContext';
-import { getPrimaryVariant, isAnyVariantSpeechMatch } from '@/lib/wordVariants';
+import { getPrimaryVariant } from '@/lib/wordVariants';
 import type { Track, WordGroupWithVariants } from '@/types/models';
 
 interface PhraseDetailModalProps {
@@ -21,9 +16,6 @@ interface PhraseDetailModalProps {
   track: Track;
   onClose: () => void;
 }
-
-type CheckStage = 'idle' | 'checking' | 'correct' | 'incorrect' | 'exhausted' | 'check-failed';
-const MAX_ATTEMPTS = 3;
 
 /**
  * Modeled directly on src/components/culture/ProverbDetailModal.tsx (same
@@ -39,36 +31,23 @@ const MAX_ATTEMPTS = 3;
  * button used TTS unconditionally, which meant no phrase ever played a real
  * recording even after one existed.
  *
- * Pronunciation checking reuses the exact same pipeline
- * src/components/exercises/adult/SpeakingPractice.tsx already uses for
- * lesson exercises: transcribeAudio (Whisper via the talk-stt function) +
- * isAnyVariantSpeechMatch against this phrase's own word_group/variants —
- * these phrases are real word_groups (see 0007_phrasebook_content.sql), so
- * that matcher works unchanged. Same gate, same caveat: only runs when a
- * live AI provider is configured (EXPO_PUBLIC_TALK_AI_MODE=live); in mock
- * mode (the default) this falls back to self-comparison only (record,
- * listen back, judge yourself against the TTS) — no "Check pronunciation"
- * button, exactly like SpeakingPractice's own mock-mode fallback. Recording
- * is hidden for a kid-track profile — mic permission is never requested for
- * kids, per this app's existing hard rule (moot today since kids are
- * currently flag-hidden, but keeps this correct either way).
+ * "Practice saying it" is the shared record → check → compare flow
+ * (src/components/pronunciation/PronunciationPractice.tsx) — the same check
+ * and result screens as lessons and Repeat After Me, against this phrase's
+ * own variants. Finishing resets it for another go (there's no session to
+ * revisit in). Recording is hidden for a kid-track profile — mic permission
+ * is never requested for kids, per this app's existing hard rule.
  */
 export function PhraseDetailModal({ phrase, track, onClose }: PhraseDetailModalProps) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { speak, isSpeaking } = useLetterSpeech();
-  const recorder = useVoiceRecorder();
-  const player = useAudioPlayer(null);
-  const playerStatus = useAudioPlayerStatus(player);
-  const [recordedUri, setRecordedUri] = useState<string | null>(null);
-  const [recordError, setRecordError] = useState<string | null>(null);
-  const [checkStage, setCheckStage] = useState<CheckStage>('idle');
-  const [attemptCount, setAttemptCount] = useState(0);
+  // Bumped to restart practice after finishing a go (a new phrase remounts it via the key).
+  const [practiceKey, setPracticeKey] = useState(0);
 
   const backdropAnim = useRef(new Animated.Value(0)).current;
   const contentAnim = useRef(new Animated.Value(0)).current;
   const isVisible = phrase !== null;
-  const scoringActive = !isUsingMockAiProvider;
   // Computed here (not after the early returns below) so useWordAudioPlayer
   // can be called unconditionally every render, same requirement as every
   // other hook above it.
@@ -82,10 +61,6 @@ export function PhraseDetailModal({ phrase, track, onClose }: PhraseDetailModalP
   useEffect(() => {
     if (!isVisible) return;
     contentAnim.setValue(0);
-    setRecordedUri(null);
-    setRecordError(null);
-    setCheckStage('idle');
-    setAttemptCount(0);
     Animated.spring(contentAnim, { toValue: 1, useNativeDriver: true, speed: 16, bounciness: 8 }).start();
   }, [phrase?.id, isVisible, contentAnim]);
 
@@ -100,70 +75,6 @@ export function PhraseDetailModal({ phrase, track, onClose }: PhraseDetailModalP
       // placeholder so the phrase is still audible, same fallback
       // SpeakingPractice-style exercises use elsewhere in the app.
       speak(variant.wordArabic);
-    }
-  };
-
-  const startRecording = async () => {
-    setRecordError(null);
-    setCheckStage('idle');
-    try {
-      await recorder.start();
-      Haptics.selectionAsync();
-    } catch {
-      setRecordError("Couldn't start recording. Give it another try.");
-    }
-  };
-
-  const stopRecording = async () => {
-    try {
-      const uri = await recorder.stop();
-      if (!uri) {
-        setRecordError("That recording didn't save properly. Give it another try.");
-        return;
-      }
-      player.replace({ uri });
-      setRecordedUri(uri);
-      setCheckStage('idle');
-      Haptics.selectionAsync();
-    } catch {
-      setRecordError("Couldn't finish recording. Give it another try.");
-    }
-  };
-
-  const playRecording = () => {
-    try {
-      player.seekTo(0).then(() => player.play());
-    } catch {
-      setRecordError("Couldn't play that back — try recording again.");
-    }
-  };
-
-  const checkPronunciation = async () => {
-    if (!recordedUri || checkStage === 'checking') return;
-    setRecordError(null);
-    setCheckStage('checking');
-    try {
-      const file = new File(recordedUri);
-      const bytes = await file.bytes();
-      const result = await transcribeAudio(bytes, 'audio/m4a');
-      if (!result.ok) {
-        setCheckStage('check-failed');
-        return;
-      }
-
-      const nextAttemptCount = attemptCount + 1;
-      setAttemptCount(nextAttemptCount);
-
-      if (isAnyVariantSpeechMatch(phrase, result.text)) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        setCheckStage('correct');
-      } else if (nextAttemptCount >= MAX_ATTEMPTS) {
-        setCheckStage('exhausted');
-      } else {
-        setCheckStage('incorrect');
-      }
-    } catch {
-      setCheckStage('check-failed');
     }
   };
 
@@ -214,74 +125,16 @@ export function PhraseDetailModal({ phrase, track, onClose }: PhraseDetailModalP
             {canRecord ? (
               <>
                 <Text style={styles.sectionLabel}>Practice saying it</Text>
-                {recordError ? <Text style={styles.errorText}>{recordError}</Text> : null}
-
-                {recorder.permission === 'needs-explanation' ? (
-                  <PressableScale onPress={recorder.requestPermission} style={styles.micPrompt}>
-                    <Text style={styles.micPromptText}>
-                      {scoringActive
-                        ? '🎙️ Allow the microphone to record yourself — we’ll check how close it sounds to the correct pronunciation.'
-                        : '🎙️ Allow the microphone to record yourself and compare — just for you, never scored or sent anywhere.'}
-                    </Text>
-                  </PressableScale>
-                ) : recorder.permission === 'denied' ? (
-                  <Text style={styles.mutedText}>Microphone access is off — turn it on in Settings to practice speaking.</Text>
-                ) : (
-                  <View style={styles.recordRow}>
-                    <PressableScale
-                      onPress={recorder.isRecording ? stopRecording : startRecording}
-                      style={[styles.recordButton, recorder.isRecording && styles.recordButtonActive]}
-                    >
-                      <Text style={styles.recordIcon}>{recorder.isRecording ? '⏹' : '🎙️'}</Text>
-                    </PressableScale>
-                    <Text style={styles.recordLabel}>
-                      {recorder.isRecording ? 'Recording… tap to stop' : 'Tap to record yourself'}
-                    </Text>
-                  </View>
-                )}
-
-                {recordedUri ? (
-                  <PressableScale onPress={playRecording} style={styles.playbackButton}>
-                    <Text style={styles.playbackIcon}>{playerStatus.playing ? '⏸' : '▶️'}</Text>
-                    <Text style={styles.playbackLabel}>Your recording</Text>
-                  </PressableScale>
-                ) : null}
-
-                {recordedUri && scoringActive ? (
-                  checkStage === 'idle' || checkStage === 'checking' ? (
-                    <Button
-                      themed
-                      label="Check pronunciation"
-                      onPress={checkPronunciation}
-                      loading={checkStage === 'checking'}
-                      variant="secondary"
-                      style={{ marginTop: spacing.sm, marginBottom: spacing.xl }}
-                    />
-                  ) : (
-                    <View
-                      style={[
-                        styles.feedbackBanner,
-                        checkStage === 'correct' && styles.feedbackBannerCorrect,
-                        { marginBottom: spacing.xl },
-                      ]}
-                    >
-                      <Text style={[styles.feedbackText, checkStage === 'correct' && styles.feedbackTextCorrect]}>
-                        {checkStage === 'correct'
-                          ? 'Nice! That sounds right.'
-                          : checkStage === 'incorrect'
-                            ? 'Not quite — give it another try.'
-                            : checkStage === 'exhausted'
-                              ? "No worries — here's how it's said above."
-                              : "Couldn't check that this time — you can keep practicing."}
-                      </Text>
-                      {checkStage === 'incorrect' ? (
-                        <Text style={styles.attemptText}>
-                          Attempt {attemptCount} of {MAX_ATTEMPTS}
-                        </Text>
-                      ) : null}
-                    </View>
-                  )
-                ) : null}
+                <PronunciationPractice
+                  key={`${phrase.id}-${practiceKey}`}
+                  nativeVariant={variant}
+                  matchGroup={phrase}
+                  maxAttempts={PRONUNCIATION_MAX_ATTEMPTS}
+                  allowFallbackVoice
+                  showNativeButton={false}
+                  outOfTriesMessage="Keep practicing — listen to the native speaker again and have another go anytime."
+                  onFinish={() => setPracticeKey((k) => k + 1)}
+                />
               </>
             ) : null}
           </ScrollView>

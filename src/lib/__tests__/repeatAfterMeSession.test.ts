@@ -4,6 +4,7 @@
 import {
   advanceAfterNotice,
   assessAttempt,
+  finishItem,
   continueAfterUpgradeGate,
   currentItem,
   orderItemsForSession,
@@ -150,5 +151,41 @@ describe('orderItemsForSession', () => {
       'item-3': { attempts: 3, lastResult: 'needs_review', lastPracticedAt: '2026-10-01T00:00:00Z' },
     });
     expect(ordered.map((i) => i.id)).toEqual(['item-3', 'item-2', 'item-4', 'item-1']);
+  });
+});
+
+describe('finishItem (the shared practice flow reports a finished item)', () => {
+  it('said right → correct with its attempt count, next item', () => {
+    let s = startSession(items(2), { isPremium: true, lockedCount: 0 });
+    s = finishItem(s, { correct: true, attempts: 2 });
+    expect(s.results['item-1']).toEqual({ attempts: 2, result: 'correct' });
+    expect(currentItem(s)?.id).toBe('item-2');
+  });
+
+  it('moved on (or out of tries) → needs review, queued for the end review pass, next item', () => {
+    let s = startSession(items(2), { isPremium: true, lockedCount: 0 });
+    s = finishItem(s, { correct: false, attempts: 1 });
+    expect(s.results['item-1']).toEqual({ attempts: 1, result: 'needs_review' });
+    expect(s.missedIds).toEqual(['item-1']);
+    expect(s.notice).toBeNull();
+    expect(currentItem(s)?.id).toBe('item-2');
+  });
+
+  it('the review pass adds its attempt and finishes', () => {
+    let s = startSession(items(1), { isPremium: true, lockedCount: 0 });
+    s = finishItem(s, { correct: false, attempts: 3 });
+    expect(s.phase).toBe('review');
+    s = finishItem(s, { correct: true, attempts: 1 });
+    expect(s.results['item-1']).toEqual({ attempts: 4, result: 'correct' });
+    expect(s.phase).toBe('done');
+  });
+
+  it('free: still stops at the upgrade gate after five, then reviews what was missed', () => {
+    let s = startSession(items(5), { isPremium: false, lockedCount: 2 });
+    s = finishItem(s, { correct: false, attempts: 3 });
+    for (let i = 0; i < 4; i++) s = finishItem(s, { correct: true, attempts: 1 });
+    expect(s.phase).toBe('upgrade-gate');
+    s = continueAfterUpgradeGate(s);
+    expect(currentItem(s)?.id).toBe('item-1');
   });
 });

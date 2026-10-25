@@ -2,10 +2,6 @@ import { getPromptVariant } from '@/lib/wordVariants';
 import type { ExerciseItem, ExerciseOutcome } from '@/types/exercises';
 import type { WordGroupWithVariants } from '@/types/models';
 
-/** Misses on one speaking exercise before the app moves on by itself and
- * queues the word to revisit at the end. */
-export const SPEAKING_MISSES_BEFORE_REVISIT = 4;
-
 /**
  * Keeps the ordered, de-duplicated list of words to revisit at the end of a
  * session: a word is added when it's left mispronounced, and removed if the

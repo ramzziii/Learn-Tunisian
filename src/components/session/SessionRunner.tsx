@@ -16,7 +16,7 @@ import { fetchLessonMap } from '@/data/content';
 import { recordWordGroupResult } from '@/data/progress';
 import { recordSessionLog } from '@/data/sessionLogs';
 import { useExerciseQueue } from '@/hooks/useExerciseQueue';
-import { useFadeInOnChange } from '@/hooks/useFadeInOnChange';
+import { useSlideInOnChange } from '@/hooks/useSlideInOnChange';
 import { useSessionTimer } from '@/hooks/useSessionTimer';
 import { evaluateBadges, type Badge } from '@/lib/badges';
 import { getSeenBadgeIds, markBadgesSeen } from '@/lib/badgeProgress';
@@ -98,7 +98,7 @@ export function SessionRunner({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timer.isComplete]);
   const destination = exitHref ?? '/home';
-  const fadeAnim = useFadeInOnChange(currentExercise?.key);
+  const slideIn = useSlideInOnChange(currentExercise?.key);
 
   const [stats, setStats] = useState({ correct: 0, incorrect: 0 });
   const practicedGroupIds = useRef(new Set<string>());
@@ -274,7 +274,7 @@ export function SessionRunner({
       {phase === 'revisit-intro' ? (
         <RevisitIntro count={revisitIds.length} onStart={startRevisit} onSkip={() => setPhase('done')} />
       ) : currentExercise ? (
-        <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
+        <Animated.View style={[{ flex: 1 }, slideIn]}>
           <ExerciseRenderer exercise={currentExercise} onComplete={handleAnswer} />
         </Animated.View>
       ) : (

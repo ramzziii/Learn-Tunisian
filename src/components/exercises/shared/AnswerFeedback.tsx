@@ -1,107 +1,78 @@
-import { useEffect, useMemo, useRef } from 'react';
-import { Animated, StyleSheet, Text, View } from 'react-native';
+import { useMemo } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 
-import { PressableScale } from '@/components/ui/PressableScale';
+import { FeedbackSheet } from '@/components/ui/FeedbackSheet';
 import { radii, spacing, type ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/lib/theme/ThemeContext';
+
+/** Seconds the result pop-up waits before moving on by itself. */
+export const ANSWER_AUTO_ADVANCE_SECONDS = 3;
 
 interface AnswerFeedbackProps {
   isCorrect: boolean;
   correctWordArabic?: string;
   correctTransliteration?: string;
   correctMeaning?: string;
-  /** Replays the correct word's audio — shown only when provided, so an incorrect answer teaches rather than just says "wrong." */
-  onListenAgain?: () => void;
-  /** Warmer, more game-like copy for the kid track — same layout/animation,
-   * just softer wording and no ❌ on a miss. */
+  /** Next was tapped, or the countdown finished. Fires once. */
+  onNext: () => void;
+  /** Warmer, more game-like copy for the kid track — same pop-up, softer
+   * wording and no ❌ on a miss. */
   kidFriendly?: boolean;
 }
 
+/**
+ * The result pop-up after a reading/typing/listen answer: "Great job!" or
+ * "Not quite" (with the right answer, so a miss teaches), a Next button and a
+ * countdown from 3 that moves on by itself.
+ */
 export function AnswerFeedback({
   isCorrect,
   correctWordArabic,
   correctTransliteration,
   correctMeaning,
-  onListenAgain,
+  onNext,
   kidFriendly = false,
 }: AnswerFeedbackProps) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  // This banner mounts fresh on every single answer in every lesson — by far
-  // the most-repeated moment in the app — so it gets a real spring entrance
-  // and a bouncy icon rather than just popping into place.
-  const slideAnim = useRef(new Animated.Value(0)).current;
-  const iconAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.spring(slideAnim, { toValue: 1, useNativeDriver: true, speed: 16, bounciness: 10 }).start();
-    Animated.spring(iconAnim, { toValue: 1, useNativeDriver: true, speed: 14, bounciness: 16, delay: 80 }).start();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const bannerStyle = {
-    opacity: slideAnim,
-    transform: [{ translateY: slideAnim.interpolate({ inputRange: [0, 1], outputRange: [40, 0] }) }],
-  };
-  const iconStyle = { transform: [{ scale: iconAnim }] };
-
-  if (isCorrect) {
-    return (
-      <Animated.View style={[styles.banner, styles.correct, bannerStyle]}>
-        <Animated.Text style={[styles.icon, iconStyle]}>{kidFriendly ? '🎉' : '✅'}</Animated.Text>
-        <Text style={styles.correctText}>{kidFriendly ? 'Yay! You got it!' : "Nice! That's correct."}</Text>
-      </Animated.View>
-    );
-  }
 
   return (
-    <Animated.View style={[styles.banner, styles.incorrect, bannerStyle]}>
-      <Animated.Text style={[styles.icon, iconStyle]}>{kidFriendly ? '🌟' : '❌'}</Animated.Text>
-      <Text style={styles.notQuiteText}>{kidFriendly ? "Almost! Let's try that again." : 'Not quite.'}</Text>
-      {correctWordArabic ? (
-        <View style={styles.wordRow}>
+    <FeedbackSheet
+      visible
+      tone={isCorrect ? 'success' : 'error'}
+      icon={isCorrect ? (kidFriendly ? '🎉' : '🎉') : kidFriendly ? '🌟' : '❌'}
+      title={isCorrect ? (kidFriendly ? 'Yay! You got it!' : 'Great job!') : kidFriendly ? "Almost! Let's try that again." : 'Not quite'}
+      message={isCorrect ? 'That’s the one.' : correctWordArabic ? 'Here’s the right answer:' : undefined}
+      autoAdvanceSeconds={ANSWER_AUTO_ADVANCE_SECONDS}
+      onPrimary={onNext}
+    >
+      {!isCorrect && correctWordArabic ? (
+        <View style={styles.answer}>
           <Text style={styles.wordArabic}>{correctWordArabic}</Text>
-          {correctTransliteration ? <Text style={styles.transliteration}>{correctTransliteration}</Text> : null}
-          {correctMeaning ? <Text style={styles.meaning}>{correctMeaning}</Text> : null}
+          {correctTransliteration || correctMeaning ? (
+            <View style={styles.detailRow}>
+              {correctTransliteration ? <Text style={styles.transliteration}>{correctTransliteration}</Text> : null}
+              {correctTransliteration && correctMeaning ? <Text style={styles.dot}>·</Text> : null}
+              {correctMeaning ? <Text style={styles.meaning}>{correctMeaning}</Text> : null}
+            </View>
+          ) : null}
         </View>
       ) : null}
-      {onListenAgain ? (
-        <PressableScale haptic onPress={onListenAgain} style={styles.listenAgainButton}>
-          <Text style={styles.listenAgainText}>🔊 Listen again</Text>
-        </PressableScale>
-      ) : null}
-    </Animated.View>
+    </FeedbackSheet>
   );
 }
 
 const makeStyles = (colors: ThemeColors) =>
   StyleSheet.create({
-    banner: {
-      position: 'absolute',
-      bottom: 0,
-      left: 0,
-      right: 0,
-      padding: spacing.lg,
-      borderTopLeftRadius: radii.lg,
-      borderTopRightRadius: radii.lg,
+    answer: {
       alignItems: 'center',
+      paddingVertical: spacing.md,
+      borderRadius: radii.md,
+      backgroundColor: `${colors.error}10`,
     },
-    correct: { backgroundColor: `${colors.success}1F` },
-    incorrect: { backgroundColor: `${colors.error}1F` },
-    icon: { fontSize: 28, marginBottom: spacing.xs },
-    correctText: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
-    notQuiteText: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
-    wordRow: { alignItems: 'center', marginTop: spacing.sm },
-    wordArabic: { fontSize: 24, fontWeight: '700', color: colors.textPrimary },
-    transliteration: { fontSize: 14, color: colors.textSecondary, fontStyle: 'italic', marginTop: 2 },
-    meaning: { fontSize: 14, color: colors.textSecondary, marginTop: 2, textTransform: 'capitalize' },
-    listenAgainButton: {
-      marginTop: spacing.md,
-      paddingVertical: spacing.xs,
-      paddingHorizontal: spacing.md,
-      borderRadius: radii.pill,
-      borderWidth: 1.5,
-      borderColor: colors.primary,
-    },
-    listenAgainText: { fontSize: 13, fontWeight: '600', color: colors.primary },
+    wordArabic: { fontSize: 30, fontWeight: '700', color: colors.textPrimary },
+    detailRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 2, flexWrap: 'wrap', justifyContent: 'center' },
+    transliteration: { fontSize: 16, color: colors.textSecondary, fontStyle: 'italic' },
+    dot: { fontSize: 16, color: colors.textSecondary },
+    meaning: { fontSize: 16, color: colors.textSecondary, textTransform: 'capitalize' },
   });

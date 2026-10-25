@@ -29,35 +29,29 @@ jest.mock('@/components/premium/Premium', () => ({
   openUpgradeFlow: () => mockOpenUpgrade(),
   PremiumBadge: () => null,
 }));
-// Stand-in for the per-item exercise (tested on its own).
+// Stand-in for the per-item exercise (tested on its own): reports a whole
+// finished item, the way the shared practice flow does.
 jest.mock('@/components/repeatAfterMe/RepeatAfterMeExercise', () => ({
   RepeatAfterMeExercise: (props: {
     item: Item;
-    attemptsUsed: number;
+    maxAttempts: number;
     isReview: boolean;
-    notice: string | null;
-    onAssess: (gotIt: boolean) => void;
-    onContinue: () => void;
+    onFinish: (r: { correct: boolean; attempts: number }) => void;
   }) => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { Text, Pressable } = require('react-native');
     return (
       <>
-        <Text>{`Item: ${props.item.id}${props.isReview ? ' (review)' : ''} attempts=${props.attemptsUsed}`}</Text>
-        {props.notice ? (
-          <Pressable onPress={props.onContinue}>
-            <Text>Continue</Text>
-          </Pressable>
-        ) : (
-          <>
-            <Pressable onPress={() => props.onAssess(true)}>
-              <Text>Got it</Text>
-            </Pressable>
-            <Pressable onPress={() => props.onAssess(false)}>
-              <Text>Not yet</Text>
-            </Pressable>
-          </>
-        )}
+        <Text>{`Item: ${props.item.id}${props.isReview ? ' (review)' : ''} max=${props.maxAttempts}`}</Text>
+        <Pressable onPress={() => props.onFinish({ correct: true, attempts: 1 })}>
+          <Text>Got it</Text>
+        </Pressable>
+        <Pressable onPress={() => props.onFinish({ correct: true, attempts: 2 })}>
+          <Text>Got it on try 2</Text>
+        </Pressable>
+        <Pressable onPress={() => props.onFinish({ correct: false, attempts: props.maxAttempts })}>
+          <Text>Missed</Text>
+        </Pressable>
       </>
     );
   },
@@ -78,7 +72,7 @@ const renderScreen = () =>
   );
 
 const gotIt = async () => fireEvent.press(await screen.findByText('Got it'));
-const notYet = async () => fireEvent.press(await screen.findByText('Not yet'));
+const missed = async () => fireEvent.press(await screen.findByText('Missed'));
 
 beforeEach(() => {
   mockPremium = { isPremium: false, isResolved: true };
@@ -127,17 +121,24 @@ it('free: after the upgrade screen, items missed this session still get their re
   mockLoad.mockResolvedValue({ items: items(5), lockedCount: 2 });
   await renderScreen();
 
-  await notYet();
-  await notYet();
-  await notYet();
-  await fireEvent.press(await screen.findByText('Continue')); // "we'll revisit this later"
+  await missed(); // v1: 3 tries, "we'll revisit this later"
   for (let i = 0; i < 4; i++) await gotIt();
 
   await fireEvent.press(await screen.findByText('Continue to review'));
-  expect(await screen.findByText('Item: v1 (review) attempts=3')).toBeOnTheScreen();
+  expect(await screen.findByText('Item: v1 (review) max=1')).toBeOnTheScreen();
   await gotIt();
 
   expect(await screen.findByText(/Session complete/)).toBeOnTheScreen();
+});
+
+it('each item gets three tries; the review pass gets one', async () => {
+  mockPremium = { isPremium: true, isResolved: true };
+  mockLoad.mockResolvedValue({ items: items(1), lockedCount: 0 });
+  await renderScreen();
+
+  expect(await screen.findByText('Item: v1 max=3')).toBeOnTheScreen();
+  await missed();
+  expect(await screen.findByText('Item: v1 (review) max=1')).toBeOnTheScreen();
 });
 
 it('Premium: every item, no upgrade screen', async () => {
@@ -157,13 +158,9 @@ it('persists each item’s attempts and self-reported result, and the session co
   mockLoad.mockResolvedValue({ items: items(2), lockedCount: 0 });
   await renderScreen();
 
-  await notYet(); // v1 attempt 1
-  await gotIt(); // v1 attempt 2 → correct
-  await notYet();
-  await notYet();
-  await notYet(); // v2 missed after 3
-  await fireEvent.press(await screen.findByText('Continue'));
-  await notYet(); // v2 review → still needs review
+  await fireEvent.press(await screen.findByText('Got it on try 2')); // v1 correct on try 2
+  await missed(); // v2 missed after 3
+  await missed(); // v2 review → still needs review
 
   await screen.findByText(/Session complete/);
   expect(mockRecordItem.mock.calls).toEqual([

@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Animated, StyleSheet, Text, View } from 'react-native';
 
 import { openUpgradeFlow, PremiumBadge } from '@/components/premium/Premium';
 import { RepeatAfterMeExercise } from '@/components/repeatAfterMe/RepeatAfterMeExercise';
@@ -11,6 +11,7 @@ import { Reveal } from '@/components/ui/Reveal';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { radii, spacing, type ThemeColors } from '@/constants/theme';
 import { loadRepeatAfterMeSession, type RepeatAfterMeItem } from '@/data/repeatAfterMe';
+import { useSlideInOnChange } from '@/hooks/useSlideInOnChange';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
 import { usePremium } from '@/lib/premium/PremiumContext';
 import {
@@ -19,10 +20,9 @@ import {
   recordRepeatAfterMeItemResult,
 } from '@/lib/repeatAfterMe/progress';
 import {
-  advanceAfterNotice,
-  assessAttempt,
   continueAfterUpgradeGate,
   currentItem,
+  finishItem,
   RAM_FREE_ITEMS_PER_SESSION,
   RAM_MAX_ATTEMPTS,
   startSession,
@@ -46,6 +46,7 @@ export default function RepeatAfterMeScreen() {
   const { isPremium, isResolved } = usePremium();
   const [session, setSession] = useState<Session | null>(null);
   const [loadError, setLoadError] = useState(false);
+  const slideIn = useSlideInOnChange(`${session?.phase}-${session?.index}`);
 
   const load = useCallback(async () => {
     if (!activeProfile || !isResolved) return;
@@ -73,7 +74,8 @@ export default function RepeatAfterMeScreen() {
       const before = previous.results[item.id];
       const after = next.results[item.id];
       if (previous.phase === 'review' && after && after !== before) {
-        recordRepeatAfterMeItemResult(activeProfile.id, item.id, { attempts: 1, result: after.result }).catch(() => {});
+        const attemptsThisPass = after.attempts - (before?.attempts ?? 0);
+        recordRepeatAfterMeItemResult(activeProfile.id, item.id, { attempts: attemptsThisPass, result: after.result }).catch(() => {});
       } else if (previous.phase === 'practice' && after && !before) {
         recordRepeatAfterMeItemResult(activeProfile.id, item.id, after).catch(() => {});
       }
@@ -173,16 +175,15 @@ export default function RepeatAfterMeScreen() {
           </Text>
         </View>
       </View>
-      <RepeatAfterMeExercise
-        key={`${session.phase}-${item.id}`}
-        item={item}
-        attemptsUsed={isReview ? (session.results[item.id]?.attempts ?? 0) : session.attemptsOnCurrent}
-        maxAttempts={RAM_MAX_ATTEMPTS}
-        isReview={isReview}
-        notice={session.notice}
-        onAssess={(gotIt) => commit(session, assessAttempt(session, gotIt))}
-        onContinue={() => commit(session, advanceAfterNotice(session))}
-      />
+      <Animated.View style={[{ flex: 1 }, slideIn]}>
+        <RepeatAfterMeExercise
+          key={`${session.phase}-${item.id}`}
+          item={item}
+          maxAttempts={isReview ? 1 : RAM_MAX_ATTEMPTS}
+          isReview={isReview}
+          onFinish={(result) => commit(session, finishItem(session, result))}
+        />
+      </Animated.View>
     </ScreenContainer>
   );
 }
