@@ -138,6 +138,7 @@ export function mapWordVariant(row: WordVariantRow): WordVariant {
     isNativeVoice: row.is_native_voice,
     inRepeatAfterMe: row.in_repeat_after_me === true,
     recordingSkippedAt: row.recording_skipped_at ?? null,
+    explanationAudioPath: row.explanation_audio_path ?? null,
     approvedBy: row.approved_by,
     approvedAt: row.approved_at,
   };

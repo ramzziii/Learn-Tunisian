@@ -4,9 +4,13 @@ import { createFakeSupabase } from '@/test-utils/fakeSupabase';
 
 const mockDb = createFakeSupabase();
 const mockSaveRecorded = jest.fn();
+const mockUploadAudio = jest.fn();
+const mockDeleteAudio = jest.fn();
 jest.mock('@/lib/supabase/client', () => ({ supabase: mockDb.client }));
 jest.mock('@/data/admin/audioUpload', () => ({
   saveRecordedWordVariantAudio: (...a: unknown[]) => mockSaveRecorded(...a),
+  uploadWordVariantAudio: (...a: unknown[]) => mockUploadAudio(...a),
+  deleteWordVariantAudio: (...a: unknown[]) => mockDeleteAudio(...a),
 }));
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -35,6 +39,7 @@ const variantRow = (id: string, groupId: string, overrides: Record<string, unkno
   in_repeat_after_me: false,
   recording_skipped_at: null,
   recording_skipped_by: null,
+  explanation_audio_path: null,
   ...overrides,
 });
 const groupRow = (id: string, unitId: string, lessonNumber: number, sortOrder: number) => ({
@@ -70,6 +75,8 @@ function seed(variants: unknown[]) {
 beforeEach(() => {
   mockDb.reset();
   mockSaveRecorded.mockReset();
+  mockUploadAudio.mockReset().mockResolvedValue('g1/v1-explanation-3000.m4a');
+  mockDeleteAudio.mockReset().mockResolvedValue(undefined);
 });
 
 describe('fetchRecordingQueue', () => {
@@ -226,6 +233,21 @@ describe('saveQueueRecording', () => {
     expect(saved).toMatchObject({ audioPath: 'g1/v1-2000.m4a', isNativeVoice: true, inRepeatAfterMe: true });
   });
 
+  it('an uploaded file’s format is passed to the safe save (a recording passes none)', async () => {
+    mockDb.respond('word_variants.update', {
+      data: variantRow('v1', 'g1', { audio_path: 'g1/v1-2000.mp3', is_native_voice: true, in_repeat_after_me: true }),
+      error: null,
+    });
+    mockSaveRecorded.mockImplementation(async ({ persistAudioPath }: { persistAudioPath: (p: string) => Promise<string | null> }) =>
+      persistAudioPath('g1/v1-2000.mp3')
+    );
+    const format = { extension: 'mp3', contentType: 'audio/mpeg' };
+
+    await queue.saveQueueRecording({ item, localUri: 'file:///cache/ahla.mp3', format, addToRepeatAfterMe: true, actorAccountId: 'admin-1' });
+
+    expect(mockSaveRecorded).toHaveBeenCalledWith(expect.objectContaining({ localUri: 'file:///cache/ahla.mp3', format }));
+  });
+
   it('unticked box keeps it out of Repeat After Me', async () => {
     await runSave(false, variantRow('v1', 'g1', { audio_path: 'g1/v1-2000.m4a', is_native_voice: true }));
     expect(mockDb.writes()[0].payload).toMatchObject({ in_repeat_after_me: false });
@@ -241,5 +263,171 @@ describe('saveQueueRecording', () => {
     await expect(
       queue.saveQueueRecording({ item, localUri: 'file:///take.m4a', addToRepeatAfterMe: true, actorAccountId: 'admin-1' })
     ).rejects.toThrow(/saving it to this variant failed/);
+  });
+});
+
+describe('fetchMissingExplanations (Native Recordings → Missing Explanations)', () => {
+  it('lists forms that have a pronunciation but no explanation yet, in working order', async () => {
+    seed([
+      variantRow('has-both', 'g1', { audio_path: 'g1/a.m4a', explanation_audio_path: 'g1/a-explanation.m4a' }),
+      variantRow('needs-explanation', 'g1', { variant_label: 'masculine', audio_path: 'g1/b.m4a' }),
+      variantRow('no-pronunciation-yet', 'g1', { variant_label: 'feminine' }),
+      variantRow('greetings-needs', 'g2', { audio_path: 'g2/c.m4a' }),
+    ]);
+
+    const items = await queue.fetchMissingExplanations();
+
+    expect(items.map((i: { variant: { id: string } }) => i.variant.id)).toEqual(['needs-explanation', 'greetings-needs']);
+    expect(items[0]).toMatchObject({ englishMeaning: 'meaning g1', unitName: 'Basics', lessonNumber: 2 });
+    expect(mockDb.queries[0].calls).toContainEqual(['in', 'content_status', ['draft', 'pending_review', 'approved']]);
+  });
+});
+
+describe('saveQueueRecording with an explanation', () => {
+  const item = { variant: { id: 'v1', wordGroupId: 'g1', audioPath: 'g1/old.m4a', explanationAudioPath: null } };
+  const persistWith = (row: Record<string, unknown>) => {
+    mockDb.respond('word_variants.update', { data: row, error: null });
+    mockSaveRecorded.mockImplementation(async ({ persistAudioPath }: { persistAudioPath: (p: string) => Promise<string | null> }) =>
+      persistAudioPath('g1/v1-2000.m4a')
+    );
+  };
+
+  it('uploads the explanation as its own file, then saves both paths in one write', async () => {
+    persistWith(
+      variantRow('v1', 'g1', {
+        audio_path: 'g1/v1-2000.m4a',
+        explanation_audio_path: 'g1/v1-explanation-3000.m4a',
+        is_native_voice: true,
+        in_repeat_after_me: true,
+      })
+    );
+
+    const saved = await queue.saveQueueRecording({
+      item,
+      localUri: 'file:///take.m4a',
+      explanation: { localUri: 'file:///explain.mp3', format: { extension: 'mp3', contentType: 'audio/mpeg' } },
+      addToRepeatAfterMe: true,
+      actorAccountId: 'admin-1',
+    });
+
+    expect(mockUploadAudio).toHaveBeenCalledWith('file:///explain.mp3', 'g1', 'v1-explanation', { extension: 'mp3', contentType: 'audio/mpeg' });
+    expect(mockDb.writes()).toHaveLength(1);
+    expect(mockDb.writes()[0].payload).toMatchObject({ audio_path: 'g1/v1-2000.m4a', explanation_audio_path: 'g1/v1-explanation-3000.m4a' });
+    expect(saved).toMatchObject({ audioPath: 'g1/v1-2000.m4a', explanationAudioPath: 'g1/v1-explanation-3000.m4a' });
+  });
+
+  it('without an explanation (box unticked), the explanation column is left alone', async () => {
+    persistWith(variantRow('v1', 'g1', { audio_path: 'g1/v1-2000.m4a', is_native_voice: true, in_repeat_after_me: true }));
+
+    await queue.saveQueueRecording({ item, localUri: 'file:///take.m4a', addToRepeatAfterMe: true, actorAccountId: 'admin-1' });
+
+    expect(mockUploadAudio).not.toHaveBeenCalled();
+    expect(mockDb.writes()[0].payload).not.toHaveProperty('explanation_audio_path');
+  });
+
+  it('explanation upload fails: nothing is saved, and the pronunciation is not touched', async () => {
+    mockUploadAudio.mockRejectedValue(new Error('Upload was blocked by Supabase Storage permissions'));
+
+    await expect(
+      queue.saveQueueRecording({
+        item,
+        localUri: 'file:///take.m4a',
+        explanation: { localUri: 'file:///explain.m4a' },
+        addToRepeatAfterMe: true,
+        actorAccountId: 'admin-1',
+      })
+    ).rejects.toThrow(/explanation recording.*blocked/i);
+    expect(mockSaveRecorded).not.toHaveBeenCalled();
+    expect(mockDb.writes()).toHaveLength(0);
+  });
+
+  it('the save fails after the explanation uploaded: the new explanation file is cleaned up, old files kept', async () => {
+    mockSaveRecorded.mockRejectedValue(new Error('Audio uploaded, but saving it to this variant failed'));
+
+    await expect(
+      queue.saveQueueRecording({
+        item: { variant: { ...item.variant, explanationAudioPath: 'g1/v1-explanation-1000.m4a' } },
+        localUri: 'file:///take.m4a',
+        explanation: { localUri: 'file:///explain.m4a' },
+        addToRepeatAfterMe: true,
+        actorAccountId: 'admin-1',
+      })
+    ).rejects.toThrow(/saving it to this variant failed/);
+    expect(mockDeleteAudio).toHaveBeenCalledWith('g1/v1-explanation-3000.m4a');
+    expect(mockDeleteAudio).not.toHaveBeenCalledWith('g1/v1-explanation-1000.m4a');
+  });
+
+  it('a replaced explanation’s old file is deleted only after both are saved', async () => {
+    persistWith(
+      variantRow('v1', 'g1', {
+        audio_path: 'g1/v1-2000.m4a',
+        explanation_audio_path: 'g1/v1-explanation-3000.m4a',
+        is_native_voice: true,
+        in_repeat_after_me: true,
+      })
+    );
+
+    await queue.saveQueueRecording({
+      item: { variant: { ...item.variant, explanationAudioPath: 'g1/v1-explanation-1000.m4a' } },
+      localUri: 'file:///take.m4a',
+      explanation: { localUri: 'file:///explain.m4a' },
+      addToRepeatAfterMe: true,
+      actorAccountId: 'admin-1',
+    });
+
+    expect(mockDeleteAudio).toHaveBeenCalledWith('g1/v1-explanation-1000.m4a');
+  });
+
+  it('rejects (and cleans up) if the explanation column didn’t stick — e.g. migration 0016 not applied', async () => {
+    persistWith(variantRow('v1', 'g1', { audio_path: 'g1/v1-2000.m4a', is_native_voice: true, in_repeat_after_me: true }));
+
+    await expect(
+      queue.saveQueueRecording({
+        item,
+        localUri: 'file:///take.m4a',
+        explanation: { localUri: 'file:///explain.m4a' },
+        addToRepeatAfterMe: true,
+        actorAccountId: 'admin-1',
+      })
+    ).rejects.toThrow(/explanation.*0016/);
+    expect(mockDeleteAudio).toHaveBeenCalledWith('g1/v1-explanation-3000.m4a');
+  });
+});
+
+describe('saveQueueExplanation (adding one to existing content)', () => {
+  it('saves only the explanation, through the same safe replace, never the pronunciation', async () => {
+    mockDb.respond('word_variants.update', {
+      data: variantRow('v1', 'g1', { audio_path: 'g1/v1-1.m4a', explanation_audio_path: 'g1/v1-explanation-4000.m4a' }),
+      error: null,
+    });
+    mockSaveRecorded.mockImplementation(async ({ persistAudioPath }: { persistAudioPath: (p: string) => Promise<string | null> }) =>
+      persistAudioPath('g1/v1-explanation-4000.m4a')
+    );
+
+    const saved = await queue.saveQueueExplanation({
+      item: { variant: { id: 'v1', wordGroupId: 'g1', audioPath: 'g1/v1-1.m4a', explanationAudioPath: 'g1/v1-explanation-old.m4a' } },
+      localUri: 'file:///explain.m4a',
+      actorAccountId: 'admin-1',
+    });
+
+    expect(mockSaveRecorded).toHaveBeenCalledWith(
+      expect.objectContaining({ wordGroupId: 'g1', variantId: 'v1-explanation', previousPath: 'g1/v1-explanation-old.m4a' })
+    );
+    const payload = mockDb.writes()[0].payload as Record<string, unknown>;
+    expect(payload).toMatchObject({ explanation_audio_path: 'g1/v1-explanation-4000.m4a' });
+    expect(payload).not.toHaveProperty('audio_path');
+    expect(payload).not.toHaveProperty('in_repeat_after_me');
+    expect(saved.explanationAudioPath).toBe('g1/v1-explanation-4000.m4a');
+  });
+
+  it('a failed save rejects (the caller stays on the word)', async () => {
+    mockSaveRecorded.mockRejectedValue(new Error('Upload was blocked'));
+    await expect(
+      queue.saveQueueExplanation({
+        item: { variant: { id: 'v1', wordGroupId: 'g1', audioPath: 'g1/v1-1.m4a', explanationAudioPath: null } },
+        localUri: 'file:///explain.m4a',
+        actorAccountId: 'admin-1',
+      })
+    ).rejects.toThrow(/blocked/);
   });
 });

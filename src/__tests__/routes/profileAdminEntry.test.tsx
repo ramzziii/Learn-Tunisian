@@ -31,6 +31,13 @@ jest.mock('@/data/profiles', () => ({
 jest.mock('@/data/progress', () => ({
   fetchProgressSummary: jest.fn(async () => ({ wordsLearning: 1, wordsMastered: 2, wordsReviewed: 3, totalWordsSeen: 4 })),
 }));
+jest.mock('@/components/translation/TranslationRequestsEntry', () => ({
+  TranslationRequestsEntry: () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { Text } = require('react-native');
+    return <Text>[translation requests entry]</Text>;
+  },
+}));
 jest.mock('@/data/content', () => ({ countCompletedLessons: jest.fn(async () => 1) }));
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires

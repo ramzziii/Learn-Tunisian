@@ -5,27 +5,37 @@ const mockFetchQueue = jest.fn();
 const mockFetchSkipped = jest.fn();
 const mockSkip = jest.fn();
 const mockRestore = jest.fn();
+const mockFetchMissingExplanations = jest.fn();
+const mockPush = jest.fn();
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,
   default: { getItem: jest.fn(async () => null), setItem: jest.fn(async () => undefined) },
 }));
-jest.mock('expo-router', () => ({ router: { back: jest.fn(), push: jest.fn(), replace: jest.fn(), canGoBack: () => true } }));
+jest.mock('expo-router', () => ({
+  router: { back: jest.fn(), push: (...a: unknown[]) => mockPush(...a), replace: jest.fn(), canGoBack: () => true },
+}));
 jest.mock('@/lib/auth/AuthContext', () => ({ useAuth: () => ({ session: { user: { id: 'admin-1' } } }) }));
 jest.mock('@/data/admin/recordingQueue', () => ({
   fetchRecordingQueue: (...a: unknown[]) => mockFetchQueue(...a),
   fetchSkippedRecordings: (...a: unknown[]) => mockFetchSkipped(...a),
   skipRecording: (...a: unknown[]) => mockSkip(...a),
   restoreSkippedRecording: (...a: unknown[]) => mockRestore(...a),
+  fetchMissingExplanations: (...a: unknown[]) => mockFetchMissingExplanations(...a),
 }));
 // The station itself is tested on its own; this stub exposes its callbacks.
 jest.mock('@/components/admin/RecordingStation', () => ({
-  RecordingStation: (props: { item: { variant: { id: string } }; onSaved: (v: unknown) => void; onSkip?: () => void }) => {
+  RecordingStation: (props: {
+    item: { variant: { id: string } };
+    mode?: string;
+    onSaved: (v: unknown) => void;
+    onSkip?: () => void;
+  }) => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { Text, Pressable } = require('react-native');
     return (
       <>
-        <Text>{`Recording ${props.item.variant.id}${props.onSkip ? '' : ' (no skip)'}`}</Text>
+        <Text>{`Recording ${props.item.variant.id}${props.onSkip ? '' : ' (no skip)'}${props.mode ? ` mode=${props.mode}` : ''}`}</Text>
         <Pressable onPress={() => props.onSaved({ id: props.item.variant.id })}>
           <Text>Stub save</Text>
         </Pressable>
@@ -44,6 +54,8 @@ const Recordings = require('../../../app/admin/recordings').default;
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const SkippedRecordings = require('../../../app/admin/recordings-skipped').default;
 // eslint-disable-next-line @typescript-eslint/no-var-requires
+const MissingExplanations = require('../../../app/admin/recordings-explanations').default;
+// eslint-disable-next-line @typescript-eslint/no-var-requires
 const { ThemeProvider } = require('@/lib/theme/ThemeContext');
 
 const item = (id: string) => ({
@@ -55,7 +67,7 @@ const item = (id: string) => ({
 });
 
 beforeEach(() => {
-  [mockFetchQueue, mockFetchSkipped, mockSkip, mockRestore].forEach((m) => m.mockReset());
+  [mockFetchQueue, mockFetchSkipped, mockSkip, mockRestore, mockFetchMissingExplanations, mockPush].forEach((m) => m.mockReset());
   mockSkip.mockResolvedValue({});
   mockRestore.mockResolvedValue({});
 });
@@ -216,5 +228,73 @@ describe('Skipped Recordings', () => {
       </ThemeProvider>
     );
     expect(await screen.findByText(/No skipped words/)).toBeOnTheScreen();
+  });
+});
+
+describe('Missing Explanations', () => {
+  const recorded = (id: string) => ({ ...item(id), variant: { ...item(id).variant, audioPath: `g1/${id}.m4a`, explanationAudioPath: null } });
+
+  it('is linked from Native Recordings', async () => {
+    mockFetchQueue.mockResolvedValue([item('a')]);
+    await render(
+      <ThemeProvider>
+        <Recordings />
+      </ThemeProvider>
+    );
+
+    await fireEvent.press(await screen.findByText('Missing Explanations ›'));
+    expect(mockPush).toHaveBeenCalledWith('/admin/recordings-explanations');
+  });
+
+  it('lists recorded words with no explanation, flagged as such, with a count', async () => {
+    mockFetchMissingExplanations.mockResolvedValue([recorded('a'), recorded('b')]);
+    await render(
+      <ThemeProvider>
+        <MissingExplanations />
+      </ThemeProvider>
+    );
+
+    expect(await screen.findByText(/2 words have no explanation recording yet/)).toBeOnTheScreen();
+    expect(screen.getByText('meaning a')).toBeOnTheScreen();
+    expect(screen.getAllByText('No explanation').length).toBe(2);
+  });
+
+  it('opens a word in explanation-only mode; after saving, the next one comes up; Skip just moves on', async () => {
+    mockFetchMissingExplanations.mockResolvedValue([recorded('a'), recorded('b'), recorded('c')]);
+    await render(
+      <ThemeProvider>
+        <MissingExplanations />
+      </ThemeProvider>
+    );
+
+    await fireEvent.press(await screen.findByText('meaning a'));
+    expect(screen.getByText('Recording a mode=explanation')).toBeOnTheScreen();
+    await fireEvent.press(screen.getByText('Stub save'));
+    expect(await screen.findByText('Recording b mode=explanation')).toBeOnTheScreen();
+    await fireEvent.press(screen.getByText('Stub skip'));
+    expect(await screen.findByText('Recording c mode=explanation')).toBeOnTheScreen();
+    expect(mockSkip).not.toHaveBeenCalled(); // not a permanent skip
+  });
+
+  it('all done: a clear finished state', async () => {
+    mockFetchMissingExplanations.mockResolvedValue([]);
+    await render(
+      <ThemeProvider>
+        <MissingExplanations />
+      </ThemeProvider>
+    );
+    expect(await screen.findByText(/Every recorded word has an explanation/)).toBeOnTheScreen();
+  });
+
+  it('load failure: error with retry', async () => {
+    mockFetchMissingExplanations.mockRejectedValueOnce(new Error('network')).mockResolvedValue([recorded('a')]);
+    await render(
+      <ThemeProvider>
+        <MissingExplanations />
+      </ThemeProvider>
+    );
+
+    await fireEvent.press(await screen.findByText('Try again'));
+    expect(await screen.findByText('meaning a')).toBeOnTheScreen();
   });
 });

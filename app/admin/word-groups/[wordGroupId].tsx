@@ -276,6 +276,7 @@ function VariantRow({
       <TextInput value={sortOrder} onChangeText={setSortOrder} style={styles.input} keyboardType="number-pad" />
       <PillSelect label="Status" options={CONTENT_STATUS_OPTIONS} value={status} onChange={(v) => setStatus(v as ContentStatus)} />
 
+      <Text style={styles.fieldLabel}>Pronunciation recording</Text>
       <AudioRecorderField
         wordGroupId={variant.wordGroupId}
         variantId={variant.id}
@@ -290,6 +291,26 @@ function VariantRow({
           return updated.audioPath;
         }}
         repeatAfterMe={repeatAfterMeOptions(variant, actorAccountId, onSaved)}
+      />
+
+      {/* A separate file and column from the pronunciation above, and never
+          part of Repeat After Me (so no repeatAfterMe prop here). */}
+      <Text style={styles.fieldLabel}>Explanation recording (optional)</Text>
+      <Text style={styles.helperText}>
+        A native speaker explaining it — in English, Arabic, or both.
+        {variant.explanationAudioPath ? '' : ' No explanation yet.'}
+      </Text>
+      <AudioRecorderField
+        wordGroupId={variant.wordGroupId}
+        variantId={`${variant.id}-explanation`}
+        currentAudioPath={variant.explanationAudioPath}
+        updatedAt={variant.updatedAt}
+        onUploaded={async (path) => {
+          // Not caught, for the same reason as above.
+          const updated = await updateWordVariant(variant.id, { explanationAudioPath: path }, actorAccountId);
+          onSaved(updated);
+          return updated.explanationAudioPath;
+        }}
       />
 
       <View style={styles.variantHeaderRow}>
@@ -439,6 +460,7 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md },
   card: { backgroundColor: colors.surface, borderRadius: radii.lg, padding: spacing.md, gap: 4 },
   errorText: { fontSize: 13, color: colors.error, marginBottom: spacing.xs },
+  helperText: { fontSize: 12, color: colors.textSecondary },
   fieldLabel: { fontSize: 11, fontWeight: '700', color: colors.textSecondary, marginTop: spacing.sm, textTransform: 'uppercase' },
   input: {
     borderWidth: 1,

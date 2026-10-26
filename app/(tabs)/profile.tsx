@@ -10,6 +10,7 @@ import { PressableScale } from '@/components/ui/PressableScale';
 import { Reveal } from '@/components/ui/Reveal';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { SelectableCard } from '@/components/ui/SelectableCard';
+import { TranslationRequestsEntry } from '@/components/translation/TranslationRequestsEntry';
 import { radii, spacing, type ThemeColors } from '@/constants/theme';
 import { KIDS_SECTION_ENABLED } from '@/constants/features';
 import { countCompletedLessons } from '@/data/content';
@@ -145,7 +146,9 @@ export default function ProfileScreen() {
       guard: resetInFlightRef,
       onStart: () => setPasswordReset({ kind: 'sending' }),
     });
-    if (outcome.kind !== 'busy') setPasswordReset(outcome);
+    if (outcome.kind === 'busy') return;
+    setPasswordReset(outcome);
+    if (outcome.kind === 'sent') router.push({ pathname: '/auth/reset-code', params: { email: outcome.email } });
   };
 
   const handleSignOut = () => {
@@ -228,6 +231,9 @@ export default function ProfileScreen() {
           <ProgressStat label="Lessons done" value={progressStats.lessonsCompleted} emoji="🏁" />
         </Reveal>
 
+        <Text style={styles.sectionTitle}>Translations</Text>
+        <TranslationRequestsEntry />
+
         <Text style={styles.sectionTitle}>Vocabulary</Text>
         <Button themed label="View favorites" variant="secondary" onPress={() => router.push('/favorites')} />
 
@@ -303,8 +309,7 @@ export default function ProfileScreen() {
         />
         {passwordReset.kind === 'sent' ? (
           <Text style={styles.resetSent}>
-            📬 Check your email — we sent a password-reset link to {passwordReset.email}. Open the link in that email to
-            set a new password.
+            📬 Check your email — we sent a 6-digit code to {passwordReset.email}. Enter it to set a new password.
           </Text>
         ) : passwordReset.kind === 'error' ? (
           <Text style={styles.resetError}>{passwordReset.message}</Text>

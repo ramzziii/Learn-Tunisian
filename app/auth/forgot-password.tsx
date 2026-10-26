@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { Text } from 'react-native';
 
 import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
@@ -14,7 +14,6 @@ export default function ForgotPassword() {
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [sentTo, setSentTo] = useState<string | null>(null);
 
   const handleSend = async () => {
     setError(null);
@@ -26,42 +25,8 @@ export default function ForgotPassword() {
       setError(resetError);
       return;
     }
-    setSentTo(trimmedEmail);
+    router.replace({ pathname: '/auth/reset-code', params: { email: trimmedEmail } });
   };
-
-  if (sentTo) {
-    return (
-      <ScreenContainer>
-        <BackButton />
-        <View style={{ flex: 1, justifyContent: 'center' }}>
-          <Text style={{ fontSize: 48, textAlign: 'center', marginBottom: spacing.lg }}>📬</Text>
-          <Text style={{ fontSize: 26, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' }}>
-            Check your email
-          </Text>
-          <Text
-            style={{
-              fontSize: 15,
-              color: colors.textSecondary,
-              textAlign: 'center',
-              marginTop: spacing.md,
-              lineHeight: 22,
-            }}
-          >
-            If an account exists for{'\n'}
-            <Text style={{ fontWeight: '700', color: colors.textPrimary }}>{sentTo}</Text>, we sent a link to reset
-            your password.{'\n\n'}
-            Tap the link, then come back here and sign in with your new password.
-          </Text>
-          <Button
-            label="Back to sign in"
-            variant="secondary"
-            onPress={() => router.replace('/auth/sign-in')}
-            style={{ marginTop: spacing.xl }}
-          />
-        </View>
-      </ScreenContainer>
-    );
-  }
 
   return (
     <ScreenContainer>
@@ -70,7 +35,7 @@ export default function ForgotPassword() {
         Reset your password
       </Text>
       <Text style={{ fontSize: 15, color: colors.textSecondary, marginTop: spacing.sm, marginBottom: spacing.xl }}>
-        Enter your email and we&apos;ll send you a link to set a new password.
+        Enter your email and we&apos;ll send you a 6-digit code to set a new password.
       </Text>
 
       <TextField
@@ -84,7 +49,7 @@ export default function ForgotPassword() {
         error={error}
       />
 
-      <Button label="Send reset link" onPress={handleSend} loading={isSubmitting} disabled={!email} />
+      <Button label="Send code" onPress={handleSend} loading={isSubmitting} disabled={!email} />
     </ScreenContainer>
   );
 }

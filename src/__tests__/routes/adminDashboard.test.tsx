@@ -68,6 +68,7 @@ it.each([
   ['Correction Review', '/admin/corrections'],
   ['Native Recordings', '/admin/recordings'],
   ['Skipped Recordings', '/admin/recordings-skipped'],
+  ['Translation Requests', '/admin/translation-requests'],
 ])('"%s" still opens %s', async (title, href) => {
   await renderDashboard();
 

@@ -12,7 +12,8 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,
   default: { getItem: jest.fn(async () => null), setItem: jest.fn(async () => undefined) },
 }));
-jest.mock('expo-router', () => ({ router: { push: jest.fn(), replace: jest.fn(), back: jest.fn() } }));
+const mockPush = jest.fn();
+jest.mock('expo-router', () => ({ router: { push: (...a: unknown[]) => mockPush(...a), replace: jest.fn(), back: jest.fn() } }));
 jest.mock('@/lib/account/ActiveProfileContext', () => ({
   useActiveProfile: () => ({ activeProfile: mockProfile, profiles: [mockProfile] }),
 }));
@@ -39,6 +40,13 @@ jest.mock('@/data/profiles', () => ({
 jest.mock('@/data/progress', () => ({
   fetchProgressSummary: jest.fn(async () => ({ wordsLearning: 1, wordsMastered: 2, wordsReviewed: 3, totalWordsSeen: 4 })),
 }));
+jest.mock('@/components/translation/TranslationRequestsEntry', () => ({
+  TranslationRequestsEntry: () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { Text } = require('react-native');
+    return <Text>[translation requests entry]</Text>;
+  },
+}));
 jest.mock('@/data/content', () => ({ countCompletedLessons: jest.fn(async () => 1) }));
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -56,6 +64,7 @@ const renderProfile = () =>
 const textsInOrder = () => screen.getAllByText(/.+/).map((el) => [el.props.children].flat(Infinity).join(''));
 
 beforeEach(() => {
+  mockPush.mockReset();
   mockEmail = 'ramzi@example.com';
   mockSendPasswordReset.mockReset().mockResolvedValue({ error: null });
   mockSignOut.mockReset().mockResolvedValue(undefined);
@@ -93,8 +102,9 @@ it('confirms only after the request succeeds, and says to follow the emailed lin
 
   expect(confirmationShownDuringRequest).toBe(false);
   expect(await screen.findByText(/Check your email/)).toBeOnTheScreen();
-  expect(screen.getByText(/ramzi@example\.com/)).toBeOnTheScreen();
-  expect(screen.getByText(/link in that email to set a new password/)).toBeOnTheScreen();
+  expect(screen.getByText(/6-digit code to ramzi@example\.com/)).toBeOnTheScreen();
+  // Straight on to entering the code (no email link to follow).
+  expect(mockPush).toHaveBeenCalledWith({ pathname: '/auth/reset-code', params: { email: 'ramzi@example.com' } });
 });
 
 it('a failed request shows the error, no confirmation, and can be retried', async () => {
@@ -163,4 +173,5 @@ it('the rest of Profile is unchanged (settings sections still render)', async ()
   await renderProfile();
   expect(await screen.findByText('Appearance')).toBeOnTheScreen();
   expect(screen.getByText('Daily goal')).toBeOnTheScreen();
+  expect(screen.getByText('[translation requests entry]')).toBeOnTheScreen();
 });

@@ -7,6 +7,7 @@ import { Platform } from 'react-native';
 // can read directly as bytes; File/Directory are native-only.
 import { File } from 'expo-file-system';
 
+import type { AudioFormat } from '@/lib/admin/audioFile';
 import { supabase } from '@/lib/supabase/client';
 
 const AUDIO_BUCKET = 'audio';
@@ -35,9 +36,18 @@ const isWeb = Platform.OS === 'web';
  *
  * Extension/content-type differ by platform because expo-audio's web
  * recorder actually produces webm (see RecordingPresets.HIGH_QUALITY's
- * `web: { mimeType: 'audio/webm' }`), not m4a like native does.
+ * `web: { mimeType: 'audio/webm' }`), not m4a like native does. An uploaded
+ * file (Upload audio, src/lib/admin/audioFile.ts) passes its own validated
+ * `format` instead, since it's whatever the admin picked on any platform.
  */
-export async function uploadWordVariantAudio(localUri: string, wordGroupId: string, variantId: string): Promise<string> {
+export async function uploadWordVariantAudio(
+  localUri: string,
+  wordGroupId: string,
+  variantId: string,
+  format?: AudioFormat,
+  /** The private translation-audio bucket for translation answers; content audio otherwise. */
+  bucket: string = AUDIO_BUCKET
+): Promise<string> {
   const { data: isAdmin, error: adminError } = await supabase.rpc('is_admin');
   if (adminError) {
     throw new Error('Could not verify admin permissions before uploading audio.');
@@ -46,8 +56,8 @@ export async function uploadWordVariantAudio(localUri: string, wordGroupId: stri
     throw new Error('Audio uploads require an admin account because the audio bucket is write-protected.');
   }
 
-  const extension = isWeb ? 'webm' : localUri.includes('.') ? localUri.split('.').pop() : 'm4a';
-  const contentType = isWeb ? 'audio/webm' : `audio/${extension === 'm4a' ? 'mp4' : extension}`;
+  const extension = format?.extension ?? (isWeb ? 'webm' : localUri.includes('.') ? localUri.split('.').pop() : 'm4a');
+  const contentType = format?.contentType ?? (isWeb ? 'audio/webm' : `audio/${extension === 'm4a' ? 'mp4' : extension}`);
   const path = `${wordGroupId}/${variantId}-${Date.now()}.${extension}`;
 
   const bytes = isWeb
@@ -57,7 +67,7 @@ export async function uploadWordVariantAudio(localUri: string, wordGroupId: stri
   // upsert stays true as a harmless safety net (e.g. a retried request after
   // a dropped response) — it should never actually need to overwrite
   // anything now that the path includes the upload timestamp.
-  const { error } = await supabase.storage.from(AUDIO_BUCKET).upload(path, bytes, { contentType, upsert: true });
+  const { error } = await supabase.storage.from(bucket).upload(path, bytes, { contentType, upsert: true });
   if (error) {
     // The is_admin RPC above already catches the common case — this is the
     // belt-and-suspenders path for a stale/expired session slipping through
@@ -79,9 +89,9 @@ export async function uploadWordVariantAudio(localUri: string, wordGroupId: stri
  * wasted storage, not a correctness problem, since nothing references that
  * path anymore once word_variants.audio_path has moved on.
  */
-export async function deleteWordVariantAudio(path: string): Promise<void> {
+export async function deleteWordVariantAudio(path: string, bucket: string = AUDIO_BUCKET): Promise<void> {
   try {
-    await supabase.storage.from(AUDIO_BUCKET).remove([path]);
+    await supabase.storage.from(bucket).remove([path]);
   } catch {
     // no-op
   }
@@ -103,14 +113,19 @@ export async function saveRecordedWordVariantAudio({
   variantId,
   previousPath,
   persistAudioPath,
+  format,
+  bucket = AUDIO_BUCKET,
 }: {
   localUri: string;
   wordGroupId: string;
   variantId: string;
   previousPath: string | null;
   persistAudioPath: (audioPath: string) => Promise<string | null>;
+  /** Set for an uploaded file; omitted for a recording. */
+  format?: AudioFormat;
+  bucket?: string;
 }): Promise<string> {
-  const path = await uploadWordVariantAudio(localUri, wordGroupId, variantId);
+  const path = await uploadWordVariantAudio(localUri, wordGroupId, variantId, format, bucket);
 
   let savedPath: string | null;
   try {
@@ -124,7 +139,7 @@ export async function saveRecordedWordVariantAudio({
   }
 
   if (previousPath && previousPath !== path) {
-    await deleteWordVariantAudio(previousPath);
+    await deleteWordVariantAudio(previousPath, bucket);
   }
   return path;
 }

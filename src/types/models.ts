@@ -124,6 +124,9 @@ export interface WordVariant {
   inRepeatAfterMe: boolean;
   /** Set when an admin permanently skipped recording this form. */
   recordingSkippedAt: string | null;
+  /** Optional native-speaker explanation (English, Arabic or both). Never the
+   * pronunciation: exercises and Repeat After Me only ever play audioPath. */
+  explanationAudioPath: string | null;
   /** Stamped automatically when nativeVerified flips to true — see src/data/admin/content.ts. */
   approvedBy: string | null;
   approvedAt: string | null;
