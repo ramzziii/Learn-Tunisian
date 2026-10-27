@@ -238,12 +238,18 @@ grounding, not instead of it.
   Needs the service-role key specifically (Project Settings → API) since it
   writes content before any user session exists — never put these values in
   `.env`/`EXPO_PUBLIC_*`.
-- **Cost controls**: a 20-conversation-turn/profile/day cap (UTC calendar
-  day), checked before any paid call — the client surfaces a
+- **Cost controls**: a per-account daily quota (UTC calendar day) on every
+  paid AI call — 60 tutor turns, 200 text-to-speech and 150 speech-to-text
+  calls — consumed atomically by `consume_ai_quota` before the call and
+  failing closed (`0018_ai_quota_and_account_email.sql`; counts live in
+  `ai_daily_usage`). It also refuses callers with no signed-in user, so the
+  public anon key alone can't spend. The tutor additionally caps prompt sizes
+  and requires the `profileId` to belong to the caller. The client surfaces a
   `daily_limit_reached` error with its own copy, not the generic rate-limit
   message. Every chat and embedding call logs its token usage to
-  `ai_usage_log` (`profile_id`, `call_type`, `model`, token counts) — no
-  dashboard for it yet, query the table directly to see actual spend.
+  `ai_usage_log` (`profile_id`, `call_type`, `model`, token counts; learners
+  see only their own rows, admins see all) — no dashboard for it yet, query
+  the table directly to see actual spend.
 
 ## Project structure
 
@@ -283,7 +289,7 @@ src/
 supabase/
   migrations/0001-0008_*.sql
   seed.sql
-  functions/talk-to-a-tunisian/   Edge Function: chat + RAG retrieval + daily cap + corrections logging
+  functions/talk-to-a-tunisian/   Edge Function: chat + RAG retrieval + daily quota + corrections logging
   functions/talk-tts/             Edge Function proxy: text-to-speech
   functions/talk-stt/             Edge Function proxy: speech-to-text
   functions/talk-review/          Edge Function: reviewer's approve/reject-with-correction promotion

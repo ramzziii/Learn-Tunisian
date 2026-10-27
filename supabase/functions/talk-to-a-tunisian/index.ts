@@ -11,11 +11,12 @@
 // Everything else about "one implementation, not a second copy" still holds
 // for the parts that don't need the secret.
 //
-// Supabase verifies the caller's JWT automatically before this code runs
-// (the default for a deployed function), so every request here is already
-// from a signed-in user. Retrieval/logging queries below run through that
-// same forwarded JWT (RLS-enforced), not the service-role key — this app
-// has never used service-role, and there's no reason to start here.
+// Retrieval/logging queries below run through the caller's forwarded JWT
+// (RLS-enforced), not the service-role key. The function does not rely on
+// the gateway's JWT check alone (which also admits the public anon key):
+// before any paid call it requires the profileId to belong to the caller and
+// consumes the caller's per-account daily quota (consume_ai_quota, which
+// refuses callers with no user identity — 0018_ai_quota_and_account_email.sql).
 //
 // Deploy: supabase functions deploy talk-to-a-tunisian
 // Configure secrets (never commit these):
@@ -38,9 +39,13 @@ const MAX_HISTORY_TURNS = 12;
 // How many retrieved verified examples to ground a single turn in — enough
 // to be useful, small enough to stay cheap.
 const MATCH_COUNT = 6;
-// Per-profile cost/abuse ceiling — resets at UTC midnight. See README for
-// why this specific number.
-const DAILY_TURN_LIMIT = 20;
+// Upper bounds on every prompt-bearing field, so one request can't carry
+// far more paid input than a real conversation turn. Generous: a real system
+// prompt (src/lib/ai/buildSystemPrompt.ts) is a few thousand characters.
+const MAX_SYSTEM_PROMPT_CHARS = 20_000;
+const MAX_TURN_CHARS = 2_000;
+const MAX_RETRIEVAL_QUERY_CHARS = 1_000;
+const MAX_HISTORY_ENTRIES = 100;
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
@@ -74,6 +79,28 @@ function jsonResponse(body: unknown, status = 200): Response {
 
 function errorResponse(kind: string, message: string, status: number): Response {
   return jsonResponse({ error: { kind, message } }, status);
+}
+
+/** The first prompt field that is the wrong type or over its limit, or null. */
+function oversizedField(body: RequestBody): string | null {
+  if (typeof body.systemPrompt !== 'string' || body.systemPrompt.length > MAX_SYSTEM_PROMPT_CHARS) return 'systemPrompt';
+  if (typeof body.retrievalQuery !== 'string' || body.retrievalQuery.length > MAX_RETRIEVAL_QUERY_CHARS) return 'retrievalQuery';
+  if (body.learnerMessage != null && (typeof body.learnerMessage !== 'string' || body.learnerMessage.length > MAX_TURN_CHARS)) {
+    return 'learnerMessage';
+  }
+  if (body.history.length > MAX_HISTORY_ENTRIES) return 'history';
+  for (const turn of body.history) {
+    if (typeof turn?.text !== 'string' || turn.text.length > MAX_TURN_CHARS) return 'history';
+  }
+  return null;
+}
+
+/** consume_ai_quota failed: no user identity → 401; anything else fails closed. */
+function quotaErrorResponse(error: { message?: string; code?: string }): Response {
+  if (error.code === '42501' || /not_authenticated/.test(error.message ?? '')) {
+    return errorResponse('unauthorized', 'Please sign in to talk with the tutor.', 401);
+  }
+  return errorResponse('provider_error', 'Could not check your daily usage — please try again.', 503);
 }
 
 function supabaseForRequest(req: Request) {
@@ -183,18 +210,31 @@ Deno.serve(async (req) => {
     return errorResponse('invalid_response', 'Missing systemPrompt, history, profileId, or retrievalQuery', 400);
   }
 
+  const tooBig = oversizedField(body);
+  if (tooBig) {
+    return errorResponse('invalid_response', `The ${tooBig} field is missing or too long`, 413);
+  }
+
   const supabase = supabaseForRequest(req);
 
-  // Daily cap, checked before any paid call — a profile at the ceiling
-  // shouldn't cost anything further today.
-  const todayStart = new Date();
-  todayStart.setUTCHours(0, 0, 0, 0);
-  const { count: turnsToday, error: countError } = await supabase
-    .from('corrections')
-    .select('id', { count: 'exact', head: true })
-    .eq('profile_id', body.profileId)
-    .gte('created_at', todayStart.toISOString());
-  if (!countError && (turnsToday ?? 0) >= DAILY_TURN_LIMIT) {
+  // The profile must be one of the caller's own (RLS on profiles only
+  // returns those), so usage and turns can't be attributed to someone else.
+  const { data: ownProfile, error: profileError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('id', body.profileId)
+    .maybeSingle();
+  if (profileError || !ownProfile) {
+    return errorResponse('forbidden', 'That profile does not belong to this account.', 403);
+  }
+
+  // Per-account daily cap, consumed atomically before any paid call. Fails
+  // closed: an error here never lets the call through.
+  const { data: allowed, error: quotaError } = await supabase.rpc('consume_ai_quota', { p_kind: 'chat' });
+  if (quotaError) {
+    return quotaErrorResponse(quotaError);
+  }
+  if (allowed !== true) {
     return errorResponse('daily_limit_reached', "You've reached today's conversation limit — come back tomorrow!", 429);
   }
 

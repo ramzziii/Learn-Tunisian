@@ -36,10 +36,9 @@ interface AuthContextValue {
   updatePassword: (newPassword: string) => Promise<{ error: string | null }>;
 }
 
-/** Either shape a Supabase recovery redirect can carry, depending on the
- * project's auth flow type (implicit vs. PKCE) — see the comment above
- * parseRecoveryUrl in app/auth/reset-password.tsx. */
-export type RecoveryLinkParams = { accessToken: string; refreshToken: string } | { code: string };
+/** What a recovery redirect carries under the PKCE flow (src/lib/supabase/client.ts):
+ * a single-use code, exchangeable only on the device that requested the reset. */
+export type RecoveryLinkParams = { code: string };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
@@ -91,10 +90,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error: error?.message ?? null };
       },
       establishRecoverySession: async (params) => {
-        const { error } =
-          'code' in params
-            ? await supabase.auth.exchangeCodeForSession(params.code)
-            : await supabase.auth.setSession({ access_token: params.accessToken, refresh_token: params.refreshToken });
+        // Only a PKCE code is accepted. Installing bare session tokens from a
+        // link would let any app or web page sign the learner into another
+        // account (run-1 security audit), so that path no longer exists.
+        const code = (params as { code?: unknown } | null)?.code;
+        if (typeof code !== 'string' || !code) {
+          return { error: 'This reset link is not valid. Request a new reset code instead.' };
+        }
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
         return { error: error?.message ?? null };
       },
       verifyPasswordResetCode: async (email, code) => {

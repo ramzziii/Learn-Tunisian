@@ -68,7 +68,16 @@ export interface TutorResponse {
 }
 
 export interface AiProviderError {
-  kind: 'network' | 'timeout' | 'rate_limited' | 'invalid_response' | 'provider_error' | 'not_configured' | 'daily_limit_reached';
+  kind:
+    | 'network'
+    | 'timeout'
+    | 'rate_limited'
+    | 'invalid_response'
+    | 'provider_error'
+    | 'not_configured'
+    | 'daily_limit_reached'
+    | 'unauthorized'
+    | 'forbidden';
   message: string;
 }
 

@@ -91,12 +91,11 @@ Deno.serve(async (req) => {
     return jsonResponse({ email: 'not_configured' });
   }
 
-  const { data: account, error: accountError } = await service
-    .from('accounts')
-    .select('email')
-    .eq('id', request.account_id)
-    .maybeSingle();
-  if (accountError || !account?.email) {
+  // The verified login email from auth.users — not public.accounts.email,
+  // which used to be editable by its owner (run-1 security audit).
+  const { data: userData, error: userError } = await service.auth.admin.getUserById(request.account_id);
+  const recipient = userData?.user?.email;
+  if (userError || !recipient) {
     await record('failed');
     return jsonResponse({ email: 'failed', message: 'No email address on the requester’s account.' });
   }
@@ -114,7 +113,7 @@ Deno.serve(async (req) => {
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from, to: [account.email], subject: 'Your Tunisian translation is ready', text, html }),
+      body: JSON.stringify({ from, to: [recipient], subject: 'Your Tunisian translation is ready', text, html }),
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
     if (!response.ok) {

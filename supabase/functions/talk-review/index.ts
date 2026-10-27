@@ -8,7 +8,9 @@
 // It also updates the corrections log row so it drops out of the pending
 // queue. Same thin-proxy shape as talk-to-a-tunisian (CORS, timeout, JSON
 // error envelope), and same auth model — runs through the caller's own JWT
-// (RLS-enforced), not the service-role key.
+// (RLS-enforced), not the service-role key. It refuses non-admins (is_admin)
+// before doing anything else; RLS on phrases/sentences is admin-only too
+// (0017_security_fixes.sql).
 //
 // Deploy: supabase functions deploy talk-review
 // Uses the same AI_API_KEY / AI_BASE_URL / AI_EMBEDDING_MODEL secrets as
@@ -90,6 +92,15 @@ Deno.serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } },
   });
+
+  // Admins only, checked with the caller's own JWT before anything else:
+  // the embedding call spends the app's AI key, and the insert below marks
+  // text native_verified for every learner's tutor. The admin screen is a
+  // client-side gate only, so this function must enforce it itself.
+  const { data: isAdmin, error: adminError } = await supabase.rpc('is_admin');
+  if (adminError || isAdmin !== true) {
+    return errorResponse('forbidden', 'Only admins can review corrections.', 403);
+  }
 
   const baseUrl = Deno.env.get('AI_BASE_URL') || DEFAULT_BASE_URL;
   const embeddingModel = Deno.env.get('AI_EMBEDDING_MODEL') || DEFAULT_EMBEDDING_MODEL;

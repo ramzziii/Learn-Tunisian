@@ -6,6 +6,8 @@ import { Text } from 'react-native';
 
 const mockResetPasswordForEmail = jest.fn(async () => ({ error: null }));
 const mockVerifyOtp = jest.fn(async () => ({ data: {}, error: null as null | { message: string } }));
+const mockExchangeCode = jest.fn(async () => ({ data: {}, error: null as null | { message: string } }));
+const mockSetSession = jest.fn(async () => ({ data: {}, error: null }));
 const mockCreateURL = jest.fn((path: string) => `exp://192.168.1.5:8081/--${path}`);
 
 jest.mock('expo-linking', () => ({ createURL: (path: string) => mockCreateURL(path) }));
@@ -16,6 +18,8 @@ jest.mock('@/lib/supabase/client', () => ({
       onAuthStateChange: jest.fn(() => ({ data: { subscription: { unsubscribe: jest.fn() } } })),
       resetPasswordForEmail: (...a: unknown[]) => mockResetPasswordForEmail(...(a as [])),
       verifyOtp: (...a: unknown[]) => mockVerifyOtp(...(a as [])),
+      exchangeCodeForSession: (...a: unknown[]) => mockExchangeCode(...(a as [])),
+      setSession: (...a: unknown[]) => mockSetSession(...(a as [])),
     },
   },
 }));
@@ -26,6 +30,7 @@ const { AuthProvider, useAuth } = require('@/lib/auth/AuthContext');
 let auth: {
   sendPasswordReset: (email: string) => Promise<{ error: string | null }>;
   verifyPasswordResetCode: (email: string, code: string) => Promise<{ error: string | null }>;
+  establishRecoverySession: (params: unknown) => Promise<{ error: string | null }>;
 };
 function Capture() {
   auth = useAuth();
@@ -86,5 +91,41 @@ describe('verifyPasswordResetCode (6-digit code from the reset email)', () => {
     });
 
     expect(result).toEqual({ error: 'Token has expired or is invalid' });
+  });
+});
+
+describe('establishRecoverySession (reset link)', () => {
+  async function renderAuth() {
+    await render(
+      <AuthProvider>
+        <Capture />
+      </AuthProvider>
+    );
+  }
+
+  it('exchanges the PKCE code — which only works on the device that asked for the reset', async () => {
+    mockExchangeCode.mockClear();
+    await renderAuth();
+
+    let result: { error: string | null } = { error: 'not run' };
+    await act(async () => {
+      result = await auth.establishRecoverySession({ code: 'xyz789' });
+    });
+
+    expect(mockExchangeCode).toHaveBeenCalledWith('xyz789');
+    expect(result).toEqual({ error: null });
+  });
+
+  it('never installs bare session tokens handed to it', async () => {
+    mockSetSession.mockClear();
+    await renderAuth();
+
+    let result: { error: string | null } = { error: null };
+    await act(async () => {
+      result = await auth.establishRecoverySession({ accessToken: 'a', refreshToken: 'r' });
+    });
+
+    expect(mockSetSession).not.toHaveBeenCalled();
+    expect(result.error).toMatch(/not valid/i);
   });
 });

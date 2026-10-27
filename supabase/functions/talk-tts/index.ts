@@ -14,6 +14,16 @@
 // This hasn't been exercised against a live key in this environment — treat
 // it as reviewed-but-unverified until tested with real credentials, the same
 // as talk-to-a-tunisian was before it was verified via direct curl.
+//
+// It does not rely on the gateway's JWT check alone (which also admits the
+// public anon key): before the paid call it consumes the caller's per-account
+// daily quota via consume_ai_quota, which refuses callers with no user
+// identity (0018_ai_quota_and_account_email.sql).
+
+import { createClient } from 'npm:@supabase/supabase-js@2';
+
+const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
 
 const DEFAULT_BASE_URL = 'https://api.openai.com/v1';
 const DEFAULT_TTS_MODEL = 'tts-1';
@@ -41,6 +51,14 @@ function errorResponse(kind: string, message: string, status: number): Response 
   });
 }
 
+/** consume_ai_quota failed: no user identity → 401; anything else fails closed. */
+function quotaErrorResponse(error: { message?: string; code?: string }): Response {
+  if (error.code === '42501' || /not_authenticated/.test(error.message ?? '')) {
+    return errorResponse('unauthorized', 'Please sign in to use audio features.', 401);
+  }
+  return errorResponse('provider_error', 'Could not check your daily usage — please try again.', 503);
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders() });
@@ -65,6 +83,19 @@ Deno.serve(async (req) => {
     return errorResponse('invalid_response', 'Missing text', 400);
   }
   const text = body.text.slice(0, MAX_TEXT_LENGTH);
+
+  // Per-account daily quota, consumed before the paid call; also rejects a
+  // caller with no signed-in user. Fails closed on any error.
+  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } },
+  });
+  const { data: allowed, error: quotaError } = await supabase.rpc('consume_ai_quota', { p_kind: 'tts' });
+  if (quotaError) {
+    return quotaErrorResponse(quotaError);
+  }
+  if (allowed !== true) {
+    return errorResponse('daily_limit_reached', "You've reached today's audio limit — come back tomorrow!", 429);
+  }
 
   const baseUrl = Deno.env.get('AI_BASE_URL') || DEFAULT_BASE_URL;
   const model = Deno.env.get('AI_TTS_MODEL') || DEFAULT_TTS_MODEL;

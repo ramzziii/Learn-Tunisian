@@ -27,6 +27,11 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,
+    // PKCE: a password-reset link then carries only a single-use code that
+    // can be exchanged on this device (which holds the code verifier). With
+    // the implicit flow the link carried a full session in its URL, which
+    // any app registering the same custom scheme could capture.
+    flowType: 'pkce',
   },
 });
 
