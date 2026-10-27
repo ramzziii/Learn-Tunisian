@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
+import * as Linking from 'expo-linking';
 
 import { supabase } from '@/lib/supabase/client';
 
@@ -20,7 +21,7 @@ interface AuthContextValue {
   signUpWithEmail: (email: string, password: string) => Promise<SignUpResult>;
   signInWithEmail: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
-  /** Emails a password-recovery link to the given address. Always succeeds
+  /** Emails a password-recovery code (and link) to the given address. Always succeeds
    * from the caller's perspective for an unknown email too — Supabase itself
    * doesn't reveal whether an account exists, so neither does this app. */
   sendPasswordReset: (email: string) => Promise<{ error: string | null }>;
@@ -28,13 +29,16 @@ interface AuthContextValue {
    * session, so updatePassword has something to act on. See
    * app/auth/reset-password.tsx for where the link's URL gets parsed. */
   establishRecoverySession: (params: RecoveryLinkParams) => Promise<{ error: string | null }>;
+  /** Checks the 6-digit code from the reset email. On success the user is
+   * signed in, so updatePassword can then set the new password. Codes are
+   * single-use. See app/auth/reset-code.tsx. */
+  verifyPasswordResetCode: (email: string, code: string) => Promise<{ error: string | null }>;
   updatePassword: (newPassword: string) => Promise<{ error: string | null }>;
 }
 
-/** Either shape a Supabase recovery redirect can carry, depending on the
- * project's auth flow type (implicit vs. PKCE) — see the comment above
- * parseRecoveryUrl in app/auth/reset-password.tsx. */
-export type RecoveryLinkParams = { accessToken: string; refreshToken: string } | { code: string };
+/** What a recovery redirect carries under the PKCE flow (src/lib/supabase/client.ts):
+ * a single-use code, exchangeable only on the device that requested the reset. */
+export type RecoveryLinkParams = { code: string };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
@@ -76,15 +80,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
       sendPasswordReset: async (email) => {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: 'learntunisian://auth/reset-password',
+          // Built for wherever the app is running — exp://<dev-host>/--/… in
+          // Expo Go, learntunisian://… in a real build. A hard-coded
+          // learntunisian:// link can't open the app in Expo Go. Supabase only
+          // honors addresses on its Redirect URLs allow-list (Auth → URL
+          // Configuration), so both forms need to be listed there.
+          redirectTo: Linking.createURL('/auth/reset-password'),
         });
         return { error: error?.message ?? null };
       },
       establishRecoverySession: async (params) => {
-        const { error } =
-          'code' in params
-            ? await supabase.auth.exchangeCodeForSession(params.code)
-            : await supabase.auth.setSession({ access_token: params.accessToken, refresh_token: params.refreshToken });
+        // Only a PKCE code is accepted. Installing bare session tokens from a
+        // link would let any app or web page sign the learner into another
+        // account (run-1 security audit), so that path no longer exists.
+        const code = (params as { code?: unknown } | null)?.code;
+        if (typeof code !== 'string' || !code) {
+          return { error: 'This reset link is not valid. Request a new reset code instead.' };
+        }
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        return { error: error?.message ?? null };
+      },
+      verifyPasswordResetCode: async (email, code) => {
+        const { error } = await supabase.auth.verifyOtp({ email: email.trim(), token: code.trim(), type: 'recovery' });
         return { error: error?.message ?? null };
       },
       updatePassword: async (newPassword) => {

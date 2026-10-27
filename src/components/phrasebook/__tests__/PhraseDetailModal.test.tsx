@@ -12,6 +12,13 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 jest.mock('@/hooks/useWordAudioPlayer', () => ({
   useWordAudioPlayer: () => ({ play: jest.fn(), hasAudio: true, isResolving: false, hasError: false, isFallbackVoice: false, isPlaying: false, retry: jest.fn() }),
 }));
+jest.mock('@/components/ui/ExplanationPlayButton', () => ({
+  ExplanationPlayButton: ({ variant }: { variant: { explanationAudioPath?: string | null } }) => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { Text } = require('react-native');
+    return variant?.explanationAudioPath ? <Text>{`[explanation ${variant.explanationAudioPath}]`}</Text> : null;
+  },
+}));
 jest.mock('@/components/pronunciation/PronunciationPractice', () => {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const React = require('react');
@@ -79,4 +86,19 @@ it('kid profiles never see recording (no mic prompts for kids)', async () => {
   await renderModal('kid');
   expect(screen.queryByText('Practice saying it')).toBeNull();
   expect(mockPracticeProps).not.toHaveBeenCalled();
+});
+
+it('offers the explanation for a phrase that has one, next to the pronunciation', async () => {
+  const withExplanation = { ...phrase, variants: [{ ...variant, explanationAudioPath: 'g/v1-explanation.m4a' }] };
+  await render(
+    <ThemeProvider>
+      <PhraseDetailModal phrase={withExplanation} track="adult" onClose={jest.fn()} />
+    </ThemeProvider>
+  );
+  expect(screen.getByText('[explanation g/v1-explanation.m4a]')).toBeOnTheScreen();
+});
+
+it('no explanation: no explanation control', async () => {
+  await renderModal();
+  expect(screen.queryByText(/\[explanation/)).toBeNull();
 });

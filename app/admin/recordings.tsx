@@ -103,6 +103,7 @@ export default function AdminRecordings() {
           <Text style={styles.centeredTitle}>Every word has a native voice</Text>
           <Text style={styles.centeredBody}>Nothing left to record. Skipped words are under Skipped Recordings.</Text>
           <Button label="Skipped Recordings" variant="secondary" onPress={() => router.push('/admin/recordings-skipped')} />
+          <Button label="Missing Explanations" variant="ghost" onPress={() => router.push('/admin/recordings-explanations')} />
         </View>
       </ScreenContainer>
     );
@@ -141,9 +142,14 @@ export default function AdminRecordings() {
       <Text style={styles.subtitle}>
         {items.length} {items.length === 1 ? 'word needs' : 'words need'} a native voice
       </Text>
-      <Pressable onPress={() => router.push('/admin/recordings-skipped')} hitSlop={8}>
-        <Text style={styles.link}>Skipped Recordings ›</Text>
-      </Pressable>
+      <View style={styles.links}>
+        <Pressable onPress={() => router.push('/admin/recordings-skipped')} hitSlop={8}>
+          <Text style={styles.link}>Skipped Recordings ›</Text>
+        </Pressable>
+        <Pressable onPress={() => router.push('/admin/recordings-explanations')} hitSlop={8}>
+          <Text style={styles.link}>Missing Explanations ›</Text>
+        </Pressable>
+      </View>
       <ScrollView contentContainerStyle={styles.list}>
         {items.map((item) => (
           <Pressable
@@ -170,6 +176,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 26, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md },
   subtitle: { fontSize: 14, color: colors.textSecondary, marginTop: spacing.xs, marginBottom: spacing.sm },
   link: { fontSize: 14, fontWeight: '700', color: colors.primary },
+  links: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
   list: { gap: spacing.sm, paddingVertical: spacing.md, paddingBottom: spacing.xxl },
   scroll: { gap: spacing.md, paddingBottom: spacing.xxl },
   row: {

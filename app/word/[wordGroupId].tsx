@@ -7,6 +7,7 @@ import { VariantCallout } from '@/components/exercises/shared/VariantCallout';
 import { WordPicture } from '@/components/exercises/shared/WordPicture';
 import { AudioPlayButton } from '@/components/ui/AudioPlayButton';
 import { BackButton } from '@/components/ui/BackButton';
+import { ExplanationPlayButton } from '@/components/ui/ExplanationPlayButton';
 import { Button } from '@/components/ui/Button';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { PressableScale } from '@/components/ui/PressableScale';
@@ -141,6 +142,7 @@ export default function WordDetail() {
             onRetry={retry}
             style={{ marginTop: spacing.lg }}
           />
+          <ExplanationPlayButton variant={displayVariant} style={{ marginTop: spacing.md }} />
           <Text style={[styles.verificationBadge, displayVariant.nativeVerified && styles.verificationBadgeVerified]}>
             {displayVariant.nativeVerified ? '✓ Native-speaker verified' : '⚠️ Draft — pending native review'}
           </Text>

@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/Button';
 import { colors, radii, spacing } from '@/constants/theme';
 import { saveRecordedWordVariantAudio } from '@/data/admin/audioUpload';
 import { useAdminAudioRecorder } from '@/hooks/useAdminAudioRecorder';
-import { getAudioUrl } from '@/lib/supabase/client';
+import { pickAudioFile, type PickedAudioFile } from '@/lib/admin/audioFile';
+import { getAudioUrl, supabase } from '@/lib/supabase/client';
 import { invalidateCachedAudio } from '@/lib/offline/audioCache';
 
 interface AudioRecorderFieldProps {
@@ -30,10 +31,15 @@ interface AudioRecorderFieldProps {
     isIncluded: boolean;
     onDecide: (include: boolean) => Promise<void>;
   };
+  /** A private bucket (translation answers) instead of the public content
+   * bucket: uploads go there, and the saved audio previews via a signed URL. */
+  audioBucket?: string;
 }
 
 /**
- * Record → preview → upload for one word_variant's audio. Uses
+ * Record (or Upload audio: pick a file) → preview → save for one
+ * word_variant's audio. Uploading never needs the microphone, so it stays
+ * available when microphone permission is denied. Uses
  * useAdminAudioRecorder (manual start/stop, no fixed duration cap) rather
  * than useVoiceRecorder, which is built for Talk's bounded conversational
  * turns — see that hook's own comment for why reusing it here caused a
@@ -46,9 +52,13 @@ export function AudioRecorderField({
   updatedAt,
   onUploaded,
   repeatAfterMe,
+  audioBucket,
 }: AudioRecorderFieldProps) {
   const recorder = useAdminAudioRecorder();
+  // The audio waiting to be saved — a recording's URI or a picked file's.
   const [recordedUri, setRecordedUri] = useState<string | null>(null);
+  // Set when recordedUri came from Upload audio rather than the recorder.
+  const [pickedFile, setPickedFile] = useState<PickedAudioFile | null>(null);
   const [savedAudioPath, setSavedAudioPath] = useState<string | null>(currentAudioPath);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -72,7 +82,30 @@ export function AudioRecorderField({
     setPreviewVersion(updatedAt);
   }, [updatedAt]);
 
-  const previewSource = recordedUri ?? (savedAudioPath ? getAudioUrl(savedAudioPath, previewVersion) : null);
+  // Private buckets have no public URL: sign one for the saved file instead.
+  const [signedPreviewUrl, setSignedPreviewUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!audioBucket || !savedAudioPath) {
+      setSignedPreviewUrl(null);
+      return;
+    }
+    let isCurrent = true;
+    supabase.storage
+      .from(audioBucket)
+      .createSignedUrl(savedAudioPath, 3600)
+      .then(({ data }) => {
+        if (isCurrent) setSignedPreviewUrl(data?.signedUrl ?? null);
+      })
+      .catch(() => {
+        if (isCurrent) setSignedPreviewUrl(null);
+      });
+    return () => {
+      isCurrent = false;
+    };
+  }, [audioBucket, savedAudioPath]);
+
+  const savedPreviewUrl = audioBucket ? signedPreviewUrl : savedAudioPath ? getAudioUrl(savedAudioPath, previewVersion) : null;
+  const previewSource = recordedUri ?? savedPreviewUrl;
   const previewPlayer = useAudioPlayer(previewSource ? { uri: previewSource } : null);
   const previewStatus = useAudioPlayerStatus(previewPlayer);
 
@@ -113,11 +146,31 @@ export function AudioRecorderField({
     }
     if (recorder.isRecording) {
       const uri = await recorder.stop();
-      if (uri) setRecordedUri(uri);
+      if (uri) {
+        setRecordedUri(uri);
+        setPickedFile(null);
+      }
       return;
     }
     setRecordedUri(null);
+    setPickedFile(null);
     await recorder.start();
+  };
+
+  const handleUploadPress = async () => {
+    setRepeatAfterMeMessage(null);
+    setRepeatAfterMeError(null);
+    setError(null);
+    const result = await pickAudioFile();
+    // Cancelling leaves whatever was there (saved audio or an unsaved take).
+    if (result.kind === 'canceled') return;
+    if (result.kind === 'invalid') {
+      setError(result.message);
+      return;
+    }
+    setSuccessMessage(null);
+    setRecordedUri(result.file.uri);
+    setPickedFile(result.file);
   };
 
   const handlePlayPreview = () => {
@@ -141,28 +194,34 @@ export function AudioRecorderField({
         variantId,
         previousPath,
         persistAudioPath: onUploaded,
+        format: pickedFile?.format,
+        ...(audioBucket ? { bucket: audioBucket } : {}),
       });
       setSavedAudioPath(path);
       setPreviewVersion(Date.now());
       setRecordedUri(null);
+      setPickedFile(null);
       setSuccessMessage('Audio saved successfully.');
       // Only asked after the new recording is durably saved.
       if (repeatAfterMe) setIsAskingRepeatAfterMe(true);
-      if (previousPath && previousPath !== path) invalidateCachedAudio(previousPath);
+      if (!audioBucket && previousPath && previousPath !== path) invalidateCachedAudio(previousPath);
     } catch (err) {
-      // recordedUri is kept so the admin can retry without re-recording.
+      // recordedUri is kept so the admin can retry without re-recording or re-picking.
       setError(err instanceof Error ? err.message : 'Could not upload audio.');
     } finally {
       setIsUploading(false);
     }
   };
 
-  if (recorder.permission === 'denied') {
-    return <Text style={styles.deniedText}>Microphone permission denied — enable it in device settings to record audio.</Text>;
-  }
+  const micDenied = recorder.permission === 'denied';
 
   return (
     <View style={styles.container}>
+      {micDenied ? (
+        <Text style={styles.deniedText}>
+          Microphone permission denied — enable it in device settings to record audio. You can still upload an audio file.
+        </Text>
+      ) : null}
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
       {successMessage ? <Text style={styles.successText}>{successMessage}</Text> : null}
 
@@ -192,13 +251,26 @@ export function AudioRecorderField({
       {repeatAfterMeMessage ? <Text style={styles.successText}>{repeatAfterMeMessage}</Text> : null}
 
       {savedAudioPath && !recordedUri ? <Text style={styles.currentPath}>Current: {savedAudioPath}</Text> : null}
-      {recordedUri ? <Text style={styles.currentPath}>New recording ready — preview, then save.</Text> : null}
+      {recordedUri ? (
+        <Text style={styles.currentPath}>
+          {pickedFile ? `Selected ${pickedFile.name} — preview, then save.` : 'New recording ready — preview, then save.'}
+        </Text>
+      ) : null}
 
       <View style={styles.row}>
+        {micDenied ? null : (
+          <Button
+            label={recorder.isRecording ? `Stop (${Math.floor(recorder.durationMillis / 1000)}s)` : 'Record'}
+            variant={recorder.isRecording ? 'primary' : 'secondary'}
+            onPress={handleRecordPress}
+            style={{ flex: 1 }}
+          />
+        )}
         <Button
-          label={recorder.isRecording ? `Stop (${Math.floor(recorder.durationMillis / 1000)}s)` : 'Record'}
-          variant={recorder.isRecording ? 'primary' : 'secondary'}
-          onPress={handleRecordPress}
+          label="Upload audio"
+          variant="secondary"
+          onPress={handleUploadPress}
+          disabled={recorder.isRecording || isUploading}
           style={{ flex: 1 }}
         />
         <Button
@@ -211,7 +283,12 @@ export function AudioRecorderField({
       </View>
 
       {recordedUri ? (
-        <Button label="Save Recording" onPress={handleSave} loading={isUploading} style={{ marginTop: spacing.xs }} />
+        <Button
+          label={pickedFile ? 'Save uploaded audio' : 'Save Recording'}
+          onPress={handleSave}
+          loading={isUploading}
+          style={{ marginTop: spacing.xs }}
+        />
       ) : null}
     </View>
   );

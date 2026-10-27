@@ -70,6 +70,11 @@ export default function AdminDashboard() {
           onPress={() => router.push('/admin/recordings-skipped')}
         />
         <SelectableCard
+          title="Translation Requests"
+          subtitle="Learners' phrase requests — answer within 3 business days"
+          onPress={() => router.push('/admin/translation-requests')}
+        />
+        <SelectableCard
           title="Correction Review"
           subtitle="Pending AI-generated phrases/sentences"
           onPress={() => router.push('/admin/corrections')}

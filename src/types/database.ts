@@ -105,6 +105,8 @@ export interface WordVariantRow {
   /** 0013_recording_skips.sql — admin skipped recording this form. */
   recording_skipped_at: string | null;
   recording_skipped_by: string | null;
+  /** 0016_explanation_audio.sql — optional spoken explanation, separate from audio_path. */
+  explanation_audio_path?: string | null;
   approved_by: string | null;
   approved_at: string | null;
 }

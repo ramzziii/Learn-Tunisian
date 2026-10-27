@@ -44,7 +44,8 @@ export async function loadRepeatAfterMeSession(options: {
   const groupsById = new Map(((groupRows ?? []) as WordGroupRow[]).map((g) => [g.id, g]));
 
   const contentOrdered = variants
-    .filter((v) => groupsById.has(v.word_group_id))
+    // Only the pronunciation belongs here — never an explanation recording.
+    .filter((v) => groupsById.has(v.word_group_id) && !!v.audio_path)
     .sort((a, b) => {
       const ga = groupsById.get(a.word_group_id)!;
       const gb = groupsById.get(b.word_group_id)!;
@@ -59,7 +60,7 @@ export async function loadRepeatAfterMeSession(options: {
       id: row.id,
       wordGroupId: row.word_group_id,
       englishMeaning: groupsById.get(row.word_group_id)!.english_meaning,
-      variant: mapWordVariant(row),
+      variant: { ...mapWordVariant(row), explanationAudioPath: null },
     }));
 
   const ordered = orderItemsForSession(contentOrdered, options.progress);

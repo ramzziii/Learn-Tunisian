@@ -79,6 +79,30 @@ describe('loadRepeatAfterMeSession', () => {
     expect(items[0]).toMatchObject({ englishMeaning: 'meaning of g1', variant: { audioPath: 'g1/v1-1000.m4a' } });
   });
 
+  it('explanation recordings never reach Repeat After Me — items carry only the pronunciation', async () => {
+    mockDb.respond('word_variants.select', {
+      data: [variantRow('v1', 'g1', 0, { explanation_audio_path: 'g1/v1-explanation-9.m4a' })],
+      error: null,
+    });
+    mockDb.respond('word_groups.select', { data: [groupRow('g1', 1)], error: null });
+
+    const { items } = await loadRepeatAfterMeSession({ isPremium: true, progress: {} });
+
+    expect(items[0].variant.audioPath).toBe('g1/v1-1000.m4a');
+    expect(items[0].variant.explanationAudioPath).toBeNull();
+  });
+
+  it('a form with only an explanation (no pronunciation) is never an item', async () => {
+    mockDb.respond('word_variants.select', {
+      data: [variantRow('v1', 'g1', 0, { audio_path: null, explanation_audio_path: 'g1/v1-explanation-9.m4a' })],
+      error: null,
+    });
+    mockDb.respond('word_groups.select', { data: [groupRow('g1', 1)], error: null });
+
+    const { items } = await loadRepeatAfterMeSession({ isPremium: true, progress: {} });
+    expect(items).toEqual([]);
+  });
+
   it('Premium: every item, in stable content order', async () => {
     seed(8);
     const { items, lockedCount } = await loadRepeatAfterMeSession({ isPremium: true, progress: {} });

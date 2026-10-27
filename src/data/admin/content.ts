@@ -343,6 +343,7 @@ export async function createWordVariant(
     speakerName?: string | null;
     dialectNotes?: string | null;
     isNativeVoice?: boolean;
+    explanationAudioPath?: string | null;
   },
   actorAccountId: string
 ): Promise<WordVariant> {
@@ -360,6 +361,7 @@ export async function createWordVariant(
       speaker_name: input.speakerName ?? null,
       dialect_notes: input.dialectNotes ?? null,
       is_native_voice: input.isNativeVoice ?? false,
+      ...(input.explanationAudioPath ? { explanation_audio_path: input.explanationAudioPath } : {}),
       created_by: actorAccountId,
       updated_by: actorAccountId,
     })
@@ -378,6 +380,7 @@ export async function updateWordVariant(
     wordArabic: string;
     transliteration: string;
     audioPath: string | null;
+    explanationAudioPath: string | null;
     notes: string | null;
     sortOrder: number;
     contentStatus: ContentStatus;
@@ -400,6 +403,7 @@ export async function updateWordVariant(
       ...(patch.wordArabic !== undefined && { word_arabic: patch.wordArabic }),
       ...(patch.transliteration !== undefined && { transliteration: patch.transliteration }),
       ...(patch.audioPath !== undefined && { audio_path: patch.audioPath }),
+      ...(patch.explanationAudioPath !== undefined && { explanation_audio_path: patch.explanationAudioPath }),
       ...(patch.notes !== undefined && { notes: patch.notes }),
       ...(patch.sortOrder !== undefined && { sort_order: patch.sortOrder }),
       ...(patch.contentStatus !== undefined && { content_status: patch.contentStatus }),

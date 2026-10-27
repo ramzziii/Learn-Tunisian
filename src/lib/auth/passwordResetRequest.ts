@@ -11,8 +11,8 @@ export type PasswordResetOutcome =
 
 /**
  * Profile's "Change password": asks the existing reset flow
- * (AuthContext.sendPasswordReset → Supabase reset email → the link opens
- * app/auth/reset-password.tsx) to email the signed-in account. Never sends
+ * (AuthContext.sendPasswordReset → Supabase reset email with a 6-digit
+ * code → entered in app/auth/reset-code.tsx) to email the signed-in account. Never sends
  * without an email, and never sends twice at once.
  */
 export async function requestPasswordReset(options: {
@@ -27,7 +27,7 @@ export async function requestPasswordReset(options: {
 
   const email = options.email?.trim();
   if (!email) {
-    return { kind: 'error', message: 'This account has no email address on file, so a password-reset link can’t be sent.' };
+    return { kind: 'error', message: 'This account has no email address on file, so a password-reset code can’t be sent.' };
   }
 
   guard.current = true;

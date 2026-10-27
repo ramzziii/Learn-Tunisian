@@ -40,7 +40,7 @@ const { RecordingStation } = require('@/components/admin/RecordingStation');
 const { ThemeProvider } = require('@/lib/theme/ThemeContext');
 
 const item = {
-  variant: { id: 'v1', wordGroupId: 'g1', variantLabel: 'also_heard', wordArabic: 'عسلامة', transliteration: '3aslema', audioPath: null },
+  variant: { id: 'v1', wordGroupId: 'g1', variantLabel: 'also_heard', wordArabic: 'عسلامة', transliteration: '3aslema', audioPath: null, explanationAudioPath: 'g1/v1-explanation-1.m4a' },
   englishMeaning: 'hello',
   unitName: 'Greetings',
   lessonNumber: 1,

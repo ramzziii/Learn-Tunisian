@@ -15,8 +15,9 @@ const MIN_PASSWORD_LENGTH = 6;
 type Stage = 'parsing' | 'ready' | 'invalid' | 'success';
 
 /** Reached only via the deep link in a password-recovery email (see
- * AuthContext.sendPasswordReset's redirectTo) — exchanges whatever the link
- * carried for a real session, then lets the user set a new password. */
+ * AuthContext.sendPasswordReset's redirectTo) — exchanges the link's PKCE
+ * code for a session (only possible on the device that requested the reset),
+ * then lets the user set a new password. */
 export default function ResetPassword() {
   const { establishRecoverySession, updatePassword } = useAuth();
   const url = Linking.useURL();
@@ -85,10 +86,11 @@ export default function ResetPassword() {
               lineHeight: 22,
             }}
           >
-            It may have expired or already been used. Request a new one to reset your password.
+            It may have expired, already been used, or been opened on a different device from the one you asked for
+            the reset on. Request a 6-digit reset code instead — it works on any device.
           </Text>
           <Button
-            label="Request a new link"
+            label="Get a reset code"
             onPress={() => router.replace('/auth/forgot-password')}
             style={{ marginTop: spacing.xl }}
           />

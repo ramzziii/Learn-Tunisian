@@ -6,6 +6,7 @@ import { PRONUNCIATION_MAX_ATTEMPTS, PronunciationPractice } from '@/components/
 import { PressableScale } from '@/components/ui/PressableScale';
 import { radii, spacing, type ThemeColors } from '@/constants/theme';
 import { useLetterSpeech } from '@/hooks/useLetterSpeech';
+import { ExplanationPlayButton } from '@/components/ui/ExplanationPlayButton';
 import { useWordAudioPlayer } from '@/hooks/useWordAudioPlayer';
 import { useTheme } from '@/lib/theme/ThemeContext';
 import { getPrimaryVariant } from '@/lib/wordVariants';
@@ -111,6 +112,7 @@ export function PhraseDetailModal({ phrase, track, onClose }: PhraseDetailModalP
               <Text style={styles.sourceLabel}>
                 {wordPlayer.isFallbackVoice ? '🤖 Generated voice' : '🎙️ Native recording'}
               </Text>
+              <ExplanationPlayButton variant={variant} style={{ marginTop: 8 }} />
             </Animated.View>
 
             {variant.notes ? (

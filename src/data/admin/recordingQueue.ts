@@ -1,6 +1,7 @@
-import { saveRecordedWordVariantAudio } from '@/data/admin/audioUpload';
+import { deleteWordVariantAudio, saveRecordedWordVariantAudio, uploadWordVariantAudio } from '@/data/admin/audioUpload';
 import { updateWordVariant } from '@/data/admin/content';
 import { mapWordVariant } from '@/data/mappers';
+import type { AudioFormat } from '@/lib/admin/audioFile';
 import { supabase } from '@/lib/supabase/client';
 import type { WordGroupRow, WordVariantRow } from '@/types/database';
 import type { WordVariant } from '@/types/models';
@@ -20,21 +21,24 @@ export interface RecordingQueueItem {
   reason: RecordingNeed;
 }
 
-/**
- * Every word form (all variant labels) that still needs a native voice:
- * no recording, a recording whose Storage file doesn't exist, or a recording
- * not marked as a native voice. Archived/rejected content is left out.
- * Ordered by unit, lesson, word, then form (primary → masculine → feminine →
- * also heard) — the order an admin would work.
- */
-async function loadNeedingRecording(): Promise<{ item: RecordingQueueItem; skipped: boolean }[]> {
+/** A recorded word form that has no explanation recording yet. */
+export type ExplanationQueueItem = Omit<RecordingQueueItem, 'reason'>;
+
+interface VariantContext {
+  variants: WordVariantRow[];
+  groups: Map<string, WordGroupRow>;
+  units: Map<string, { id: string; name: string; sort_order: number }>;
+}
+
+/** Every non-archived/rejected form, with its word group and unit. */
+async function loadVariantContext(): Promise<VariantContext> {
   const { data: variantRows, error: variantsError } = await supabase
     .from('word_variants')
     .select('*')
     .in('content_status', ['draft', 'pending_review', 'approved']);
   if (variantsError) throw variantsError;
   const variants = (variantRows ?? []) as WordVariantRow[];
-  if (variants.length === 0) return [];
+  if (variants.length === 0) return { variants, groups: new Map(), units: new Map() };
 
   const [{ data: groupRows, error: groupsError }, { data: unitRows, error: unitsError }] = await Promise.all([
     supabase.from('word_groups').select('*').in('id', [...new Set(variants.map((v) => v.word_group_id))]),
@@ -44,11 +48,49 @@ async function loadNeedingRecording(): Promise<{ item: RecordingQueueItem; skipp
   if (unitsError) throw unitsError;
   const groups = new Map(((groupRows ?? []) as WordGroupRow[]).map((g) => [g.id, g]));
   const units = new Map(((unitRows ?? []) as { id: string; name: string; sort_order: number }[]).map((u) => [u.id, u]));
+  return { variants: variants.filter((v) => groups.has(v.word_group_id)), groups, units };
+}
+
+/** Unit, lesson, word, then form (primary → masculine → feminine → also heard) — the order an admin would work. */
+function compareRows({ groups, units }: VariantContext, a: WordVariantRow, b: WordVariantRow): number {
+  const ga = groups.get(a.word_group_id)!;
+  const gb = groups.get(b.word_group_id)!;
+  const ua = units.get(ga.unit_id)?.sort_order ?? 0;
+  const ub = units.get(gb.unit_id)?.sort_order ?? 0;
+  return (
+    ua - ub ||
+    ga.lesson_number - gb.lesson_number ||
+    ga.sort_order - gb.sort_order ||
+    ga.id.localeCompare(gb.id) ||
+    (LABEL_RANK[a.variant_label] ?? 9) - (LABEL_RANK[b.variant_label] ?? 9) ||
+    a.sort_order - b.sort_order ||
+    a.id.localeCompare(b.id)
+  );
+}
+
+function toItem({ groups, units }: VariantContext, row: WordVariantRow): ExplanationQueueItem {
+  const group = groups.get(row.word_group_id)!;
+  return {
+    variant: mapWordVariant(row),
+    englishMeaning: group.english_meaning,
+    unitName: units.get(group.unit_id)?.name ?? '',
+    lessonNumber: group.lesson_number,
+  };
+}
+
+/**
+ * Every word form (all variant labels) that still needs a native voice:
+ * no recording, a recording whose Storage file doesn't exist, or a recording
+ * not marked as a native voice. Archived/rejected content is left out.
+ */
+async function loadNeedingRecording(): Promise<{ item: RecordingQueueItem; skipped: boolean }[]> {
+  const context = await loadVariantContext();
+  const { variants } = context;
+  if (variants.length === 0) return [];
 
   const existingFiles = await listExistingAudio(variants.map((v) => v.audio_path).filter((p): p is string => !!p));
 
   return variants
-    .filter((v) => groups.has(v.word_group_id))
     .map((v) => {
       const reason: RecordingNeed | null = !v.audio_path
         ? 'no_audio'
@@ -60,34 +102,20 @@ async function loadNeedingRecording(): Promise<{ item: RecordingQueueItem; skipp
       return { row: v, reason };
     })
     .filter((x): x is { row: WordVariantRow; reason: RecordingNeed } => x.reason !== null)
-    .sort((a, b) => {
-      const ga = groups.get(a.row.word_group_id)!;
-      const gb = groups.get(b.row.word_group_id)!;
-      const ua = units.get(ga.unit_id)?.sort_order ?? 0;
-      const ub = units.get(gb.unit_id)?.sort_order ?? 0;
-      return (
-        ua - ub ||
-        ga.lesson_number - gb.lesson_number ||
-        ga.sort_order - gb.sort_order ||
-        ga.id.localeCompare(gb.id) ||
-        (LABEL_RANK[a.row.variant_label] ?? 9) - (LABEL_RANK[b.row.variant_label] ?? 9) ||
-        a.row.sort_order - b.row.sort_order ||
-        a.row.id.localeCompare(b.row.id)
-      );
-    })
-    .map(({ row, reason }) => {
-      const group = groups.get(row.word_group_id)!;
-      return {
-        skipped: !!row.recording_skipped_at,
-        item: {
-          variant: mapWordVariant(row),
-          englishMeaning: group.english_meaning,
-          unitName: units.get(group.unit_id)?.name ?? '',
-          lessonNumber: group.lesson_number,
-          reason,
-        },
-      };
-    });
+    .sort((a, b) => compareRows(context, a.row, b.row))
+    .map(({ row, reason }) => ({ skipped: !!row.recording_skipped_at, item: { ...toItem(context, row), reason } }));
+}
+
+/**
+ * Native Recordings → Missing Explanations: forms that already have a
+ * pronunciation recording but no explanation recording yet, in working order.
+ */
+export async function fetchMissingExplanations(): Promise<ExplanationQueueItem[]> {
+  const context = await loadVariantContext();
+  return context.variants
+    .filter((v) => !!v.audio_path && !v.explanation_audio_path)
+    .sort((a, b) => compareRows(context, a, b))
+    .map((row) => toItem(context, row));
 }
 
 /**
@@ -146,31 +174,105 @@ export function restoreSkippedRecording(variantId: string, actorAccountId: strin
 export async function saveQueueRecording(options: {
   item: Pick<RecordingQueueItem, 'variant'>;
   localUri: string;
+  /** Set for an uploaded file; omitted for a recording. */
+  format?: AudioFormat;
+  /** The optional explanation take ("Add explanation recording" ticked). */
+  explanation?: { localUri: string; format?: AudioFormat };
   addToRepeatAfterMe: boolean;
   actorAccountId: string;
 }): Promise<WordVariant> {
-  const { item, localUri, addToRepeatAfterMe, actorAccountId } = options;
+  const { item, localUri, format, explanation, addToRepeatAfterMe, actorAccountId } = options;
+  const previousExplanation = item.variant.explanationAudioPath ?? null;
+  let saved: WordVariant | null = null;
+
+  // The explanation is uploaded first, as its own file. Nothing is written to
+  // the database unless both uploads succeed — then both paths go in one write.
+  let explanationPath: string | null = null;
+  if (explanation) {
+    try {
+      explanationPath = await uploadWordVariantAudio(
+        explanation.localUri,
+        item.variant.wordGroupId,
+        `${item.variant.id}-explanation`,
+        explanation.format
+      );
+    } catch (err) {
+      throw new Error(
+        `Couldn’t upload the explanation recording (${err instanceof Error ? err.message : 'unknown error'}). Nothing was saved.`
+      );
+    }
+  }
+
+  try {
+    await saveRecordedWordVariantAudio({
+      localUri,
+      format,
+      wordGroupId: item.variant.wordGroupId,
+      variantId: item.variant.id,
+      previousPath: item.variant.audioPath,
+      persistAudioPath: async (audioPath) => {
+        const updated = await updateWordVariant(
+          item.variant.id,
+          {
+            audioPath,
+            ...(explanationPath ? { explanationAudioPath: explanationPath } : {}),
+            isNativeVoice: true,
+            inRepeatAfterMe: addToRepeatAfterMe,
+            recordingSkipped: false,
+          },
+          actorAccountId
+        );
+        if (updated.inRepeatAfterMe !== addToRepeatAfterMe) {
+          throw new Error('The Repeat After Me choice was not saved — has the 0012_repeat_after_me migration been applied?');
+        }
+        if (explanationPath && updated.explanationAudioPath !== explanationPath) {
+          throw new Error('The explanation recording was not saved — has the 0016_explanation_audio migration been applied?');
+        }
+        saved = updated;
+        return updated.audioPath;
+      },
+    });
+  } catch (err) {
+    // The old pronunciation/explanation are untouched; just drop the new
+    // explanation file nothing points at.
+    if (explanationPath) await deleteWordVariantAudio(explanationPath);
+    throw err;
+  }
+
+  if (!saved) throw new Error('The recording was not saved.');
+  if (explanationPath && previousExplanation && previousExplanation !== explanationPath) {
+    await deleteWordVariantAudio(previousExplanation);
+  }
+  return saved;
+}
+
+/**
+ * Missing Explanations: saves only the explanation recording, with the same
+ * safe replace (upload → save path → verify → only then delete the old one).
+ * Never touches the pronunciation or Repeat After Me.
+ */
+export async function saveQueueExplanation(options: {
+  item: Pick<RecordingQueueItem, 'variant'>;
+  localUri: string;
+  format?: AudioFormat;
+  actorAccountId: string;
+}): Promise<WordVariant> {
+  const { item, localUri, format, actorAccountId } = options;
   let saved: WordVariant | null = null;
 
   await saveRecordedWordVariantAudio({
     localUri,
+    format,
     wordGroupId: item.variant.wordGroupId,
-    variantId: item.variant.id,
-    previousPath: item.variant.audioPath,
-    persistAudioPath: async (audioPath) => {
-      const updated = await updateWordVariant(
-        item.variant.id,
-        { audioPath, isNativeVoice: true, inRepeatAfterMe: addToRepeatAfterMe, recordingSkipped: false },
-        actorAccountId
-      );
-      if (updated.inRepeatAfterMe !== addToRepeatAfterMe) {
-        throw new Error('The Repeat After Me choice was not saved — has the 0012_repeat_after_me migration been applied?');
-      }
+    variantId: `${item.variant.id}-explanation`,
+    previousPath: item.variant.explanationAudioPath ?? null,
+    persistAudioPath: async (explanationAudioPath) => {
+      const updated = await updateWordVariant(item.variant.id, { explanationAudioPath }, actorAccountId);
       saved = updated;
-      return updated.audioPath;
+      return updated.explanationAudioPath;
     },
   });
 
-  if (!saved) throw new Error('The recording was not saved.');
+  if (!saved) throw new Error('The explanation recording was not saved.');
   return saved;
 }
