@@ -11,20 +11,17 @@ import { ProgressBar } from '@/components/ui/ProgressBar';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { radii, spacing, type ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/lib/theme/ThemeContext';
-import { fetchBadgeStats } from '@/data/badgeStats';
 import { fetchLessonMap } from '@/data/content';
 import { recordWordGroupResult } from '@/data/progress';
 import { recordSessionLog } from '@/data/sessionLogs';
 import { useExerciseQueue } from '@/hooks/useExerciseQueue';
 import { useSlideInOnChange } from '@/hooks/useSlideInOnChange';
 import { useSessionTimer } from '@/hooks/useSessionTimer';
-import { evaluateBadges, type Badge } from '@/lib/badges';
-import { getSeenBadgeIds, markBadgesSeen } from '@/lib/badgeProgress';
 import { masteryLabel, type MasteryLabel } from '@/lib/masteryStatus';
 import { recommendNextStep } from '@/lib/nextStepRecommendation';
 import { buildRevisitExercises, updateRevisitList } from '@/lib/speakingRevisit';
 import type { ExerciseItem, ExerciseOutcome } from '@/types/exercises';
-import type { DailyGoalMinutes, LessonWithState, SessionType, Track, WordGroupWithVariants } from '@/types/models';
+import type { DailyGoalMinutes, LessonWithState, SessionType, WordGroupWithVariants } from '@/types/models';
 
 const masteryBadgeColors = (colors: ThemeColors): Record<MasteryLabel, string> => ({
   New: colors.textSecondary,
@@ -37,7 +34,6 @@ interface SessionRunnerProps {
   groups: WordGroupWithVariants[];
   goalMinutes: DailyGoalMinutes;
   profileId: string;
-  track: Track;
   sessionType: SessionType;
   /** Shown when `groups` is empty — differs between a lesson with no content and a review queue with nothing due. */
   emptyMessage: string;
@@ -62,7 +58,6 @@ export function SessionRunner({
   groups,
   goalMinutes,
   profileId,
-  track,
   sessionType,
   emptyMessage,
   exitHref,
@@ -72,7 +67,7 @@ export function SessionRunner({
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const timer = useSessionTimer(goalMinutes);
-  const { currentExercise: queuedExercise, next } = useExerciseQueue(groups, track);
+  const { currentExercise: queuedExercise, next } = useExerciseQueue(groups);
 
   // Words left mispronounced in speaking exercises are replayed once the time
   // goal is reached, before the summary — see src/lib/speakingRevisit.ts.
@@ -107,27 +102,6 @@ export function SessionRunner({
   const [masteryBadge, setMasteryBadge] = useState<MasteryLabel | null>(null);
   const badgeAnim = useRef(new Animated.Value(0)).current;
 
-  const [newlyEarnedBadges, setNewlyEarnedBadges] = useState<Badge[]>([]);
-  const hasCheckedBadgesRef = useRef(false);
-
-  useEffect(() => {
-    if (track !== 'kid' || !timer.isComplete || hasCheckedBadgesRef.current) return;
-    hasCheckedBadgesRef.current = true;
-    (async () => {
-      try {
-        const [stats, seenIds] = await Promise.all([fetchBadgeStats(profileId), getSeenBadgeIds(profileId)]);
-        const earned = evaluateBadges(stats).filter((b) => b.earned);
-        const newlyEarned = earned.filter((b) => !seenIds.has(b.id));
-        setNewlyEarnedBadges(newlyEarned);
-        await markBadgesSeen(
-          profileId,
-          earned.map((b) => b.id)
-        );
-      } catch {
-        // Badges are a best-effort celebration, not a blocking feature.
-      }
-    })();
-  }, [track, timer.isComplete, profileId]);
 
   const [nextLesson, setNextLesson] = useState<{ lesson: LessonWithState; reasonText: string } | null>(null);
   const hasCheckedNextLessonRef = useRef(false);
@@ -288,7 +262,6 @@ export function SessionRunner({
           correctCount={stats.correct}
           incorrectCount={stats.incorrect}
           sessionType={sessionType}
-          track={track}
           onClose={() => logAndExit()}
           onAddMore={(minutes) => {
             timer.addMinutes(minutes);
@@ -299,7 +272,6 @@ export function SessionRunner({
           }
           onContinueLesson={nextLesson ? () => logAndExit(`/lesson/${nextLesson.lesson.id}`) : undefined}
           continueLessonReason={nextLesson?.reasonText}
-          newlyEarnedBadges={newlyEarnedBadges}
         />
       ) : null}
     </ScreenContainer>

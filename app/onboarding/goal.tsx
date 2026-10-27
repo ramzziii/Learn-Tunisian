@@ -47,8 +47,8 @@ export default function DailyGoalSetup() {
     <OnboardingStepLayout
       title="Set a daily goal"
       subtitle="You can change this anytime from settings."
-      step={4}
-      totalSteps={4}
+      step={5}
+      totalSteps={5}
       footer={
         <>
           {error ? <Text style={{ color: colors.error, marginBottom: spacing.sm }}>{error}</Text> : null}

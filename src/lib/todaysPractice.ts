@@ -1,14 +1,14 @@
 import type { RepeatAfterMeItem } from '@/data/repeatAfterMe';
 import { buildOptions } from '@/hooks/useExerciseQueue';
 import { getPromptVariant } from '@/lib/wordVariants';
-import type { AdultExerciseType, ExerciseItem } from '@/types/exercises';
-import type { SessionType, Track, WordGroupWithVariants } from '@/types/models';
+import type { ExerciseItem, ExerciseType } from '@/types/exercises';
+import type { SessionType, WordGroupWithVariants } from '@/types/models';
 
 /** Kept short on purpose — a daily nudge, not a full lesson. */
 export const TODAYS_PRACTICE_LIMITS = { review: 5, newWords: 2, repeatAfterMe: 2 } as const;
 
-const ADULT_TYPE_CYCLE: AdultExerciseType[] = ['reading_match', 'typing_spelling', 'speaking'];
-const NO_CHOICE_TYPE_CYCLE: AdultExerciseType[] = ['typing_spelling', 'speaking'];
+const TYPE_CYCLE: ExerciseType[] = ['reading_match', 'typing_spelling', 'speaking'];
+const NO_CHOICE_TYPE_CYCLE: ExerciseType[] = ['typing_spelling', 'speaking'];
 
 export type TodaysPracticeStep =
   | { kind: 'word'; key: string; source: 'review' | 'new'; group: WordGroupWithVariants; exercise: ExerciseItem }
@@ -33,7 +33,6 @@ export interface TodaysPracticeInputs {
   isPremium: boolean;
   /** Free plan only: today's free review hasn't been used yet. */
   freeReviewAvailable: boolean;
-  track: Track;
 }
 
 function uniqueById<T extends { id: string }>(items: readonly T[], exclude: ReadonlySet<string>): T[] {
@@ -66,17 +65,15 @@ export function composeTodaysPractice(inputs: TodaysPracticeInputs): TodaysPract
   const wordSteps: TodaysPracticeStep[] = words.map(({ group, source }, i) => {
     const key = `today-${source}-${group.id}`;
     const promptVariant = getPromptVariant(group, i);
-    const type =
-      inputs.track === 'kid' && canOfferChoices
-        ? 'listen_and_tap'
-        : (canOfferChoices ? ADULT_TYPE_CYCLE : NO_CHOICE_TYPE_CYCLE)[i % (canOfferChoices ? ADULT_TYPE_CYCLE.length : NO_CHOICE_TYPE_CYCLE.length)];
+    const cycle = canOfferChoices ? TYPE_CYCLE : NO_CHOICE_TYPE_CYCLE;
+    const type = cycle[i % cycle.length];
     const exercise: ExerciseItem = {
       key,
       type,
       targetGroup: group,
       promptVariant,
       options:
-        type === 'reading_match' || type === 'listen_and_tap'
+        type === 'reading_match'
           ? buildOptions(group, { group, variant: promptVariant }, pool, i)
           : [],
     };

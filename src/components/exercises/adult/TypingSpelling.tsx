@@ -5,7 +5,7 @@ import { AnswerFeedback } from '@/components/exercises/shared/AnswerFeedback';
 import { VariantCallout } from '@/components/exercises/shared/VariantCallout';
 import { AudioPlayButton } from '@/components/ui/AudioPlayButton';
 import { PressableScale } from '@/components/ui/PressableScale';
-import { adultTrackSizing, radii, spacing, type ThemeColors } from '@/constants/theme';
+import { exerciseSizing, radii, spacing, type ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/lib/theme/ThemeContext';
 import { useAnswerFeedback } from '@/hooks/useAnswerFeedback';
 import { useShake } from '@/hooks/useShake';
@@ -19,7 +19,7 @@ interface TypingSpellingProps {
   onComplete: (wasCorrect: boolean) => void;
 }
 
-/** Adult/teen track: hear a word and its meaning, type its transliteration. Any variant of the concept counts as correct. */
+/** hear a word and its meaning, type its transliteration. Any variant of the concept counts as correct. */
 export function TypingSpelling({ exercise, onComplete }: TypingSpellingProps) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -99,7 +99,7 @@ const makeStyles = (colors: ThemeColors) =>
     container: { flex: 1, alignItems: 'center' },
     meaning: { fontSize: 20, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md },
     instructions: {
-      fontSize: adultTrackSizing.bodyFontSize,
+      fontSize: exerciseSizing.bodyFontSize,
       color: colors.textSecondary,
       marginTop: spacing.xs,
       marginBottom: spacing.md,

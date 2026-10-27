@@ -73,7 +73,6 @@ export default function LessonSession() {
       groups={groups}
       goalMinutes={goalMinutes}
       profileId={activeProfile.id}
-      track={activeProfile.track}
       sessionType="lesson"
       emptyMessage="This lesson doesn't have any words yet."
       currentLessonId={lessonId}

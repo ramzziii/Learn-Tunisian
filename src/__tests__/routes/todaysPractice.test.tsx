@@ -12,7 +12,7 @@ const mockMarkFreeReviewStarted = jest.fn();
 const mockMarkReviewCompletedToday = jest.fn();
 const mockRouter = { back: jest.fn(), replace: jest.fn(), push: jest.fn(), canGoBack: () => true };
 let mockPremium = { isPremium: true, isResolved: true };
-const mockProfile = { id: 'p1', track: 'adult' };
+const mockProfile = { id: 'p1' };
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,
@@ -121,7 +121,7 @@ it('loads for this profile with its entitlement, once the entitlement is known',
       <TodaysPracticeScreen />
     </ThemeProvider>
   );
-  await waitFor(() => expect(mockLoad).toHaveBeenCalledWith({ profileId: 'p1', isPremium: false, track: 'adult' }));
+  await waitFor(() => expect(mockLoad).toHaveBeenCalledWith({ profileId: 'p1', isPremium: false }));
 });
 
 it('runs the steps in order through to a clear completion state', async () => {

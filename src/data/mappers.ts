@@ -23,7 +23,6 @@ import type {
   Progress,
   ProgressStatus,
   StartingProficiency,
-  Track,
   Unit,
   VariantLabel,
   WordGroup,
@@ -44,7 +43,6 @@ export function mapProfile(row: ProfileRow): Profile {
     country: row.country,
     startingProficiency: row.starting_proficiency as StartingProficiency,
     learningGoal: row.learning_goal as LearningGoal | null,
-    track: row.track as Track,
     isPremium: row.is_premium,
     createdAt: row.created_at,
   };
@@ -66,7 +64,6 @@ export function mapConsentRecord(row: ConsentRecordRow): ConsentRecord {
     id: row.id,
     accountId: row.account_id,
     profileId: row.profile_id,
-    isForChild: row.is_for_child,
     consentType: row.consent_type,
     termsVersion: row.terms_version,
     acceptedAt: row.accepted_at,

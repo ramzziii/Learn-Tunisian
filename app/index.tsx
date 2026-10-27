@@ -13,7 +13,7 @@ export default function Index() {
   if (authLoading) return <LoadingScreen />;
   if (!session) return <Redirect href="/welcome" />;
   if (profilesLoading) return <LoadingScreen />;
-  if (profiles.length === 0) return <Redirect href="/onboarding/who" />;
+  if (profiles.length === 0) return <Redirect href="/onboarding/consent" />;
   if (!activeProfile) return <Redirect href="/profiles" />;
   return <Redirect href="/home" />;
 }

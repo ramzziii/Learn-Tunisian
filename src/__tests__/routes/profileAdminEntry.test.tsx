@@ -4,7 +4,7 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 
 const mockPush = jest.fn();
 let mockIsAdmin = true;
-const mockProfile = { id: 'p1', name: 'Ramzi', track: 'adult', isPremium: false };
+const mockProfile = { id: 'p1', name: 'Ramzi', isPremium: false };
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,

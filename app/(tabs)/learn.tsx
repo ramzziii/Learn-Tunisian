@@ -115,7 +115,6 @@ export default function LearnScreen() {
               <UnitSection
                 key={unitWithLessons.unit.id}
                 unitWithLessons={unitWithLessons}
-                track={activeProfile.track}
                 isFirstUnit={index === 0}
                 onSelectLesson={(lessonId) => router.push(`/lesson/${lessonId}`)}
                 onBrowseWords={(lessonId) => router.push(`/words/${lessonId}`)}

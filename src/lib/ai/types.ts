@@ -21,7 +21,6 @@ export interface GroundedVocabularyItem {
 
 /** Minimal, non-identifying learner context — no email, no account info, nothing unrelated to learning. */
 export interface LearnerContext {
-  track: 'kid' | 'adult';
   level: TalkLevel;
   /** English meanings the learner already knows well (status = 'known'), for the tutor to reuse naturally. */
   knownWords: string[];

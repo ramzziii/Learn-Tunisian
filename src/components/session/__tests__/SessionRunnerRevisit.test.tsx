@@ -17,7 +17,6 @@ jest.mock('expo-router', () => ({ router: { replace: jest.fn() } }));
 jest.mock('@/data/progress', () => ({ recordWordGroupResult: (...a: unknown[]) => mockRecordResult(...(a as [])) }));
 jest.mock('@/data/content', () => ({ fetchLessonMap: jest.fn(async () => []) }));
 jest.mock('@/data/sessionLogs', () => ({ recordSessionLog: jest.fn(async () => undefined) }));
-jest.mock('@/data/badgeStats', () => ({ fetchBadgeStats: jest.fn() }));
 // The cross-fade between exercises is purely visual; at opacity 0 mid-fade
 // the exercise reads as hidden to the queries below.
 jest.mock('@/hooks/useFadeInOnChange', () => ({
@@ -84,7 +83,7 @@ const groups = ['salam', 'shukran'].map((id) => ({ id, englishMeaning: id, varia
 const renderSession = () =>
   render(
     <ThemeProvider>
-      <SessionRunner groups={groups} goalMinutes={5} profileId="p1" track="adult" sessionType="lesson" emptyMessage="" />
+      <SessionRunner groups={groups} goalMinutes={5} profileId="p1" sessionType="lesson" emptyMessage="" />
     </ThemeProvider>
   );
 

@@ -6,7 +6,7 @@ import { VariantCallout } from '@/components/exercises/shared/VariantCallout';
 import { AudioPlayButton } from '@/components/ui/AudioPlayButton';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Reveal } from '@/components/ui/Reveal';
-import { adultTrackSizing, radii, spacing, type ThemeColors } from '@/constants/theme';
+import { exerciseSizing, radii, spacing, type ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/lib/theme/ThemeContext';
 import { useAnswerFeedback } from '@/hooks/useAnswerFeedback';
 import { useShake } from '@/hooks/useShake';
@@ -19,7 +19,7 @@ interface ReadingMatchProps {
   onComplete: (wasCorrect: boolean) => void;
 }
 
-/** Adult/teen track: listen to a word, tap the matching written Arabic script. */
+/** listen to a word, tap the matching written Arabic script. */
 export function ReadingMatch({ exercise, onComplete }: ReadingMatchProps) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -98,7 +98,7 @@ const makeStyles = (colors: ThemeColors) =>
   StyleSheet.create({
     container: { flex: 1, alignItems: 'center' },
     instructions: {
-      fontSize: adultTrackSizing.bodyFontSize,
+      fontSize: exerciseSizing.bodyFontSize,
       fontWeight: '600',
       color: colors.textPrimary,
       marginTop: spacing.md,

@@ -51,8 +51,12 @@ export function ActiveProfileProvider({ children }: { children: ReactNode }) {
       ]);
       if (cancelled) return;
       setProfiles(fetched);
+      // One profile per account: an account's only profile is simply used.
+      // An account that already has several (from before profiles were
+      // limited to one) keeps them all; until the learner picks one on the
+      // one-time chooser (app/profiles/index.tsx) none is chosen silently.
       const storedIsValid = storedId && fetched.some((p) => p.id === storedId);
-      setActiveProfileIdState(storedIsValid ? storedId : null);
+      setActiveProfileIdState(storedIsValid ? storedId : fetched.length === 1 ? fetched[0].id : null);
       setIsLoading(false);
     })();
     return () => {

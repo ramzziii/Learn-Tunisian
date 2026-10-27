@@ -7,7 +7,8 @@ import { dateToIsoDate, formatDateOfBirth, parseIsoDateLocal } from '@/lib/age';
 
 const TODAY = new Date();
 const EARLIEST_BIRTH_DATE = new Date(TODAY.getFullYear() - 100, 0, 1);
-const DEFAULT_PICKER_DATE = new Date(TODAY.getFullYear() - 8, TODAY.getMonth(), TODAY.getDate());
+// The app is adults-only, so the picker opens on a typical adult age.
+const DEFAULT_PICKER_DATE = new Date(TODAY.getFullYear() - 25, TODAY.getMonth(), TODAY.getDate());
 
 interface DateOfBirthFieldProps {
   label: string;

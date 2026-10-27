@@ -48,8 +48,8 @@ function group(id: string): WordGroupWithVariants {
 const groups = ['a', 'b', 'c', 'd', 'e'].map(group);
 const NO_GROUPS: WordGroupWithVariants[] = [];
 
-async function takeExercises(track: 'adult' | 'kid', count: number) {
-  const { result } = await renderHook(() => useExerciseQueue(groups, track));
+async function takeExercises(count: number) {
+  const { result } = await renderHook(() => useExerciseQueue(groups));
   const seen = [];
   for (let i = 0; i < count; i++) {
     seen.push(result.current.currentExercise!);
@@ -59,12 +59,12 @@ async function takeExercises(track: 'adult' | 'kid', count: number) {
 }
 
 it('the first pass covers every word in the lesson exactly once', async () => {
-  const firstPass = await takeExercises('adult', groups.length);
+  const firstPass = await takeExercises(groups.length);
   expect(firstPass.map((e) => e.targetGroup.id).sort()).toEqual(['a', 'b', 'c', 'd', 'e']);
 });
 
 it('every question includes the correct answer, and distractors are other words (never duplicates of it)', async () => {
-  const exercises = await takeExercises('adult', groups.length);
+  const exercises = await takeExercises(groups.length);
   for (const exercise of exercises) {
     const optionGroupIds = exercise.options.map((o) => o.group.id);
     expect(optionGroupIds.filter((id) => id === exercise.targetGroup.id)).toHaveLength(1);
@@ -74,22 +74,19 @@ it('every question includes the correct answer, and distractors are other words 
 });
 
 it('never runs dry during a time-based session — keeps serving exercises past one pass', async () => {
-  const exercises = await takeExercises('adult', groups.length * 3 + 2);
+  const exercises = await takeExercises(groups.length * 3 + 2);
   expect(exercises.every((e) => e !== null)).toBe(true);
   expect(new Set(exercises.map((e) => e.key)).size).toBe(exercises.length);
 });
 
-it('kids only get the listen-and-tap exercise; adults rotate through reading, typing, and speaking', async () => {
-  const kid = await takeExercises('kid', groups.length);
-  expect(new Set(kid.map((e) => e.type))).toEqual(new Set(['listen_and_tap']));
-
-  const adult = await takeExercises('adult', groups.length);
-  expect(new Set(adult.map((e) => e.type))).toEqual(new Set(['reading_match', 'typing_spelling', 'speaking']));
+it('rotates through reading, typing and speaking (the only exercise types)', async () => {
+  const exercises = await takeExercises(groups.length);
+  expect(new Set(exercises.map((e) => e.type))).toEqual(new Set(['reading_match', 'typing_spelling', 'speaking']));
 });
 
 it('an empty lesson yields no exercise rather than crashing', async () => {
   // Hoisted: callers pass state-held (stable) arrays — an inline [] would be a
   // new identity every render and re-trigger the hook's reset effect forever.
-  const { result } = await renderHook(() => useExerciseQueue(NO_GROUPS, 'adult'));
+  const { result } = await renderHook(() => useExerciseQueue(NO_GROUPS));
   expect(result.current.currentExercise).toBeNull();
 });

@@ -1,4 +1,3 @@
-import { ListenAndTap } from '@/components/exercises/kid/ListenAndTap';
 import { ReadingMatch } from '@/components/exercises/adult/ReadingMatch';
 import { SpeakingPractice } from '@/components/exercises/adult/SpeakingPractice';
 import { TypingSpelling } from '@/components/exercises/adult/TypingSpelling';
@@ -9,11 +8,9 @@ interface ExerciseRendererProps {
   onComplete: ExerciseCompleteHandler;
 }
 
-/** Picks the right exercise UI for `exercise.type`. Kid and adult components share word data but render entirely differently. */
+/** Picks the right exercise UI for `exercise.type`. */
 export function ExerciseRenderer({ exercise, onComplete }: ExerciseRendererProps) {
   switch (exercise.type) {
-    case 'listen_and_tap':
-      return <ListenAndTap key={exercise.key} exercise={exercise} onComplete={onComplete} />;
     case 'reading_match':
       return <ReadingMatch key={exercise.key} exercise={exercise} onComplete={onComplete} />;
     case 'typing_spelling':

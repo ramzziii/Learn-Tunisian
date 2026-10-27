@@ -1,6 +1,5 @@
 import { supabase } from '@/lib/supabase/client';
 import { mapDailyGoalSettings, mapProfile } from '@/data/mappers';
-import { trackForDateOfBirth } from '@/lib/age';
 import type { DailyGoalSettingsRow, ProfileRow } from '@/types/database';
 import type {
   DailyGoalMinutes,
@@ -41,7 +40,9 @@ export async function createProfile(input: NewProfileInput): Promise<Profile> {
       country: input.country,
       starting_proficiency: input.startingProficiency,
       learning_goal: input.learningGoal,
-      track: trackForDateOfBirth(input.dateOfBirth),
+      // profiles.track is a required column left from the removed kids
+      // track; every profile is an adult profile now.
+      track: 'adult',
     })
     .select('*')
     .single<ProfileRow>();

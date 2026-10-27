@@ -48,11 +48,11 @@ const { ThemeProvider } = require('@/lib/theme/ThemeContext');
 const variant = { id: 'v1', variantLabel: 'primary', wordArabic: 'عسلامة', transliteration: '3aslema', audioPath: 'g/v1.m4a', notes: null };
 const phrase = { id: 'pb1', englishMeaning: 'hello', variants: [variant] };
 
-async function renderModal(track = 'adult') {
+async function renderModal() {
   const onClose = jest.fn();
   await render(
     <ThemeProvider>
-      <PhraseDetailModal phrase={phrase} track={track} onClose={onClose} />
+      <PhraseDetailModal phrase={phrase} onClose={onClose} />
     </ThemeProvider>
   );
   return { onClose };
@@ -82,17 +82,17 @@ it('finishing resets practice so they can go again, without closing the phrase',
   expect(onClose).not.toHaveBeenCalled();
 });
 
-it('kid profiles never see recording (no mic prompts for kids)', async () => {
-  await renderModal('kid');
-  expect(screen.queryByText('Practice saying it')).toBeNull();
-  expect(mockPracticeProps).not.toHaveBeenCalled();
+it('recording practice is always offered (adults-only app — no per-profile mic restriction)', async () => {
+  await renderModal();
+  expect(screen.getByText('Practice saying it')).toBeOnTheScreen();
+  expect(mockPracticeProps).toHaveBeenCalled();
 });
 
 it('offers the explanation for a phrase that has one, next to the pronunciation', async () => {
   const withExplanation = { ...phrase, variants: [{ ...variant, explanationAudioPath: 'g/v1-explanation.m4a' }] };
   await render(
     <ThemeProvider>
-      <PhraseDetailModal phrase={withExplanation} track="adult" onClose={jest.fn()} />
+      <PhraseDetailModal phrase={withExplanation} onClose={jest.fn()} />
     </ThemeProvider>
   );
   expect(screen.getByText('[explanation g/v1-explanation.m4a]')).toBeOnTheScreen();

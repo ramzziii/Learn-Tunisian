@@ -1,7 +1,6 @@
 // Data models mirroring the Supabase schema in supabase/migrations/0001_init.sql.
 // Keep these in sync with the SQL by hand for now (no codegen in v1).
 
-export type Track = 'kid' | 'adult';
 
 export type StartingProficiency =
   | 'none' // "No Arabic at all"
@@ -35,7 +34,6 @@ export interface Profile {
   country: string;
   startingProficiency: StartingProficiency;
   learningGoal: LearningGoal | null;
-  track: Track;
   isPremium: boolean;
   createdAt: string;
 }
@@ -53,7 +51,6 @@ export interface ConsentRecord {
   id: string;
   accountId: string;
   profileId: string;
-  isForChild: boolean;
   consentType: string;
   termsVersion: string;
   acceptedAt: string;

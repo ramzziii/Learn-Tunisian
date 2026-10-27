@@ -27,8 +27,8 @@ jest.mock('expo-router', () => ({
 // Stable identity per entitlement, like the real context — a fresh object
 // every render would re-trigger the route's [activeProfile] effect forever.
 const mockProfiles = {
-  free: { id: 'p1', track: 'adult', isPremium: false },
-  premium: { id: 'p1', track: 'adult', isPremium: true },
+  free: { id: 'p1', isPremium: false },
+  premium: { id: 'p1', isPremium: true },
 };
 jest.mock('@/lib/account/ActiveProfileContext', () => ({
   useActiveProfile: () => ({ activeProfile: mockIsPremium ? mockProfiles.premium : mockProfiles.free }),

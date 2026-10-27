@@ -104,14 +104,7 @@ export const radii = {
 
 // The kid track uses larger touch targets and type sizes per the product
 // requirement that it render "simpler visuals, bigger touch targets."
-export const kidTrackSizing = {
-  touchTarget: 96,
-  cardGap: spacing.lg,
-  titleFontSize: 28,
-  bodyFontSize: 20,
-} as const;
-
-export const adultTrackSizing = {
+export const exerciseSizing = {
   touchTarget: 72,
   cardGap: spacing.md,
   titleFontSize: 22,

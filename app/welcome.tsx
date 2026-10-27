@@ -8,7 +8,7 @@ import { colors, gradients, radii, spacing } from '@/constants/theme';
 
 const BENEFITS = [
   { emoji: '🗣️', text: 'Real spoken Tunisian Arabic — not just Modern Standard' },
-  { emoji: '👨‍👩‍👧', text: 'One app, the whole family — everyone gets their own track' },
+  { emoji: '🎯', text: 'Lessons shaped around your own goals and level' },
   { emoji: '🎯', text: '5 minutes a day. No ads, no streak guilt, ever.' },
 ];
 
@@ -36,7 +36,7 @@ export default function Welcome() {
         </View>
 
         <View style={styles.footer}>
-          <Button label="Start learning free" onPress={() => router.push('/onboarding/goal-select')} />
+          <Button label="Start learning free" onPress={() => router.push('/onboarding/age')} />
           <Button
             label="I already have an account"
             variant="ghost"

@@ -17,7 +17,6 @@ function vocabItem(overrides: Partial<GroundedVocabularyItem>): GroundedVocabula
 }
 
 const emptyLearnerContext: LearnerContext = {
-  track: 'adult',
   level: 'beginner',
   knownWords: [],
   strugglingWords: [],

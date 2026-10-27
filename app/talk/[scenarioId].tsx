@@ -16,7 +16,6 @@ import { type ConversationMessage, useConversation } from '@/hooks/useConversati
 import { useTutorSpeech } from '@/hooks/useTutorSpeech';
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
 import { isUsingMockAiProvider } from '@/lib/ai';
-import { canAccessTalkFeature } from '@/lib/ai/accessControl';
 import { transcribeAudio } from '@/lib/ai/functionsClient';
 import { buildWordHelp } from '@/lib/ai/buildWordHelp';
 import type { GroundedVocabularyItem, SuggestedReply, TutorResponse } from '@/lib/ai/types';
@@ -50,8 +49,7 @@ export default function TalkConversation() {
   const scenario = findTalkScenario(scenarioId ?? '');
   const { status, messages, vocabulary, error, sendMessage, retry } = useConversation(
     scenarioId ?? '',
-    activeProfile?.id ?? '',
-    activeProfile?.track ?? 'adult'
+    activeProfile?.id ?? ''
   );
   const tutorSpeech = useTutorSpeech();
   const voiceRecorder = useVoiceRecorder();
@@ -83,19 +81,6 @@ export default function TalkConversation() {
 
   if (!activeProfile) return <LoadingScreen themed />;
 
-  // Same defense-in-depth as the scenario picker — a kid profile reaching
-  // this route directly (e.g. a stale deep link) never sees the feature.
-  if (!canAccessTalkFeature(activeProfile.track)) {
-    return (
-      <ScreenContainer themed>
-        <BackButton themed />
-        <View style={styles.centered}>
-          <Text style={styles.centeredEmoji}>🌱</Text>
-          <Text style={styles.centeredTitle}>Coming soon!</Text>
-        </View>
-      </ScreenContainer>
-    );
-  }
 
   if (!scenario) {
     return (

@@ -58,7 +58,7 @@ export default function TodaysPracticeScreen() {
     if (!activeProfile || !isResolved) return;
     setPhase('loading');
     try {
-      const next = await loadTodaysPractice({ profileId: activeProfile.id, isPremium, track: activeProfile.track });
+      const next = await loadTodaysPractice({ profileId: activeProfile.id, isPremium });
       setPlan(next);
       setIndex(0);
       setRightCount(0);

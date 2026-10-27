@@ -36,7 +36,10 @@ export default function Plans() {
   const { source } = useLocalSearchParams<{ source?: string }>();
   const isUpgradeFlow = source === 'premium';
 
-  const goNext = () => (isUpgradeFlow ? router.back() : router.push('/onboarding/consent'));
+  // No longer an onboarding step (adults-only onboarding goes straight from
+  // account creation to consent), so both buttons return to where the
+  // learner opened it from.
+  const goNext = () => router.back();
 
   return (
     <OnboardingStepLayout
