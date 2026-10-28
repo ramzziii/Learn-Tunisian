@@ -231,6 +231,9 @@ auto-hides when there's nowhere meaningful to go back to.
 
 **Profiles**
 - One profile per account; there is no switcher and no "add profile".
+  The database enforces it (`0019_one_profile_per_account.sql` — a trigger,
+  not a unique index, so existing duplicates are left alone), and a refused
+  second profile shows a recoverable "Continue to my profile" message.
 - An account that already has several profiles from an earlier version
   sees a one-time chooser (`app/profiles/index.tsx`). The choice persists
   on the device; the other profiles are kept as they are (nothing is

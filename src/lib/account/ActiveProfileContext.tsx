@@ -32,6 +32,10 @@ export function ActiveProfileProvider({ children }: { children: ReactNode }) {
     }
     const fetched = await listProfiles(accountId);
     setProfiles(fetched);
+    // Same rule as on load: an account's only profile is the active one.
+    setActiveProfileIdState((current) =>
+      current && fetched.some((p) => p.id === current) ? current : fetched.length === 1 ? fetched[0].id : null
+    );
     return fetched;
   }, [accountId]);
 

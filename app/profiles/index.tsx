@@ -20,16 +20,17 @@ import type { Profile } from '@/types/models';
  * account that already has several profiles from an earlier version: the
  * learner picks the one to use, and the others are kept exactly as they are
  * — nothing is merged, rewritten or deleted. There is no way to add a
- * profile. An account with one (or no) profile never stays here.
+ * profile. An account with one (or no) profile never stays here, and once a
+ * profile is in use this is not a switcher: it just goes home.
  */
 export default function ProfileChooser() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const { profiles, isLoading, setActiveProfileId } = useActiveProfile();
+  const { profiles, activeProfile, isLoading, setActiveProfileId } = useActiveProfile();
   const { signOut } = useAuth();
 
   if (isLoading) return <LoadingScreen themed />;
-  if (profiles.length <= 1) return <Redirect href="/home" />;
+  if (profiles.length <= 1 || activeProfile) return <Redirect href="/home" />;
 
   const choose = async (profile: Profile) => {
     await setActiveProfileId(profile.id);

@@ -24,10 +24,19 @@ account has one learner profile; every learner gets the same exercise set
    country, mother tongue, proficiency and an optional learning goal.
 6. Daily goal (5/10/15 min) and a reminder.
 
-**One profile per account.** There is no profile switcher or "add profile".
-An account that already has several profiles from an earlier version sees a
-one-time chooser (`app/profiles/index.tsx`); the choice is remembered on the
-device and the other profiles are kept untouched. The database still has the
+**One profile per account** (an account is one Supabase Auth user, so one
+login email). Enforced in the database by
+`supabase/migrations/0019_one_profile_per_account.sql`: a trigger rejects a
+second profile for any caller with `profile_already_exists` / SQLSTATE
+23505, which `createProfile` turns into `ProfileAlreadyExistsError`
+(`src/lib/account/profileLimit.ts`); onboarding then offers "Continue to my
+profile". An account that has a profile can't re-enter the setup steps.
+There is no profile switcher or "add profile". An account that already has
+several profiles from an earlier version sees a one-time chooser
+(`app/profiles/index.tsx`) until one is picked; the choice is remembered on
+the device and the other profiles are kept untouched. The trigger
+deliberately leaves such existing duplicates alone (a unique index would
+fail on them); `scripts/check-duplicate-profiles.sql` counts them, read-only. The database still has the
 old `profiles.track` and `consent_records.is_for_child` columns (NOT NULL), so
 the app always writes `'adult'` / `false` and ignores them otherwise.
 

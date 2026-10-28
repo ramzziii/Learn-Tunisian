@@ -137,6 +137,21 @@ describe('an existing account with several profiles (from an earlier version)', 
   });
 });
 
+it('the profile created at the end of onboarding becomes the active one as soon as profiles refresh', async () => {
+  mockListProfiles.mockResolvedValueOnce([]);
+  function Refresh() {
+    const { refreshProfiles } = useActiveProfile();
+    return <Text onPress={() => refreshProfiles()}>refresh</Text>;
+  }
+  await renderWithProvider(<Refresh />);
+  expect(await screen.findByText('active=none count=0')).toBeOnTheScreen();
+
+  mockListProfiles.mockResolvedValueOnce([profile('p1', 'Sam')]);
+  await fireEvent.press(screen.getByText('refresh'));
+
+  expect(await screen.findByText('active=p1 count=1')).toBeOnTheScreen();
+});
+
 it('an account with no profile goes to onboarding (consent), not a chooser', async () => {
   mockListProfiles.mockResolvedValue([]);
   await renderWithProvider(<Index />);

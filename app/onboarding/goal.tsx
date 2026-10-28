@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { SelectableCard } from '@/components/ui/SelectableCard';
 import { colors, spacing } from '@/constants/theme';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
+import { ProfileAlreadyExistsError } from '@/lib/account/profileLimit';
 import { useAuth } from '@/lib/auth/AuthContext';
 import { useOnboarding } from '@/lib/onboarding/OnboardingContext';
 import type { DailyGoalMinutes } from '@/types/models';
@@ -20,6 +21,9 @@ export default function DailyGoalSetup() {
   const { refreshProfiles, setActiveProfileId } = useActiveProfile();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // One profile per account: if this account already has one (set up on
+  // another device, or a second tab), offer the way to it, not a retry.
+  const [hasExistingProfile, setHasExistingProfile] = useState(false);
 
   const reminderHour = state.reminderHour ?? 18;
   const reminderMinute = state.reminderMinute ?? 0;
@@ -37,10 +41,23 @@ export default function DailyGoalSetup() {
       reset();
       router.replace('/home');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Something went wrong. Please try again.');
+      setHasExistingProfile(e instanceof ProfileAlreadyExistsError);
+      setError(
+        e instanceof ProfileAlreadyExistsError
+          ? 'This account already has a learner profile, so a new one wasn’t created. Your existing profile and progress are unchanged.'
+          : e instanceof Error
+            ? e.message
+            : 'Something went wrong. Please try again.'
+      );
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const continueToExistingProfile = async () => {
+    await refreshProfiles();
+    reset();
+    router.replace('/');
   };
 
   return (
@@ -52,7 +69,11 @@ export default function DailyGoalSetup() {
       footer={
         <>
           {error ? <Text style={{ color: colors.error, marginBottom: spacing.sm }}>{error}</Text> : null}
-          <Button label="Finish setup" onPress={handleFinish} disabled={!canFinish} loading={isSubmitting} />
+          {hasExistingProfile ? (
+            <Button label="Continue to my profile" onPress={continueToExistingProfile} />
+          ) : (
+            <Button label="Finish setup" onPress={handleFinish} disabled={!canFinish} loading={isSubmitting} />
+          )}
         </>
       }
     >

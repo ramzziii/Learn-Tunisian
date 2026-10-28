@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase/client';
 import { mapDailyGoalSettings, mapProfile } from '@/data/mappers';
+import { isProfileAlreadyExistsDbError, ProfileAlreadyExistsError } from '@/lib/account/profileLimit';
 import type { DailyGoalSettingsRow, ProfileRow } from '@/types/database';
 import type {
   DailyGoalMinutes,
@@ -29,7 +30,17 @@ export interface NewProfileInput {
   learningGoal: LearningGoal | null;
 }
 
+/**
+ * Creates the account's one learner profile. Refuses with
+ * ProfileAlreadyExistsError if the account already has one — checked here
+ * first, and enforced by the database either way (a race, another device,
+ * or a direct API call all get the same rejection).
+ */
 export async function createProfile(input: NewProfileInput): Promise<Profile> {
+  const existing = await supabase.from('profiles').select('id').eq('account_id', input.accountId).limit(1);
+  if (existing.error) throw existing.error;
+  if ((existing.data ?? []).length > 0) throw new ProfileAlreadyExistsError();
+
   const { data, error } = await supabase
     .from('profiles')
     .insert({
@@ -46,7 +57,7 @@ export async function createProfile(input: NewProfileInput): Promise<Profile> {
     })
     .select('*')
     .single<ProfileRow>();
-  if (error) throw error;
+  if (error) throw isProfileAlreadyExistsDbError(error) ? new ProfileAlreadyExistsError() : error;
   return mapProfile(data);
 }
 

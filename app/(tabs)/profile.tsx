@@ -45,7 +45,7 @@ interface ProgressStats extends ProfileProgressSummary {
  * Fully converted to the live theme system.
  */
 export default function ProfileScreen() {
-  const { activeProfile, profiles } = useActiveProfile();
+  const { activeProfile } = useActiveProfile();
   const { signOut, session, sendPasswordReset } = useAuth();
   // Change password reuses the existing reset flow: email the signed-in
   // account a reset link (app/auth/reset-password.tsx sets the new one).
@@ -260,19 +260,6 @@ export default function ProfileScreen() {
           loading={isSaving}
           style={{ marginTop: spacing.xl }}
         />
-
-        {/* One profile per account. Only an account that already had several
-            profiles from an earlier version can choose between them — they are
-            kept as they are; nothing is merged or deleted (app/profiles/index.tsx). */}
-        {profiles.length > 1 ? (
-          <Button
-            themed
-            label="Choose which profile to use"
-            variant="secondary"
-            onPress={() => router.push('/profiles')}
-            style={{ marginTop: spacing.md }}
-          />
-        ) : null}
 
         <Text style={styles.sectionTitle}>Premium</Text>
         <Text style={styles.premiumStatus}>
