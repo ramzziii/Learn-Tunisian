@@ -22,6 +22,7 @@ const CARDS: HubCard[] = [
   { emoji: '🗂️', color: '#4A90A4', title: 'Flashcards', subtitle: 'Browse and listen to every phrase', href: '/phrasebook/flashcards' },
   { emoji: '📝', color: '#8B6BAE', title: 'Grammar Notes', subtitle: 'Tounsi patterns explained simply', href: '/grammar' },
   { emoji: '🎧', color: '#4A90A4', title: 'Repeat After Me', subtitle: 'Imitate native recordings, then compare', href: '/repeat-after-me' },
+  { emoji: '👂', color: '#3E7CB1', title: 'Listening Practice', subtitle: 'Match meanings to native recordings', href: '/listening-practice' },
   { emoji: '🎙️', color: '#C0567D', title: 'Speaking Practice', subtitle: 'Say 5 phrases out loud', href: '/speaking-practice' },
   { emoji: '🅰️', color: '#D9A441', title: 'Alphabet Practice', subtitle: 'Learn letters and sounds', href: '/alphabet' },
   { emoji: '🔄', color: '#4CA771', title: 'Review', subtitle: 'Keep your weak words fresh', href: '/review' },

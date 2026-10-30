@@ -1,3 +1,5 @@
+import { ListenChooseMeaning } from '@/components/exercises/adult/ListenChooseMeaning';
+import { ListenChooseRecording } from '@/components/exercises/adult/ListenChooseRecording';
 import { ReadingMatch } from '@/components/exercises/adult/ReadingMatch';
 import { SpeakingPractice } from '@/components/exercises/adult/SpeakingPractice';
 import { TypingSpelling } from '@/components/exercises/adult/TypingSpelling';
@@ -17,5 +19,9 @@ export function ExerciseRenderer({ exercise, onComplete }: ExerciseRendererProps
       return <TypingSpelling key={exercise.key} exercise={exercise} onComplete={onComplete} />;
     case 'speaking':
       return <SpeakingPractice key={exercise.key} exercise={exercise} onComplete={onComplete} />;
+    case 'listen_recording':
+      return <ListenChooseRecording key={exercise.key} exercise={exercise} onComplete={onComplete} />;
+    case 'listen_meaning':
+      return <ListenChooseMeaning key={exercise.key} exercise={exercise} onComplete={onComplete} />;
   }
 }

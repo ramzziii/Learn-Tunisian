@@ -1,6 +1,13 @@
 import type { WordGroupWithVariants, WordVariant } from '@/types/models';
 
-export type ExerciseType = 'reading_match' | 'typing_spelling' | 'speaking';
+export type ExerciseType =
+  | 'reading_match'
+  | 'typing_spelling'
+  | 'speaking'
+  /** Listening quiz: see the meaning, choose the matching native recording. */
+  | 'listen_recording'
+  /** Listening quiz: hear a native recording, choose its meaning. */
+  | 'listen_meaning';
 
 /** One multiple-choice option: always a different word_group than the others — never two variants competing within the same group. */
 export interface ExerciseOption {
