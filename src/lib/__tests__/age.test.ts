@@ -62,8 +62,16 @@ describe('timezone edge case (parseIsoDateLocal)', () => {
     process.env.TZ = 'America/Los_Angeles';
     const local = parseIsoDateLocal('2008-10-27');
     expect([local.getFullYear(), local.getMonth(), local.getDate()]).toEqual([2008, 9, 27]);
-    // The trap it avoids: new Date('2008-10-27') is UTC midnight, i.e. the 26th locally here.
-    expect(new Date('2008-10-27').getDate()).toBe(26);
+    // Exactly local midnight on that day — holds in every time zone, even if
+    // the TZ switch above doesn't take effect (it doesn't inside Jest on
+    // Linux CI, where the zone stays UTC).
+    expect(local.getTime()).toBe(new Date(2008, 9, 27).getTime());
+    // The trap it avoids: new Date('2008-10-27') is UTC midnight, which is
+    // the 26th locally in any zone behind UTC. Only demonstrable when the
+    // zone really is behind UTC.
+    if (new Date(2008, 9, 27).getTimezoneOffset() > 0) {
+      expect(new Date('2008-10-27').getDate()).toBe(26);
+    }
   });
 
   it('a user turning 18 today still passes in a negative-offset timezone', () => {
