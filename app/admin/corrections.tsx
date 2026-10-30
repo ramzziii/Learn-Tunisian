@@ -15,10 +15,13 @@ import {
   type PendingCorrection,
   type ReviewedCorrection,
 } from '@/data/corrections';
+import { fetchIsReviewer } from '@/data/reviewers';
 
-// Gated by app/admin/_layout.tsx (admin-only) — not linked from
-// Settings/Home navigation, reachable only via this direct route, same as
-// every other /admin/* screen.
+// Reached through app/admin/_layout.tsx (admin-only), but reviewing language
+// content needs more than admin: the account must be an allowlisted
+// language reviewer (public.reviewers). That's resolved before the queue is
+// fetched or rendered; talk-review and RLS enforce the same rule on the
+// server.
 
 const TARGET_TABLE_OPTIONS = [
   { value: 'sentence', label: 'Sentence' },
@@ -46,6 +49,7 @@ interface DraftFields {
 }
 
 export default function CorrectionsReview() {
+  const [access, setAccess] = useState<'checking' | 'reviewer' | 'denied' | 'error'>('checking');
   const [view, setView] = useState<'pending' | 'history'>('pending');
 
   const [reviewerName, setReviewerName] = useState('');
@@ -91,13 +95,26 @@ export default function CorrectionsReview() {
     }
   }, []);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  const checkAccess = useCallback(async () => {
+    setAccess('checking');
+    try {
+      setAccess((await fetchIsReviewer()) ? 'reviewer' : 'denied');
+    } catch {
+      setAccess('error'); // fail closed — never show the queue on a failed check
+    }
+  }, []);
 
   useEffect(() => {
-    if (view === 'history' && history === null) loadHistory();
-  }, [view, history, loadHistory]);
+    checkAccess();
+  }, [checkAccess]);
+
+  useEffect(() => {
+    if (access === 'reviewer') load();
+  }, [access, load]);
+
+  useEffect(() => {
+    if (access === 'reviewer' && view === 'history' && history === null) loadHistory();
+  }, [access, view, history, loadHistory]);
 
   const updateDraft = (id: string, patch: Partial<DraftFields>) => {
     setDrafts((current) => ({ ...current, [id]: { ...current[id], ...patch } }));
@@ -134,6 +151,42 @@ export default function CorrectionsReview() {
       setSubmittingId(null);
     }
   };
+
+  if (access === 'checking') {
+    return (
+      <View testID="reviewer-check-loading" style={{ flex: 1 }}>
+        <LoadingScreen />
+      </View>
+    );
+  }
+
+  if (access === 'error') {
+    return (
+      <ScreenContainer>
+        <BackButton />
+        <View style={styles.centered}>
+          <Text style={styles.centeredTitle}>Couldn&apos;t check your reviewer access</Text>
+          <Text style={styles.centeredBody}>Check your connection and try again.</Text>
+          <Button label="Try again" variant="secondary" onPress={checkAccess} />
+        </View>
+      </ScreenContainer>
+    );
+  }
+
+  if (access === 'denied') {
+    return (
+      <ScreenContainer>
+        <BackButton />
+        <View style={styles.centered}>
+          <Text style={styles.centeredTitle}>Reviewer access needed</Text>
+          <Text style={styles.centeredBody}>
+            Only approved language reviewers can review AI language content. Being an admin doesn&apos;t include it —
+            ask the project owner to add your account as a reviewer.
+          </Text>
+        </View>
+      </ScreenContainer>
+    );
+  }
 
   if (loadError) {
     return (
@@ -365,4 +418,5 @@ const styles = StyleSheet.create({
   actionsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
   centeredTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
+  centeredBody: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', paddingHorizontal: spacing.lg },
 });

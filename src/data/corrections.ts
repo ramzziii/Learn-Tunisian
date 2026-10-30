@@ -85,7 +85,14 @@ export interface ReviewDecision {
  */
 export async function submitReview(decision: ReviewDecision): Promise<void> {
   const { data, error } = await supabase.functions.invoke('talk-review', { body: decision });
-  if (error) throw error;
+  if (error) {
+    // A non-2xx reply (401/403/409…) carries the function's own message in
+    // its body; supabase-js only exposes it on error.context.
+    const context = (error as { context?: { json?: () => Promise<unknown> } }).context;
+    const reply = (await context?.json?.().catch(() => null)) as { error?: { message?: string } } | null | undefined;
+    if (reply?.error?.message) throw new Error(reply.error.message);
+    throw error instanceof Error ? error : new Error((error as { message?: string }).message ?? 'Review failed.');
+  }
   if (data?.error) throw new Error(data.error.message ?? 'Review failed.');
 }
 

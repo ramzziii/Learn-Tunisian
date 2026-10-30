@@ -40,6 +40,18 @@ fail on them); `scripts/check-duplicate-profiles.sql` counts them, read-only. Th
 old `profiles.track` and `consent_records.is_for_child` columns (NOT NULL), so
 the app always writes `'adult'` / `false` and ignores them otherwise.
 
+## Account deletion
+
+Profile → Account → **Delete account** (`app/account/delete.tsx`): the user
+types `DELETE`, and the `delete-account` Edge Function deletes the signed-in
+account, and only that one. It removes the private storage files first, then
+the database rows (`delete_account_data`, migration 0022), then the Auth user
+last. Every step is safe to retry, and success is shown only once the Auth
+user is gone. The account's data is deleted. Shared content and AI cost
+records are kept with the account's links removed. The device keeps nothing
+of that account's. Full table-by-table list, partial-failure recovery and
+admin/reviewer consequences: [docs/account-deletion.md](docs/account-deletion.md).
+
 ## Stack
 
 - Expo (React Native) + Expo Router, TypeScript
@@ -245,14 +257,18 @@ grounding, not instead of it.
   the way `talk-tts`/`talk-stt` still are; see the comment at the top of that
   function for why this is a deliberate, narrow exception.
 - **Reviewer workflow**: every AI-generated turn gets logged as a pending
-  candidate in `corrections`. `app/admin/corrections.tsx` — reachable only by
-  its direct route, not linked from Settings/Home nav, no new auth/role
-  system for now (a deliberate scope choice for this single-household app;
-  revisit if that ever changes) — lists pending turns, and either
+  candidate in `corrections`. Reviewing it is limited to an explicit
+  allowlist of language reviewers (`public.reviewers`, migration 0020) —
+  admin status alone doesn't count; see
+  [docs/language-review.md](docs/language-review.md) for who can do what and
+  how to add a reviewer. `app/admin/corrections.tsx` checks reviewer
+  membership before loading anything, lists pending turns, and either
   ("✅ Correct as shown") promotes the AI's text as-is or ("❌ Save
   correction") promotes an edited version, via the `talk-review` Edge
-  Function (embeds the final text, inserts into `phrases`/`sentences` with
-  `native_verified: true`). This is how the verified corpus grows from real
+  Function (verifies the caller's JWT and reviewer membership server-side,
+  embeds the final text, inserts into `phrases`/`sentences` with
+  `native_verified: true` using the service role — no client can write those
+  tables directly). This is how the verified corpus grows from real
   usage, not just manual seeding.
 - **Seed content**: `scripts/seed-talk-rag-content.mjs` inserts ~8 rows
   spanning the existing scenarios so retrieval has something to find while
@@ -278,10 +294,17 @@ grounding, not instead of it.
   public anon key alone can't spend. The tutor additionally caps prompt sizes
   and requires the `profileId` to belong to the caller. The client surfaces a
   `daily_limit_reached` error with its own copy, not the generic rate-limit
-  message. Every chat and embedding call logs its token usage to
-  `ai_usage_log` (`profile_id`, `call_type`, `model`, token counts; learners
-  see only their own rows, admins see all) — no dashboard for it yet, query
-  the table directly to see actual spend.
+  message. On top of that, a **project-wide monthly budget**
+  (`AI_MONTHLY_BUDGET_USD`, default 10 USD per UTC month,
+  `0021_ai_monthly_budget.sql`): every paid call — chat, embeddings
+  (including the reviewer's and the seed script's), TTS and STT — atomically
+  reserves a conservative cost estimate before it's sent, then logs its
+  actual units and estimated cost to `ai_usage_log` with the account id.
+  Over budget, the provider isn't called and the app shows "Talk to a
+  Tunisian is temporarily unavailable." Usage rows can't be written by
+  clients. It's an estimate, not a billing cap — also set a hard limit in
+  the OpenAI dashboard. Prices, failure handling and spend queries:
+  [docs/cost-controls.md](docs/cost-controls.md).
 
 ## Project structure
 
@@ -323,7 +346,7 @@ supabase/
   functions/talk-to-a-tunisian/   Edge Function: chat + RAG retrieval + daily quota + corrections logging
   functions/talk-tts/             Edge Function proxy: text-to-speech
   functions/talk-stt/             Edge Function proxy: speech-to-text
-  functions/talk-review/          Edge Function: reviewer's approve/reject-with-correction promotion
+  functions/talk-review/          Edge Function: reviewer's approve/reject-with-correction promotion (handler.ts holds the tested logic)
 scripts/
   seed-talk-rag-content.mjs   one-off: seeds draft RAG content with real embeddings (see "RAG grounding")
 ```
@@ -331,8 +354,12 @@ scripts/
 ## Testing
 
 ```bash
-npm test
+npm test         # Jest
+npm run test:db  # database tests: real migrations on a throwaway in-memory Postgres (PGlite)
 ```
+
+`test:db` (`supabase/tests/`) covers the daily AI quotas and the monthly AI
+budget against the actual SQL. It never connects to a real database.
 
 Runs Jest (`jest-expo` preset) against `src/**/__tests__` — 102 tests across
 13 suites, covering: spaced repetition, review-queue ordering, mastery

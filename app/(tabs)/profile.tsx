@@ -283,6 +283,14 @@ export default function ProfileScreen() {
           <Text style={styles.resetError}>{passwordReset.message}</Text>
         ) : null}
         <Button themed label="Sign out" variant="secondary" onPress={handleSignOut} style={{ marginTop: spacing.sm }} />
+        {/* Opens the confirmation screen; nothing is deleted from here. */}
+        <Button
+          themed
+          label="Delete account"
+          variant="ghost"
+          onPress={() => router.push('/account/delete')}
+          style={{ marginTop: spacing.sm }}
+        />
 
         {isAdmin ? (
           <>

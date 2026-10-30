@@ -1,136 +1,57 @@
 // "Talk to a Tunisian" text-to-speech proxy.
 //
-// Same "thin dumb proxy" shape as talk-to-a-tunisian: holds the AI
-// provider's secret API key and forwards a request to it, nothing else.
-// Only called in live mode (EXPO_PUBLIC_TALK_AI_MODE=live) — mock mode uses
-// on-device expo-speech instead, so it never reaches this function (see
-// src/hooks/useTutorSpeech.ts).
+// Holds the AI provider's secret API key and forwards one tutor turn to the
+// text-to-speech endpoint. Only called in live mode
+// (EXPO_PUBLIC_TALK_AI_MODE=live) — mock mode uses on-device expo-speech
+// instead, so it never reaches this function (see src/hooks/useTutorSpeech.ts).
+//
+// The request handling lives in handler.ts (tested under Jest); this file
+// wires it to Supabase:
+// - the caller's JWT is verified with Supabase Auth; that account owns the
+//   usage and is what the daily quota is keyed on;
+// - consume_ai_quota runs with the caller's own JWT (per-account daily cap,
+//   0018_ai_quota_and_account_email.sql);
+// - the monthly budget reservation and usage log use the service role
+//   (0021_ai_monthly_budget.sql — clients can't call or forge them). The
+//   service-role key comes from the function's environment only.
 //
 // Deploy: supabase functions deploy talk-tts
 // Configure secrets (reuses the same AI_API_KEY as talk-to-a-tunisian):
 //   supabase secrets set AI_TTS_MODEL=tts-1     # optional, this is the default
 //   supabase secrets set AI_TTS_VOICE=alloy     # optional, this is the default
+//   supabase secrets set AI_MONTHLY_BUDGET_USD=10            # optional, this is the default
+//   supabase secrets set AI_PRICE_TTS_PER_1M_CHARACTERS=15   # optional; see docs/cost-controls.md
 //
 // This hasn't been exercised against a live key in this environment — treat
-// it as reviewed-but-unverified until tested with real credentials, the same
-// as talk-to-a-tunisian was before it was verified via direct curl.
-//
-// It does not rely on the gateway's JWT check alone (which also admits the
-// public anon key): before the paid call it consumes the caller's per-account
-// daily quota via consume_ai_quota, which refuses callers with no user
-// identity (0018_ai_quota_and_account_email.sql).
+// it as reviewed-but-unverified until tested with real credentials.
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
+import { supabaseBudgetStore } from '../_shared/supabaseBudgetStore.ts';
+import { createTtsHandler } from './handler.ts';
+
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
-
-const DEFAULT_BASE_URL = 'https://api.openai.com/v1';
-const DEFAULT_TTS_MODEL = 'tts-1';
-const DEFAULT_TTS_VOICE = 'alloy';
-const REQUEST_TIMEOUT_MS = 20_000;
-// Keeps a single request bounded — this speaks one tutor turn at a time, not
-// arbitrary long-form text.
-const MAX_TEXT_LENGTH = 800;
-
-interface RequestBody {
-  text: string;
-}
-
-function corsHeaders(): HeadersInit {
-  return {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  };
-}
-
-function errorResponse(kind: string, message: string, status: number): Response {
-  return new Response(JSON.stringify({ error: { kind, message } }), {
-    status,
-    headers: { ...corsHeaders(), 'Content-Type': 'application/json' },
-  });
-}
-
-/** consume_ai_quota failed: no user identity → 401; anything else fails closed. */
-function quotaErrorResponse(error: { message?: string; code?: string }): Response {
-  if (error.code === '42501' || /not_authenticated/.test(error.message ?? '')) {
-    return errorResponse('unauthorized', 'Please sign in to use audio features.', 401);
-  }
-  return errorResponse('provider_error', 'Could not check your daily usage — please try again.', 503);
-}
-
-Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders() });
-  }
-  if (req.method !== 'POST') {
-    return errorResponse('provider_error', 'Method not allowed', 405);
-  }
-
-  const apiKey = Deno.env.get('AI_API_KEY');
-  if (!apiKey) {
-    return errorResponse('not_configured', 'AI_API_KEY is not configured for this project', 500);
-  }
-
-  let body: RequestBody;
-  try {
-    body = await req.json();
-  } catch {
-    return errorResponse('invalid_response', 'Malformed request body', 400);
-  }
-
-  if (typeof body.text !== 'string' || body.text.trim().length === 0) {
-    return errorResponse('invalid_response', 'Missing text', 400);
-  }
-  const text = body.text.slice(0, MAX_TEXT_LENGTH);
-
-  // Per-account daily quota, consumed before the paid call; also rejects a
-  // caller with no signed-in user. Fails closed on any error.
-  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-    global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } },
-  });
-  const { data: allowed, error: quotaError } = await supabase.rpc('consume_ai_quota', { p_kind: 'tts' });
-  if (quotaError) {
-    return quotaErrorResponse(quotaError);
-  }
-  if (allowed !== true) {
-    return errorResponse('daily_limit_reached', "You've reached today's audio limit — come back tomorrow!", 429);
-  }
-
-  const baseUrl = Deno.env.get('AI_BASE_URL') || DEFAULT_BASE_URL;
-  const model = Deno.env.get('AI_TTS_MODEL') || DEFAULT_TTS_MODEL;
-  const voice = Deno.env.get('AI_TTS_VOICE') || DEFAULT_TTS_VOICE;
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
-  try {
-    const response = await fetch(`${baseUrl}/audio/speech`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ model, voice, input: text, response_format: 'mp3' }),
-      signal: controller.signal,
-    });
-
-    if (response.status === 429) {
-      return errorResponse('rate_limited', 'The AI provider is rate-limiting requests right now', 429);
-    }
-    if (!response.ok) {
-      const detail = await response.text().catch(() => '');
-      return errorResponse('provider_error', `AI provider returned ${response.status}: ${detail}`.slice(0, 500), 502);
-    }
-
-    const audio = await response.arrayBuffer();
-    return new Response(audio, { status: 200, headers: { ...corsHeaders(), 'Content-Type': 'audio/mpeg' } });
-  } catch (err) {
-    if (err instanceof Error && err.name === 'AbortError') {
-      return errorResponse('timeout', 'Timed out waiting for the AI provider', 504);
-    }
-    return errorResponse('network', 'Failed to reach the AI provider', 502);
-  } finally {
-    clearTimeout(timeout);
-  }
+const service = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
+  auth: { persistSession: false, autoRefreshToken: false },
 });
+
+const asCaller = (token: string) =>
+  createClient(supabaseUrl, supabaseAnonKey, { global: { headers: { Authorization: `Bearer ${token}` } } });
+
+Deno.serve(
+  createTtsHandler({
+    env: (name) => Deno.env.get(name),
+    getUserId: async (token) => {
+      const { data, error } = await service.auth.getUser(token);
+      return error ? null : (data.user?.id ?? null);
+    },
+    consumeQuota: async (token, kind) => {
+      const { data, error } = await asCaller(token).rpc('consume_ai_quota', { p_kind: kind });
+      return error ? { error } : { allowed: data === true };
+    },
+    store: supabaseBudgetStore(service),
+    fetch: (url, init) => fetch(url, init),
+    log: (message, error) => console.error(message, error),
+  })
+);

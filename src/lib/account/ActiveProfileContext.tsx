@@ -3,9 +3,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 
 import { useAuth } from '@/lib/auth/AuthContext';
 import { listProfiles } from '@/data/profiles';
+import { ACTIVE_PROFILE_STORAGE_KEY } from '@/lib/localStorageKeys';
 import type { Profile } from '@/types/models';
-
-const ACTIVE_PROFILE_STORAGE_KEY = 'learn-tunisian.active-profile-id';
 
 interface ActiveProfileContextValue {
   profiles: Profile[];

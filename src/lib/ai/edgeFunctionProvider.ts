@@ -2,7 +2,7 @@ import { buildSystemPrompt } from '@/lib/ai/buildSystemPrompt';
 import { validateTutorResponse } from '@/lib/ai/validateTutorResponse';
 import { supabase } from '@/lib/supabase/client';
 import { findTalkScenario } from '@/constants/talkScenarios';
-import type { AiProvider, AiProviderError, ConversationRequest } from '@/lib/ai/types';
+import { normalizeAiError, type AiProvider, type AiProviderError, type ConversationRequest } from '@/lib/ai/types';
 
 const FUNCTION_NAME = 'talk-to-a-tunisian';
 
@@ -51,7 +51,7 @@ export const edgeFunctionAiProvider: AiProvider = {
       return { ok: false, error: await mapInvokeError(error) };
     }
     if (data?.error) {
-      return { ok: false, error: { kind: data.error.kind ?? 'provider_error', message: data.error.message } };
+      return { ok: false, error: normalizeAiError({ kind: data.error.kind ?? 'provider_error', message: data.error.message }) };
     }
     if (typeof data?.raw !== 'string') {
       return { ok: false, error: { kind: 'invalid_response', message: 'The AI response was empty.' } };
@@ -85,7 +85,7 @@ async function mapInvokeError(error: unknown): Promise<AiProviderError> {
     try {
       const body = await context.clone().json();
       if (body?.error?.kind && body?.error?.message) {
-        return { kind: body.error.kind, message: body.error.message };
+        return normalizeAiError({ kind: body.error.kind, message: body.error.message });
       }
     } catch {
       // Not a JSON body — fall through to the heuristic below.

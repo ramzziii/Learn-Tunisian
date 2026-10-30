@@ -23,6 +23,14 @@
 // Usage:
 //   OPENAI_API_KEY=sk-... SUPABASE_URL=https://xyz.supabase.co SUPABASE_SERVICE_ROLE_KEY=... \
 //     node scripts/seed-talk-rag-content.mjs
+//
+// Every embedding call is reserved against the same project-wide monthly AI
+// budget as the app's Edge Functions and logged in ai_usage_log (no
+// account — it's an operator script), via the 0021 budget functions. Same
+// settings: AI_MONTHLY_BUDGET_USD (default 10) and
+// AI_PRICE_EMBEDDING_PER_1M_TOKENS (default 0.02 for text-embedding-3-small).
+// The cost logic mirrors supabase/functions/_shared/aiBudget.ts — keep them
+// in step. See docs/cost-controls.md.
 
 import { createClient } from '@supabase/supabase-js';
 
@@ -37,6 +45,28 @@ if (!OPENAI_API_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
 }
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+function envUsd(name, fallback) {
+  const raw = process.env[name];
+  if (raw === undefined || raw === '') return fallback;
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value < 0) {
+    console.error(`${name} must be a non-negative number.`);
+    process.exit(1);
+  }
+  return value;
+}
+
+const MONTHLY_BUDGET_USD = envUsd('AI_MONTHLY_BUDGET_USD', 10);
+const EMBEDDING_PRICE_PER_1M_TOKENS = envUsd('AI_PRICE_EMBEDDING_PER_1M_TOKENS', 0.02);
+const roundUpUsd = (usd) => Math.ceil(usd * 1e8 - 1e-6) / 1e8;
+const embeddingCost = (tokens) => roundUpUsd((tokens * EMBEDDING_PRICE_PER_1M_TOKENS) / 1e6);
+
+async function rpc(fn, args) {
+  const { data, error } = await supabase.rpc(fn, args);
+  if (error) throw new Error(`${fn} failed: ${error.message}`);
+  return data;
+}
 
 const phrases = [
   { tunisian_text: 'شنية تحب تشرب؟', english_text: 'What would you like to drink?', transliteration: 'chnowa theb teshreb?', topic: 'cafe', formality: 'casual' },
@@ -69,17 +99,55 @@ const conversationExamples = [
   },
 ];
 
+/** One paid embedding call: reserved against the monthly budget first, then reconciled / released / kept as ambiguous. */
 async function embed(text) {
-  const response = await fetch('https://api.openai.com/v1/embeddings', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: EMBEDDING_MODEL, input: text }),
+  // Upper bound: a token is never smaller than one UTF-8 byte (+ a little overhead).
+  const reserveUsd = embeddingCost(new TextEncoder().encode(text).length + 8);
+  const reservationId = await rpc('reserve_ai_budget', {
+    p_account_id: null,
+    p_call_type: 'embedding',
+    p_model: EMBEDDING_MODEL,
+    p_amount_usd: reserveUsd,
+    p_budget_usd: MONTHLY_BUDGET_USD,
   });
+  if (!reservationId) {
+    throw new Error('The monthly AI budget is used up — not calling the provider. See docs/cost-controls.md.');
+  }
+
+  let response;
+  try {
+    response = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: EMBEDDING_MODEL, input: text }),
+    });
+  } catch (err) {
+    // May or may not have reached the provider: keep the reservation counted.
+    await rpc('mark_ai_budget_ambiguous', { p_reservation_id: reservationId, p_reason: 'seed script network error' });
+    throw err;
+  }
   if (!response.ok) {
+    await rpc('release_ai_budget', { p_reservation_id: reservationId });
     throw new Error(`OpenAI embeddings call failed (${response.status}): ${await response.text()}`);
   }
-  const json = await response.json();
-  return json.data[0].embedding;
+  const json = await response.json().catch(() => null);
+  const tokens = json?.usage?.prompt_tokens ?? json?.usage?.total_tokens;
+  const hasUsage = typeof tokens === 'number';
+  await rpc('reconcile_ai_budget', {
+    p_reservation_id: reservationId,
+    p_profile_id: null,
+    p_prompt_tokens: hasUsage ? tokens : null,
+    p_completion_tokens: null,
+    p_total_tokens: hasUsage ? (json.usage.total_tokens ?? tokens) : null,
+    p_input_characters: null,
+    p_audio_seconds: null,
+    p_cost_usd: hasUsage ? embeddingCost(tokens) : reserveUsd,
+    p_usage_estimated: !hasUsage,
+    p_pricing: { model: EMBEDDING_MODEL, per1MTokens: EMBEDDING_PRICE_PER_1M_TOKENS, unit: 'tokens', reserved_usd: reserveUsd, source: 'seed script' },
+  });
+  const embedding = json?.data?.[0]?.embedding;
+  if (!Array.isArray(embedding)) throw new Error('OpenAI returned no embedding.');
+  return embedding;
 }
 
 async function seedPhrases() {

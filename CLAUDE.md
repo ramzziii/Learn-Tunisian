@@ -22,3 +22,46 @@
 - Consent text in `app/onboarding/consent.tsx` is still placeholder — real
   Terms/Privacy documents are an open release blocker. Don't invent legal
   copy.
+
+## Language review (AI content verification)
+
+- Reviewing/verifying AI-generated Tunisian Arabic is limited to accounts in
+  `public.reviewers` (0020). `is_admin` does NOT imply reviewer — never use it
+  to authorize review. See docs/language-review.md.
+- `talk-review` verifies the JWT, checks `reviewers` with the service role,
+  and is the only writer of `phrases`/`sentences` and of resolved
+  `corrections` rows; clients have no write privileges there. Its logic lives
+  in `supabase/functions/talk-review/handler.ts` (no Deno imports, run under
+  Jest) — keep it that way.
+- Don't hard-code reviewer emails or UUIDs anywhere; reviewers are added by
+  hand in the SQL editor.
+
+## Paid AI calls (cost controls)
+
+- Every paid AI-provider call must go through `meteredCall` in
+  `supabase/functions/_shared/aiBudget.ts`: per-account daily quota first
+  (0018, unchanged), then an atomic monthly budget reservation (0021), then
+  reconcile / release / mark ambiguous. Never call the provider outside it,
+  and never release a reservation for a timeout or network error.
+- Usage is logged only by `reconcile_ai_budget` via the service role; never
+  insert into `ai_usage_log` from a client or with the caller's JWT.
+- Edge Function logic lives in each function's `handler.ts` (no Deno/npm
+  imports, run under Jest); `index.ts` only wires Supabase. Jest tests
+  `require()` handlers so tsc doesn't follow their `.ts` imports.
+- Database tests: `npm run test:db` (PGlite, `supabase/tests/`). PGlite can't
+  run inside Jest here.
+- Changing a model or provider pricing? Update the defaults/AI_PRICE_* and
+  docs/cost-controls.md.
+
+## Account deletion
+
+- `delete-account` deletes only the account of the verified JWT; it rejects
+  any target in the body. Order: storage → `delete_account_data` (0022) →
+  Auth user last. Never report success before the Auth user is gone.
+- New table or column that holds user data? Decide delete vs. anonymize,
+  add it to `delete_account_data` and `account_storage_objects` (0022 or a
+  later migration), `supabase/tests/accountDeletion.test.mjs`, and
+  docs/account-deletion.md.
+- New per-profile device storage must use `learn-tunisian.<feature>.<profileId>`
+  keys so `clearLocalAccountData` finds them; shared/device-wide keys go in
+  `src/lib/localStorageKeys.ts`.

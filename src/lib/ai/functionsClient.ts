@@ -1,5 +1,5 @@
 import { supabase, supabaseAnonKey, supabaseUrl } from '@/lib/supabase/client';
-import type { AiProviderError } from '@/lib/ai/types';
+import { normalizeAiError, type AiProviderError } from '@/lib/ai/types';
 
 // The chat proxy (talk-to-a-tunisian) goes through supabase.functions.invoke,
 // which only speaks JSON in/out. talk-tts and talk-stt move raw audio bytes
@@ -41,7 +41,7 @@ async function toError(response: Response): Promise<AiProviderError> {
   try {
     const data = (await response.json()) as { error?: { kind?: string; message?: string } };
     if (data?.error?.message) {
-      return { kind: (data.error.kind as AiProviderError['kind']) ?? 'provider_error', message: data.error.message };
+      return normalizeAiError({ kind: (data.error.kind as AiProviderError['kind']) ?? 'provider_error', message: data.error.message });
     }
   } catch {
     // Response body wasn't the JSON error envelope — fall through to a generic error below.
