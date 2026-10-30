@@ -3,7 +3,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { findTalkScenario } from '@/constants/talkScenarios';
 import { fetchLearnerContext, fetchScenarioVocabulary, fetchTalkLevel } from '@/data/talkContext';
 import { aiProvider } from '@/lib/ai';
-import { canAccessTalkFeature } from '@/lib/ai/accessControl';
 import type { AiProviderError, ConversationTurn, GroundedVocabularyItem, LearnerContext, TutorResponse } from '@/lib/ai/types';
 
 export type ConversationMessage =
@@ -51,7 +50,7 @@ export interface UseConversationResult {
  * history only needs to exist for the current session (see APP_OVERVIEW.md
  * for why permanent storage is deferred).
  */
-export function useConversation(scenarioId: string, profileId: string, track: 'kid' | 'adult'): UseConversationResult {
+export function useConversation(scenarioId: string, profileId: string): UseConversationResult {
   const [state, setState] = useState<ConversationState>({
     status: 'loading',
     messages: [],
@@ -111,25 +110,11 @@ export function useConversation(scenarioId: string, profileId: string, track: 'k
     setState({ status: 'loading', messages: [], vocabulary: [], error: null });
     pendingLearnerMessageRef.current = null;
 
-    // Never fetch vocabulary/context or call the AI provider for a child
-    // profile — this is a real network/cost boundary, not just a UI gate,
-    // since the screen-level check alone would still let this hook fire the
-    // request before its result is hidden.
-    if (!canAccessTalkFeature(track)) {
-      setState({
-        status: 'error',
-        messages: [],
-        vocabulary: [],
-        error: { kind: 'not_configured', message: 'This conversation is not available for this profile.' },
-      });
-      return;
-    }
-
     try {
       const level = await fetchTalkLevel(profileId);
       const [vocabulary, learnerContext] = await Promise.all([
         fetchScenarioVocabulary(scenarioId),
-        fetchLearnerContext(profileId, track, level),
+        fetchLearnerContext(profileId, level),
       ]);
       learnerContextRef.current = learnerContext;
       setState((s) => ({ ...s, vocabulary }));
@@ -142,12 +127,12 @@ export function useConversation(scenarioId: string, profileId: string, track: 'k
       }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scenarioId, profileId, track]);
+  }, [scenarioId, profileId]);
 
   useEffect(() => {
     start();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scenarioId, profileId, track]);
+  }, [scenarioId, profileId]);
 
   const sendMessage = useCallback(
     (text: string) => {

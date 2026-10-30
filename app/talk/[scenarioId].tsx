@@ -16,7 +16,7 @@ import { type ConversationMessage, useConversation } from '@/hooks/useConversati
 import { useTutorSpeech } from '@/hooks/useTutorSpeech';
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
 import { isUsingMockAiProvider } from '@/lib/ai';
-import { canAccessTalkFeature } from '@/lib/ai/accessControl';
+import { BUDGET_EXHAUSTED_MESSAGE } from '@/lib/ai/types';
 import { transcribeAudio } from '@/lib/ai/functionsClient';
 import { buildWordHelp } from '@/lib/ai/buildWordHelp';
 import type { GroundedVocabularyItem, SuggestedReply, TutorResponse } from '@/lib/ai/types';
@@ -30,7 +30,12 @@ const ERROR_MESSAGES: Record<string, string> = {
   provider_error: 'Something went wrong on our end. Let\'s try again.',
   not_configured: 'This feature isn\'t fully set up yet.',
   daily_limit_reached: "You've reached today's conversation limit — come back tomorrow!",
+  budget_exhausted: BUDGET_EXHAUSTED_MESSAGE,
 };
+
+// Retrying straight away can't help with these (and would only repeat a
+// paid call), so the banner offers a way back instead of "Try again".
+const NOT_RETRYABLE = new Set(['daily_limit_reached', 'budget_exhausted']);
 
 // Voice input needs a real network call (speech-to-text) every time, so it's
 // only offered in live mode — mock mode stays fully offline like the rest of
@@ -50,10 +55,9 @@ export default function TalkConversation() {
   const scenario = findTalkScenario(scenarioId ?? '');
   const { status, messages, vocabulary, error, sendMessage, retry } = useConversation(
     scenarioId ?? '',
-    activeProfile?.id ?? '',
-    activeProfile?.track ?? 'adult'
+    activeProfile?.id ?? ''
   );
-  const tutorSpeech = useTutorSpeech();
+  const tutorSpeech = useTutorSpeech(activeProfile?.id);
   const voiceRecorder = useVoiceRecorder();
   const spokenMessageIds = useRef(new Set<string>());
 
@@ -83,19 +87,6 @@ export default function TalkConversation() {
 
   if (!activeProfile) return <LoadingScreen themed />;
 
-  // Same defense-in-depth as the scenario picker — a kid profile reaching
-  // this route directly (e.g. a stale deep link) never sees the feature.
-  if (!canAccessTalkFeature(activeProfile.track)) {
-    return (
-      <ScreenContainer themed>
-        <BackButton themed />
-        <View style={styles.centered}>
-          <Text style={styles.centeredEmoji}>🌱</Text>
-          <Text style={styles.centeredTitle}>Coming soon!</Text>
-        </View>
-      </ScreenContainer>
-    );
-  }
 
   if (!scenario) {
     return (
@@ -193,7 +184,7 @@ export default function TalkConversation() {
         {status === 'error' && error ? (
           <View style={styles.errorBanner}>
             <Text style={styles.errorText}>{ERROR_MESSAGES[error.kind] ?? ERROR_MESSAGES.provider_error}</Text>
-            {error.kind === 'daily_limit_reached' ? (
+            {NOT_RETRYABLE.has(error.kind) ? (
               <Button themed label="Back to situations" variant="secondary" onPress={() => router.replace('/talk')} />
             ) : (
               <Button themed label="Try again" variant="secondary" onPress={retry} />

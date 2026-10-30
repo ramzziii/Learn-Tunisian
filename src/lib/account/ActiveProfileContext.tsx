@@ -3,9 +3,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 
 import { useAuth } from '@/lib/auth/AuthContext';
 import { listProfiles } from '@/data/profiles';
+import { ACTIVE_PROFILE_STORAGE_KEY } from '@/lib/localStorageKeys';
 import type { Profile } from '@/types/models';
-
-const ACTIVE_PROFILE_STORAGE_KEY = 'learn-tunisian.active-profile-id';
 
 interface ActiveProfileContextValue {
   profiles: Profile[];
@@ -32,6 +31,10 @@ export function ActiveProfileProvider({ children }: { children: ReactNode }) {
     }
     const fetched = await listProfiles(accountId);
     setProfiles(fetched);
+    // Same rule as on load: an account's only profile is the active one.
+    setActiveProfileIdState((current) =>
+      current && fetched.some((p) => p.id === current) ? current : fetched.length === 1 ? fetched[0].id : null
+    );
     return fetched;
   }, [accountId]);
 
@@ -51,8 +54,12 @@ export function ActiveProfileProvider({ children }: { children: ReactNode }) {
       ]);
       if (cancelled) return;
       setProfiles(fetched);
+      // One profile per account: an account's only profile is simply used.
+      // An account that already has several (from before profiles were
+      // limited to one) keeps them all; until the learner picks one on the
+      // one-time chooser (app/profiles/index.tsx) none is chosen silently.
       const storedIsValid = storedId && fetched.some((p) => p.id === storedId);
-      setActiveProfileIdState(storedIsValid ? storedId : null);
+      setActiveProfileIdState(storedIsValid ? storedId : fetched.length === 1 ? fetched[0].id : null);
       setIsLoading(false);
     })();
     return () => {

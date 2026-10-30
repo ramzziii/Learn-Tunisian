@@ -11,6 +11,7 @@ import {
   type ThemeColors,
   type ThemeGradients,
 } from '@/constants/theme';
+import { THEME_STORAGE_KEY } from '@/lib/localStorageKeys';
 
 export type ThemePreference = 'light' | 'dark' | 'system';
 
@@ -23,7 +24,7 @@ interface ThemeContextValue {
   setPreference: (next: ThemePreference) => void;
 }
 
-const STORAGE_KEY = 'learn-tunisian.theme-preference';
+const STORAGE_KEY = THEME_STORAGE_KEY;
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 

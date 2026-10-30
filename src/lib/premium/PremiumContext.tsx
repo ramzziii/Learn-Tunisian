@@ -3,6 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
 import { useIsAdmin } from '@/lib/admin/AdminContext';
+import { ADMIN_PREVIEW_STORAGE_KEY } from '@/lib/localStorageKeys';
 import { resolveEffectivePremium, type AdminPremiumPreview } from '@/lib/premium/access';
 
 interface PremiumContextValue {
@@ -18,7 +19,7 @@ interface PremiumContextValue {
   setAdminPreview: (next: AdminPremiumPreview) => void;
 }
 
-const STORAGE_KEY = 'learn-tunisian.admin-premium-preview';
+const STORAGE_KEY = ADMIN_PREVIEW_STORAGE_KEY;
 
 const PremiumContext = createContext<PremiumContextValue | undefined>(undefined);
 

@@ -1,6 +1,6 @@
-import type { Track } from '@/types/models';
-
-const KID_TRACK_MAX_AGE = 12;
+/** Learn Tunisian is for adults only. The age gate is self-declared: it
+ * checks the date the person enters; it does not verify their real age. */
+export const ADULT_MIN_AGE = 18;
 
 /**
  * Parses a "YYYY-MM-DD" string as a local-time Date at midnight — NOT
@@ -8,17 +8,16 @@ const KID_TRACK_MAX_AGE = 12;
  * midnight. That mismatch (UTC vs. the local time `new Date()` used
  * elsewhere for "today") silently shifts the effective calendar date back
  * by a day in any negative-UTC-offset timezone, which can misclassify
- * someone right at the kid/adult track boundary.
+ * someone right at the 18+ boundary.
  */
 export function parseIsoDateLocal(isoDate: string): Date {
   const [year, month, day] = isoDate.split('-').map(Number);
   return new Date(year, month - 1, day);
 }
 
-/** dateOfBirth is an ISO date string ("YYYY-MM-DD"). */
-export function calculateAge(dateOfBirth: string): number {
+/** dateOfBirth is an ISO date string ("YYYY-MM-DD"); `today` is local time. */
+export function calculateAge(dateOfBirth: string, today: Date = new Date()): number {
   const dob = parseIsoDateLocal(dateOfBirth);
-  const today = new Date();
   let age = today.getFullYear() - dob.getFullYear();
   const hasHadBirthdayThisYear =
     today.getMonth() > dob.getMonth() ||
@@ -27,8 +26,13 @@ export function calculateAge(dateOfBirth: string): number {
   return age;
 }
 
-export function trackForDateOfBirth(dateOfBirth: string): Track {
-  return calculateAge(dateOfBirth) <= KID_TRACK_MAX_AGE ? 'kid' : 'adult';
+/** True when the entered date of birth makes the person 18 or older today
+ * (turning 18 today counts). False for an unparseable date. */
+export function isAdult(dateOfBirth: string, today: Date = new Date()): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth)) return false;
+  const dob = parseIsoDateLocal(dateOfBirth);
+  if (Number.isNaN(dob.getTime())) return false;
+  return calculateAge(dateOfBirth, today) >= ADULT_MIN_AGE;
 }
 
 export function formatDateOfBirth(dateOfBirth: string): string {

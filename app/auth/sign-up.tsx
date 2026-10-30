@@ -1,4 +1,4 @@
-import { Link, router } from 'expo-router';
+import { Link, Redirect, router } from 'expo-router';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
 
@@ -8,16 +8,22 @@ import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { TextField } from '@/components/ui/TextField';
 import { colors, spacing } from '@/constants/theme';
 import { useAuth } from '@/lib/auth/AuthContext';
+import { useOnboarding } from '@/lib/onboarding/OnboardingContext';
 
 const MIN_PASSWORD_LENGTH = 6;
 
 export default function SignUp() {
   const { signUpWithEmail } = useAuth();
+  const { state: onboarding } = useOnboarding();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [confirmationSentTo, setConfirmationSentTo] = useState<string | null>(null);
+
+  // No account is created before the 18+ age gate has passed in this session
+  // (app/onboarding/age.tsx); arriving here any other way goes there first.
+  if (!onboarding.dateOfBirth) return <Redirect href="/onboarding/age" />;
 
   const handleSignUp = async () => {
     setError(null);

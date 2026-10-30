@@ -1,77 +1,58 @@
-// Paid AI proxies and the answer email (run-1 security audit). Deno Edge
-// Functions can't run under Jest, so these pin the order of operations and
-// the controls in the source itself.
+// Paid AI proxies and the answer email (run-1 security audit). The request
+// handling of talk-to-a-tunisian / talk-tts / talk-stt now lives in each
+// function's handler.ts and is exercised directly (talkChatHandler,
+// talkTtsHandler, talkSttHandler tests). Deno can't run under Jest, so these
+// pin how each index.ts wires that handler to Supabase.
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { readFileSync } = require('fs') as { readFileSync: (path: string, encoding: string) => string };
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { join } = require('path') as { join: (...parts: string[]) => string };
 declare const __dirname: string;
 
-const read = (name: string) =>
-  readFileSync(join(__dirname, `../../../supabase/functions/${name}/index.ts`), 'utf8').replace(/\/\/[^\n]*/g, '');
-
-function indexOf(code: string, pattern: RegExp): number {
-  const m = pattern.exec(code);
-  if (!m) throw new Error(`not found: ${pattern}`);
-  return m.index;
-}
-
-describe('talk-to-a-tunisian', () => {
-  const code = read('talk-to-a-tunisian');
-
-  it('consumes the per-account chat quota before any paid call', () => {
-    const quota = indexOf(code, /\.rpc\('consume_ai_quota', \{ p_kind: 'chat' \}\)/);
-    expect(quota).toBeLessThan(indexOf(code, /buildRetrievalSection\(supabase/));
-    expect(quota).toBeLessThan(indexOf(code, /fetchWithTimeout\(`\$\{baseUrl\}\/chat\/completions`/));
-  });
-
-  it('fails closed: a quota error is never treated as allowed', () => {
-    expect(code).toMatch(/if \(quotaError\) \{[\s\S]*?return quotaErrorResponse\(quotaError\);/);
-    expect(code).toMatch(/if \(allowed !== true\) \{\s*return errorResponse\('daily_limit_reached'/);
-  });
-
-  it('no longer counts corrections rows by a client-chosen profileId as its cap', () => {
-    expect(code).not.toMatch(/\.from\('corrections'\)\s*\.select\('id', \{ count: 'exact'/);
-  });
-
-  it('requires the profileId to belong to the caller before any paid call', () => {
-    const own = indexOf(code, /\.from\('profiles'\)\s*\.select\('id'\)\s*\.eq\('id', body\.profileId\)/);
-    expect(own).toBeLessThan(indexOf(code, /buildRetrievalSection\(supabase/));
-    expect(code).toMatch(/return errorResponse\('forbidden', '[^']+', 403\)/);
-  });
-
-  it('bounds every prompt-bearing field before any paid call', () => {
-    expect(code).toMatch(/const MAX_SYSTEM_PROMPT_CHARS = \d+/);
-    expect(code).toMatch(/const MAX_TURN_CHARS = \d+/);
-    expect(code).toMatch(/const MAX_RETRIEVAL_QUERY_CHARS = \d+/);
-    const size = indexOf(code, /function oversizedField\(/);
-    const check = indexOf(code, /const tooBig = oversizedField\(body\)/);
-    expect(size).toBeLessThan(check);
-    expect(check).toBeLessThan(indexOf(code, /\.rpc\('consume_ai_quota'/));
-  });
-});
+const read = (name: string, file = 'index.ts') =>
+  readFileSync(join(__dirname, `../../../supabase/functions/${name}/${file}`), 'utf8').replace(/\/\/[^\n]*/g, '');
 
 describe.each([
-  ['talk-tts', 'tts', /fetch\(`\$\{baseUrl\}\/audio\/speech`/],
-  ['talk-stt', 'stt', /fetch\(`\$\{baseUrl\}\/audio\/transcriptions`/],
-])('%s', (name, kind, paidCall) => {
-  const code = read(name);
+  ['talk-to-a-tunisian', 'createChatHandler'],
+  ['talk-tts', 'createTtsHandler'],
+  ['talk-stt', 'createSttHandler'],
+])('%s', (name, factory) => {
+  const index = read(name);
+  const handler = read(name, 'handler.ts');
 
-  it('builds a client from the caller’s own Authorization header', () => {
-    expect(code).toMatch(/global: \{ headers: \{ Authorization: req\.headers\.get\('Authorization'\) \?\? '' \} \}/);
+  it('serves the tested handler', () => {
+    expect(index).toMatch(new RegExp(`Deno\\.serve\\(\\s*${factory}\\(`));
   });
 
-  it(`consumes the per-account ${kind} quota (which also rejects callers with no user) before the paid call`, () => {
-    const quota = indexOf(code, new RegExp(`\\.rpc\\('consume_ai_quota', \\{ p_kind: '${kind}' \\}\\)`));
-    expect(quota).toBeLessThan(indexOf(code, paidCall));
-    expect(code).toMatch(/if \(quotaError\) \{[\s\S]*?return quotaErrorResponse\(quotaError\);/);
-    expect(code).toMatch(/if \(allowed !== true\) \{\s*return errorResponse\('daily_limit_reached'/);
+  it('verifies the caller’s JWT with Supabase Auth on the server', () => {
+    expect(index).toMatch(/service\.auth\.getUser\(token\)/);
+  });
+
+  it('runs the per-account daily quota with the caller’s own JWT (auth.uid() is the account)', () => {
+    expect(index).toMatch(/createClient\(supabaseUrl, supabaseAnonKey, \{ global: \{ headers: \{ Authorization: `Bearer \$\{token\}` \} \} \}\)/);
+    expect(index).toMatch(/asCaller\(token\)\.rpc\('consume_ai_quota', \{ p_kind: kind \}\)/);
+  });
+
+  it('does the budget accounting with the service-role client, whose key comes only from the environment', () => {
+    expect(index).toMatch(/Deno\.env\.get\('SUPABASE_SERVICE_ROLE_KEY'\)/);
+    expect(index).toMatch(/store: supabaseBudgetStore\(service\)/);
+  });
+
+  it('the handler has no Deno or npm imports, and doesn’t log usage through a client-writable path', () => {
+    expect(handler).not.toMatch(/Deno\.|from 'npm:/);
+    expect(index + handler).not.toMatch(/from\('ai_usage_log'\)/);
   });
 });
 
-it('talk-stt rejects an oversized upload by Content-Length before buffering it', () => {
-  const code = read('talk-stt');
-  expect(indexOf(code, /req\.headers\.get\('content-length'\)/)).toBeLessThan(indexOf(code, /await req\.arrayBuffer\(\)/));
+it('talk-to-a-tunisian checks profile ownership with the caller’s JWT (RLS), not the service role', () => {
+  const index = read('talk-to-a-tunisian');
+  expect(index).toMatch(/asCaller\(token\)\.from\('profiles'\)\.select\('id'\)\.eq\('id', profileId\)/);
+});
+
+it('talk-review meters its embedding through the same service-role budget store', () => {
+  const index = read('talk-review');
+  expect(index).toMatch(/store: supabaseBudgetStore\(service\)/);
+  expect(read('talk-review', 'handler.ts')).toMatch(/callType: 'embedding'/);
 });
 
 describe('translation-answered-email', () => {

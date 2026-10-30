@@ -10,7 +10,7 @@ const mockRecordItem = jest.fn();
 const mockMarkCompleted = jest.fn();
 const mockOpenUpgrade = jest.fn();
 let mockPremium = { isPremium: false, isResolved: true };
-const mockProfile = { id: 'p1', track: 'adult' };
+const mockProfile = { id: 'p1' };
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,

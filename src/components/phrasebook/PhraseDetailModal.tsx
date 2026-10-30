@@ -10,11 +10,10 @@ import { ExplanationPlayButton } from '@/components/ui/ExplanationPlayButton';
 import { useWordAudioPlayer } from '@/hooks/useWordAudioPlayer';
 import { useTheme } from '@/lib/theme/ThemeContext';
 import { getPrimaryVariant } from '@/lib/wordVariants';
-import type { Track, WordGroupWithVariants } from '@/types/models';
+import type { WordGroupWithVariants } from '@/types/models';
 
 interface PhraseDetailModalProps {
   phrase: WordGroupWithVariants | null;
-  track: Track;
   onClose: () => void;
 }
 
@@ -36,10 +35,9 @@ interface PhraseDetailModalProps {
  * (src/components/pronunciation/PronunciationPractice.tsx) — the same check
  * and result screens as lessons and Repeat After Me, against this phrase's
  * own variants. Finishing resets it for another go (there's no session to
- * revisit in). Recording is hidden for a kid-track profile — mic permission
- * is never requested for kids, per this app's existing hard rule.
+ * revisit in).
  */
-export function PhraseDetailModal({ phrase, track, onClose }: PhraseDetailModalProps) {
+export function PhraseDetailModal({ phrase, onClose }: PhraseDetailModalProps) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { speak, isSpeaking } = useLetterSpeech();
@@ -79,7 +77,6 @@ export function PhraseDetailModal({ phrase, track, onClose }: PhraseDetailModalP
     }
   };
 
-  const canRecord = track !== 'kid';
 
   return (
     <Modal visible={isVisible} transparent animationType="slide" onRequestClose={onClose}>
@@ -124,9 +121,8 @@ export function PhraseDetailModal({ phrase, track, onClose }: PhraseDetailModalP
               </>
             ) : null}
 
-            {canRecord ? (
-              <>
-                <Text style={styles.sectionLabel}>Practice saying it</Text>
+            <>
+              <Text style={styles.sectionLabel}>Practice saying it</Text>
                 <PronunciationPractice
                   key={`${phrase.id}-${practiceKey}`}
                   nativeVariant={variant}
@@ -137,8 +133,7 @@ export function PhraseDetailModal({ phrase, track, onClose }: PhraseDetailModalP
                   outOfTriesMessage="Keep practicing — listen to the native speaker again and have another go anytime."
                   onFinish={() => setPracticeKey((k) => k + 1)}
                 />
-              </>
-            ) : null}
+            </>
           </ScrollView>
         </View>
       </Animated.View>

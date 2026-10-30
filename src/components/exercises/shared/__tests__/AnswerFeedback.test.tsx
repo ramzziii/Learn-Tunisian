@@ -48,7 +48,3 @@ it('wrong answer: "Not quite" teaches the right one (Arabic, transliteration, me
   expect(screen.queryByText(/Listen again/)).toBeNull();
 });
 
-it('kid track keeps its softer copy', async () => {
-  await renderFeedback({ isCorrect: false, kidFriendly: true, correctWordArabic: 'بني' });
-  expect(screen.getByText(/Almost!/)).toBeOnTheScreen();
-});

@@ -6,11 +6,9 @@ import { Reveal } from '@/components/ui/Reveal';
 import { radii, spacing, type ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/lib/theme/ThemeContext';
 import type { UnitWithLessons } from '@/data/content';
-import type { Track } from '@/types/models';
 
 interface UnitSectionProps {
   unitWithLessons: UnitWithLessons;
-  track: Track;
   onSelectLesson: (lessonId: string) => void;
   onBrowseWords: (lessonId: string) => void;
   /** True for lessons beyond the free plan — see src/lib/premium/access.ts. */
@@ -26,7 +24,6 @@ interface UnitSectionProps {
 // so it reacts to the live theme unconditionally.
 export function UnitSection({
   unitWithLessons,
-  track,
   onSelectLesson,
   onBrowseWords,
   isFirstUnit,
@@ -59,9 +56,9 @@ export function UnitSection({
         {lessons.map((lesson, index) => (
           <Reveal key={lesson.id} delay={Math.min(index * 40, 400)}>
             {isPremiumLocked(lesson.id) ? (
-              <LessonNode lesson={lesson} track={track} premiumLocked onPress={() => onPremiumLockedPress?.()} />
+              <LessonNode lesson={lesson} premiumLocked onPress={() => onPremiumLockedPress?.()} />
             ) : (
-              <LessonNode lesson={lesson} track={track} onPress={() => onSelectLesson(lesson.id)} />
+              <LessonNode lesson={lesson} onPress={() => onSelectLesson(lesson.id)} />
             )}
           </Reveal>
         ))}

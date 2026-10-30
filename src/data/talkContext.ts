@@ -57,14 +57,13 @@ export async function fetchTalkLevel(profileId: string): Promise<TalkLevel> {
 }
 
 /**
- * Minimal, non-identifying learner context: track, level, and a
+ * Minimal, non-identifying learner context: level, and a
  * handful of English-meaning labels for words the learner knows well or is
  * struggling with — enough for the tutor to personalize without sending
  * anything resembling account/personal information.
  */
 export async function fetchLearnerContext(
   profileId: string,
-  track: 'kid' | 'adult',
   level: TalkLevel
 ): Promise<LearnerContext> {
   const { data, error } = await supabase
@@ -93,7 +92,6 @@ export async function fetchLearnerContext(
   }
 
   return {
-    track,
     level,
     knownWords: knownGroupIds.map((id) => meaningById.get(id)).filter((v): v is string => !!v).slice(0, MAX_CONTEXT_WORDS),
     strugglingWords: strugglingGroupIds

@@ -3,7 +3,7 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 const mockRouter = { push: jest.fn(), replace: jest.fn(), back: jest.fn(), canGoBack: () => true };
-const mockProfile = { id: 'p1', name: 'Ramzi', track: 'adult' };
+const mockProfile = { id: 'p1', name: 'Ramzi' };
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,
@@ -29,7 +29,6 @@ jest.mock('@/data/sessionLogs', () => ({
   fetchMinutesLearnedToday: jest.fn(async () => 4),
   fetchRecentActivityDates: jest.fn(async () => []),
 }));
-jest.mock('@/data/badgeStats', () => ({ fetchBadgeStats: jest.fn(async () => ({})) }));
 jest.mock('@/lib/dailyChallengeProgress', () => ({
   getTodayChallengeFlags: jest.fn(async () => ({ reviewCompleted: false, speakingCompleted: false })),
 }));

@@ -5,14 +5,12 @@ import { Alert, ScrollView, StyleSheet, Switch, Text, View } from 'react-native'
 import { TimeWheelPicker } from '@/components/onboarding/TimeWheelPicker';
 import { Button } from '@/components/ui/Button';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
-import { ParentGateModal } from '@/components/ui/ParentGateModal';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Reveal } from '@/components/ui/Reveal';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { SelectableCard } from '@/components/ui/SelectableCard';
 import { TranslationRequestsEntry } from '@/components/translation/TranslationRequestsEntry';
 import { radii, spacing, type ThemeColors } from '@/constants/theme';
-import { KIDS_SECTION_ENABLED } from '@/constants/features';
 import { countCompletedLessons } from '@/data/content';
 import { fetchDailyGoalSettings, updateDailyGoalSettings } from '@/data/profiles';
 import { fetchProgressSummary, type ProfileProgressSummary } from '@/data/progress';
@@ -45,16 +43,9 @@ interface ProgressStats extends ProfileProgressSummary {
  * Match device), the one place in the app that actually changes the theme.
  *
  * Fully converted to the live theme system.
- *
- * Previously, Home intercepted a kid-track profile with ParentGateModal
- * *before* pushing here. A tab-bar tap can't be intercepted the same way, so
- * the gate moved to live here instead — same "gate at the point of entry"
- * idea, just relocated to where the entry now actually happens, mirroring
- * how app/(tabs)/talk.tsx already gates itself for kids via
- * canAccessTalkFeature. Dormant today since kids are flag-hidden.
  */
 export default function ProfileScreen() {
-  const { activeProfile, profiles } = useActiveProfile();
+  const { activeProfile } = useActiveProfile();
   const { signOut, session, sendPasswordReset } = useAuth();
   // Change password reuses the existing reset flow: email the signed-in
   // account a reset link (app/auth/reset-password.tsx sets the new one).
@@ -75,7 +66,6 @@ export default function ProfileScreen() {
   const [reminderMinute, setReminderMinute] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [gatePassed, setGatePassed] = useState(false);
 
   const load = useCallback(async () => {
     if (!activeProfile) return;
@@ -166,11 +156,6 @@ export default function ProfileScreen() {
   };
 
   if (!activeProfile) return <LoadingScreen themed />;
-
-  const isKid = KIDS_SECTION_ENABLED && activeProfile.track === 'kid';
-  if (isKid && !gatePassed) {
-    return <ParentGateModal onSuccess={() => setGatePassed(true)} onCancel={() => router.replace('/home')} />;
-  }
 
   if (loadError) {
     return (
@@ -276,23 +261,6 @@ export default function ProfileScreen() {
           style={{ marginTop: spacing.xl }}
         />
 
-        {profiles.length > 1 ? (
-          <Button
-            themed
-            label="Switch profile"
-            variant="secondary"
-            onPress={() => router.push('/profiles')}
-            style={{ marginTop: spacing.md }}
-          />
-        ) : null}
-        <Button
-          themed
-          label="Add another profile"
-          variant="ghost"
-          onPress={() => router.push('/onboarding/goal-select')}
-          style={{ marginTop: spacing.sm }}
-        />
-
         <Text style={styles.sectionTitle}>Premium</Text>
         <Text style={styles.premiumStatus}>
           {isPremium ? '⭐ Premium — everything is unlocked.' : 'Free plan — some content is marked 🔒 Premium.'}
@@ -315,6 +283,14 @@ export default function ProfileScreen() {
           <Text style={styles.resetError}>{passwordReset.message}</Text>
         ) : null}
         <Button themed label="Sign out" variant="secondary" onPress={handleSignOut} style={{ marginTop: spacing.sm }} />
+        {/* Opens the confirmation screen; nothing is deleted from here. */}
+        <Button
+          themed
+          label="Delete account"
+          variant="ghost"
+          onPress={() => router.push('/account/delete')}
+          style={{ marginTop: spacing.sm }}
+        />
 
         {isAdmin ? (
           <>

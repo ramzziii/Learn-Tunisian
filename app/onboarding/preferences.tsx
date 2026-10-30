@@ -9,7 +9,7 @@ import { COUNTRIES } from '@/constants/countries';
 import { LANGUAGES } from '@/constants/languages';
 import { spacing } from '@/constants/theme';
 import { useOnboarding } from '@/lib/onboarding/OnboardingContext';
-import type { StartingProficiency } from '@/types/models';
+import type { LearningGoal, StartingProficiency } from '@/types/models';
 
 const PROFICIENCY_OPTIONS: { value: StartingProficiency; label: string }[] = [
   { value: 'none', label: 'No Arabic at all' },
@@ -17,9 +17,17 @@ const PROFICIENCY_OPTIONS: { value: StartingProficiency; label: string }[] = [
   { value: 'speaks_not_reads', label: "Speak but can't read" },
 ];
 
+const GOAL_OPTIONS: { value: LearningGoal; label: string; subtitle: string }[] = [
+  { value: 'family', label: 'Connect with family', subtitle: 'Talk with relatives in their own words' },
+  { value: 'travel', label: 'Travel', subtitle: 'Get around and order like a local' },
+  { value: 'heritage', label: 'Heritage/roots', subtitle: 'Reconnect with where your family is from' },
+  { value: 'fun', label: 'Just for fun', subtitle: 'Curious about the language and culture' },
+];
+
+/** Profile setup, step 2: mother tongue, country, starting level and an
+ * optional learning goal (tap a selected goal again to clear it). */
 export default function PreferencesSetup() {
   const { state, update } = useOnboarding();
-  const isForChild = state.forWhom === 'child';
 
   const canContinue = state.nativeLanguage.trim().length > 0 && state.country.trim().length > 0;
 
@@ -27,8 +35,8 @@ export default function PreferencesSetup() {
     <OnboardingStepLayout
       title="Just a couple more things"
       subtitle="You can change any of this anytime in Settings."
-      step={3}
-      totalSteps={4}
+      step={4}
+      totalSteps={5}
       footer={<Button label="Continue" onPress={() => router.push('/onboarding/goal')} disabled={!canContinue} />}
     >
       <Autocomplete
@@ -47,7 +55,7 @@ export default function PreferencesSetup() {
       />
 
       <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: spacing.sm }}>
-        {isForChild ? "What's their starting level?" : "What's your starting level?"}
+        What&apos;s your starting level?
       </Text>
       {PROFICIENCY_OPTIONS.map((option) => (
         <SelectableCard
@@ -55,6 +63,19 @@ export default function PreferencesSetup() {
           title={option.label}
           selected={state.startingProficiency === option.value}
           onPress={() => update({ startingProficiency: option.value })}
+        />
+      ))}
+
+      <Text style={{ fontSize: 14, fontWeight: '600', marginTop: spacing.lg, marginBottom: spacing.sm }}>
+        Learning goal (optional)
+      </Text>
+      {GOAL_OPTIONS.map((option) => (
+        <SelectableCard
+          key={option.value}
+          title={option.label}
+          subtitle={option.subtitle}
+          selected={state.learningGoal === option.value}
+          onPress={() => update({ learningGoal: state.learningGoal === option.value ? null : option.value })}
         />
       ))}
     </OnboardingStepLayout>

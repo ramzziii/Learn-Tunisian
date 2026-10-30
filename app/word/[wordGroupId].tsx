@@ -95,7 +95,7 @@ export default function WordDetail() {
 
     setPracticeExercise({
       key: `practice-${group.id}-${Date.now()}`,
-      type: activeProfile.track === 'kid' ? 'listen_and_tap' : 'reading_match',
+      type: 'reading_match',
       targetGroup: group,
       promptVariant,
       options,

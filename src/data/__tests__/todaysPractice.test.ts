@@ -43,7 +43,7 @@ beforeEach(() => {
 });
 
 it('Premium: due review, unseen words from the current lesson, and Repeat After Me', async () => {
-  const plan = await loadTodaysPractice({ profileId: 'p1', isPremium: true, track: 'adult' });
+  const plan = await loadTodaysPractice({ profileId: 'p1', isPremium: true });
 
   expect(ids(plan)).toEqual(['due1', 'b', 'c', 'ram1']);
   expect(mockFetchAccessibleLessonWordGroups).toHaveBeenCalledWith('l2', true);
@@ -55,7 +55,7 @@ it('Premium: due review, unseen words from the current lesson, and Repeat After 
 it('free who already used today’s review: the review queue is not even fetched', async () => {
   mockHasUsedFreeReview.mockResolvedValue(true);
 
-  const plan = await loadTodaysPractice({ profileId: 'p1', isPremium: false, track: 'adult' });
+  const plan = await loadTodaysPractice({ profileId: 'p1', isPremium: false });
 
   expect(mockFetchReviewQueue).not.toHaveBeenCalled();
   expect(ids(plan)).not.toContain('due1');
@@ -64,7 +64,7 @@ it('free who already used today’s review: the review queue is not even fetched
 
 it('free: new words only come from a lesson the free plan includes', async () => {
   // l2 is the current lesson but only the first lesson is free.
-  const plan = await loadTodaysPractice({ profileId: 'p1', isPremium: false, track: 'adult' });
+  const plan = await loadTodaysPractice({ profileId: 'p1', isPremium: false });
 
   expect(mockFetchAccessibleLessonWordGroups).not.toHaveBeenCalled();
   expect(ids(plan)).toEqual(['due1', 'ram1']);
@@ -74,7 +74,7 @@ it('free: new words only come from a lesson the free plan includes', async () =>
 it('free on the first lesson: gets its unseen words', async () => {
   mockFetchLessonMap.mockResolvedValue(unitMap([lesson('l1', 'unlocked', 1), lesson('l2', 'locked', 2)]));
 
-  const plan = await loadTodaysPractice({ profileId: 'p1', isPremium: false, track: 'adult' });
+  const plan = await loadTodaysPractice({ profileId: 'p1', isPremium: false });
 
   expect(mockFetchAccessibleLessonWordGroups).toHaveBeenCalledWith('l1', false);
   expect(ids(plan)).toEqual(['due1', 'b', 'c', 'ram1']);
@@ -83,7 +83,7 @@ it('free on the first lesson: gets its unseen words', async () => {
 it('every lesson finished: no new words (nothing is invented)', async () => {
   mockFetchLessonMap.mockResolvedValue(unitMap([lesson('l1', 'completed', 1)]));
 
-  const plan = await loadTodaysPractice({ profileId: 'p1', isPremium: true, track: 'adult' });
+  const plan = await loadTodaysPractice({ profileId: 'p1', isPremium: true });
 
   expect(mockFetchAccessibleLessonWordGroups).not.toHaveBeenCalled();
   expect(ids(plan)).toEqual(['due1', 'ram1']);
@@ -92,7 +92,7 @@ it('every lesson finished: no new words (nothing is invented)', async () => {
 it('one source failing still gives a session from the others', async () => {
   mockLoadRam.mockRejectedValue(new Error('column "in_repeat_after_me" does not exist'));
 
-  const plan = await loadTodaysPractice({ profileId: 'p1', isPremium: true, track: 'adult' });
+  const plan = await loadTodaysPractice({ profileId: 'p1', isPremium: true });
 
   expect(ids(plan)).toEqual(['due1', 'b', 'c']);
 });
@@ -102,5 +102,5 @@ it('every source failing is an error (shown with retry), not a silently empty se
   mockFetchLessonMap.mockRejectedValue(new Error('offline'));
   mockLoadRam.mockRejectedValue(new Error('offline'));
 
-  await expect(loadTodaysPractice({ profileId: 'p1', isPremium: true, track: 'adult' })).rejects.toThrow();
+  await expect(loadTodaysPractice({ profileId: 'p1', isPremium: true })).rejects.toThrow();
 });

@@ -1,32 +1,43 @@
-// talk-review promotes AI text into the verified RAG corpus and spends the
-// app's AI key on an embedding. It must refuse non-admins before either of
-// those happens (run-1 security audit). Deno Edge Functions can't run under
-// Jest, so this pins the order of operations in the source itself.
+// talk-review's Deno entry point (index.ts) wires the handler to Supabase.
+// Deno can't run under Jest, so this pins the wiring in the source: the JWT
+// is verified server-side, reviewer membership is looked up with the
+// service role (never trusted from the client), admin status plays no part,
+// and the service-role key only ever comes from the function's environment.
+// The handler's behaviour itself is exercised in talkReviewHandler.test.ts.
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { readFileSync } = require('fs') as { readFileSync: (path: string, encoding: string) => string };
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { join } = require('path') as { join: (...parts: string[]) => string };
 declare const __dirname: string;
 
-const source = readFileSync(join(__dirname, '../../../supabase/functions/talk-review/index.ts'), 'utf8');
-const code = source.replace(/\/\/[^\n]*/g, ''); // ignore comments
+const dir = join(__dirname, '../../../supabase/functions/talk-review');
+const index = readFileSync(join(dir, 'index.ts'), 'utf8').replace(/\/\/[^\n]*/g, '');
+const handler = readFileSync(join(dir, 'handler.ts'), 'utf8').replace(/\/\/[^\n]*/g, '');
 
-const at = (pattern: RegExp) => {
-  const m = pattern.exec(code);
-  if (!m) throw new Error(`not found: ${pattern}`);
-  return m.index;
-};
-
-it('checks is_admin with the caller’s own JWT', () => {
-  expect(code).toMatch(/\.rpc\('is_admin'\)/);
+it('uses the service-role key from the function environment only', () => {
+  expect(index).toMatch(/Deno\.env\.get\('SUPABASE_SERVICE_ROLE_KEY'\)/);
+  expect(index).not.toMatch(/req\.headers\.get\([^)]*service/i);
 });
 
-it('refuses with 403 unless is_admin is exactly true (fails closed on an RPC error)', () => {
-  expect(code).toMatch(/if \(adminError \|\| isAdmin !== true\) \{\s*return errorResponse\('forbidden', '[^']+', 403\);/);
+it('verifies the caller’s JWT with Supabase Auth on the server', () => {
+  expect(index).toMatch(/\.auth\.getUser\(token\)/);
 });
 
-it('the admin check happens before the paid embeddings call and before the verified insert', () => {
-  const check = at(/\.rpc\('is_admin'\)/);
-  expect(check).toBeLessThan(at(/fetch\(`\$\{baseUrl\}\/embeddings`/));
-  expect(check).toBeLessThan(at(/\.from\(table\)\.insert\(/));
+it('looks reviewer membership up in public.reviewers by the verified user id', () => {
+  expect(index).toMatch(/\.from\('reviewers'\)\s*\.select\('user_id'\)\s*\.eq\('user_id', userId\)/);
+});
+
+it('does not treat admin status as reviewer permission', () => {
+  expect(index + handler).not.toMatch(/is_admin/);
+});
+
+it('promotes and updates the review log only through the service-role client', () => {
+  expect(index).toMatch(/service\s*\.from\('corrections'\)\s*\.update\(/);
+  expect(index).toMatch(/service\.from\(table\)\.insert\(/);
+  // The claim only succeeds on a still-pending row.
+  expect(index).toMatch(/\.is\('is_correct', null\)/);
+});
+
+it('the handler has no Deno or npm imports, so it can be tested in Node', () => {
+  expect(handler).not.toMatch(/Deno\.|from 'npm:/);
 });

@@ -15,13 +15,10 @@ interface AnswerFeedbackProps {
   correctMeaning?: string;
   /** Next was tapped, or the countdown finished. Fires once. */
   onNext: () => void;
-  /** Warmer, more game-like copy for the kid track — same pop-up, softer
-   * wording and no ❌ on a miss. */
-  kidFriendly?: boolean;
 }
 
 /**
- * The result pop-up after a reading/typing/listen answer: "Great job!" or
+ * The result pop-up after a reading or typing answer: "Great job!" or
  * "Not quite" (with the right answer, so a miss teaches), a Next button and a
  * countdown from 3 that moves on by itself.
  */
@@ -31,7 +28,6 @@ export function AnswerFeedback({
   correctTransliteration,
   correctMeaning,
   onNext,
-  kidFriendly = false,
 }: AnswerFeedbackProps) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -40,8 +36,8 @@ export function AnswerFeedback({
     <FeedbackSheet
       visible
       tone={isCorrect ? 'success' : 'error'}
-      icon={isCorrect ? (kidFriendly ? '🎉' : '🎉') : kidFriendly ? '🌟' : '❌'}
-      title={isCorrect ? (kidFriendly ? 'Yay! You got it!' : 'Great job!') : kidFriendly ? "Almost! Let's try that again." : 'Not quite'}
+      icon={isCorrect ? '🎉' : '❌'}
+      title={isCorrect ? 'Great job!' : 'Not quite'}
       message={isCorrect ? 'That’s the one.' : correctWordArabic ? 'Here’s the right answer:' : undefined}
       autoAdvanceSeconds={ANSWER_AUTO_ADVANCE_SECONDS}
       onPrimary={onNext}

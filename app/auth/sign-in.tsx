@@ -66,7 +66,7 @@ export default function SignIn() {
 
       <Button label="Sign in" onPress={handleSignIn} loading={isSubmitting} disabled={!email || !password} />
 
-      <Link href="/auth/sign-up" style={{ marginTop: spacing.lg, textAlign: 'center', color: colors.primary }}>
+      <Link href="/onboarding/age" style={{ marginTop: spacing.lg, textAlign: 'center', color: colors.primary }}>
         Don&apos;t have an account? Sign up
       </Link>
     </ScreenContainer>

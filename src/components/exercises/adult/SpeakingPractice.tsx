@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { VariantCallout } from '@/components/exercises/shared/VariantCallout';
 import { PRONUNCIATION_MAX_ATTEMPTS, PronunciationPractice } from '@/components/pronunciation/PronunciationPractice';
-import { adultTrackSizing, spacing, type ThemeColors } from '@/constants/theme';
+import { exerciseSizing, spacing, type ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/lib/theme/ThemeContext';
 import type { ExerciseCompleteHandler, ExerciseItem } from '@/types/exercises';
 
@@ -13,7 +13,7 @@ interface SpeakingPracticeProps {
 }
 
 /**
- * Adult/teen track: hear the word, record yourself, and see whether it
+ * hear the word, record yourself, and see whether it
  * sounded right — the shared record → check → compare flow
  * (src/components/pronunciation/PronunciationPractice.tsx), checked against
  * any variant in the word group, like every other exercise type.
@@ -48,7 +48,7 @@ const makeStyles = (colors: ThemeColors) =>
   StyleSheet.create({
     container: { flex: 1, alignItems: 'center' },
     instructions: {
-      fontSize: adultTrackSizing.bodyFontSize,
+      fontSize: exerciseSizing.bodyFontSize,
       fontWeight: '600',
       color: colors.textPrimary,
       marginTop: spacing.md,

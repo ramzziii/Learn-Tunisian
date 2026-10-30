@@ -1,28 +1,36 @@
+import { Redirect, router } from 'expo-router';
 import { useMemo } from 'react';
-import { router } from 'expo-router';
 import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
 
 import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
+import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Reveal } from '@/components/ui/Reveal';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { radii, spacing, type ThemeColors } from '@/constants/theme';
-import { useTheme } from '@/lib/theme/ThemeContext';
-import { KIDS_SECTION_ENABLED } from '@/constants/features';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
 import { useAuth } from '@/lib/auth/AuthContext';
 import { calculateAge } from '@/lib/age';
+import { useTheme } from '@/lib/theme/ThemeContext';
 import type { Profile } from '@/types/models';
 
-export default function ProfileSwitcher() {
+/**
+ * Learn Tunisian has one profile per account. This screen exists only for an
+ * account that already has several profiles from an earlier version: the
+ * learner picks the one to use, and the others are kept exactly as they are
+ * — nothing is merged, rewritten or deleted. There is no way to add a
+ * profile. An account with one (or no) profile never stays here, and once a
+ * profile is in use this is not a switcher: it just goes home.
+ */
+export default function ProfileChooser() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const { profiles: allProfiles, setActiveProfileId } = useActiveProfile();
+  const { profiles, activeProfile, isLoading, setActiveProfileId } = useActiveProfile();
   const { signOut } = useAuth();
-  // Kids section is hidden for now — don't list a kid profile as
-  // selectable, though its data is untouched in the account.
-  const profiles = KIDS_SECTION_ENABLED ? allProfiles : allProfiles.filter((p) => p.track !== 'kid');
+
+  if (isLoading) return <LoadingScreen themed />;
+  if (profiles.length <= 1 || activeProfile) return <Redirect href="/home" />;
 
   const choose = async (profile: Profile) => {
     await setActiveProfileId(profile.id);
@@ -46,8 +54,12 @@ export default function ProfileSwitcher() {
   return (
     <ScreenContainer themed>
       <BackButton themed />
-      <Text style={styles.eyebrow}>Profiles</Text>
-      <Text style={styles.title}>Who&apos;s learning?</Text>
+      <Text style={styles.eyebrow}>Your profiles</Text>
+      <Text style={styles.title}>Choose your profile</Text>
+      <Text style={styles.body}>
+        Learn Tunisian now has one profile per account. Yours has {profiles.length} from an earlier version — pick
+        the one to use. The others are kept as they are; nothing is deleted.
+      </Text>
 
       <FlatList
         data={profiles}
@@ -56,19 +68,16 @@ export default function ProfileSwitcher() {
         renderItem={({ item, index }) => (
           <Reveal delay={index * 60}>
             <PressableScale haptic style={styles.card} onPress={() => choose(item)}>
-              <Text style={styles.avatar}>{item.track === 'kid' ? '🧒' : '🙋'}</Text>
+              <Text style={styles.avatar}>🙋</Text>
               <View style={{ flex: 1 }}>
                 <Text style={styles.name}>{item.name}</Text>
-                <Text style={styles.meta}>
-                  Age {calculateAge(item.dateOfBirth)} · {item.track === 'kid' ? 'Kid track' : 'Adult/teen track'}
-                </Text>
+                <Text style={styles.meta}>Age {calculateAge(item.dateOfBirth)}</Text>
               </View>
             </PressableScale>
           </Reveal>
         )}
       />
 
-      <Button themed label="Add a profile" variant="secondary" onPress={() => router.push('/onboarding/goal-select')} />
       <Button themed label="Sign out" variant="ghost" onPress={handleSignOut} style={{ marginTop: spacing.sm }} />
     </ScreenContainer>
   );
@@ -85,6 +94,7 @@ const makeStyles = (colors: ThemeColors) =>
       marginTop: spacing.md,
     },
     title: { fontSize: 30, fontWeight: '800', color: colors.textPrimary, marginTop: spacing.xs },
+    body: { fontSize: 15, lineHeight: 22, color: colors.textSecondary, marginTop: spacing.sm },
     card: {
       flexDirection: 'row',
       alignItems: 'center',

@@ -9,13 +9,12 @@ needing to read the source code.
 ## 1. What this app is
 
 Learn Tunisian is a mobile app for learning **Tunisian Arabic (Derja)** —
-the spoken colloquial dialect, not Modern Standard Arabic. It's aimed at
-being usable by an entire family from one account: an adult and their
-children can each have their own profile, own progress, and an
-age-appropriate experience, while sharing one underlying content library.
+the spoken colloquial dialect, not Modern Standard Arabic. It is for adults
+(18+) only: each account has one learner profile with its own progress, and
+every learner gets the same full experience.
 
 The explicit positioning is "Duolingo for Tunisian Arabic, but purpose-built
-to avoid the specific problems that make people abandon language and kids
+to avoid the specific problems that make people abandon language
 apps" (ads, guilt-based notifications, streak-loss anxiety, leaderboards,
 dark-pattern paywalls, over-broad permissions, one blurry experience trying
 to serve every age at once).
@@ -45,16 +44,15 @@ not in progress. See Section 9.
 - **Genuine offline support.** Downloaded lesson audio works fully offline,
   not just "cached until evicted."
 - **Minimal, contextual permissions.** Camera is never requested (not used
-  anywhere). Microphone is only requested at the moment a 13+ profile first
-  reaches a speaking exercise, with an explanation first, and is never
-  requested for a kid profile. Notifications are requested at the point the
+  anywhere). Microphone is only requested at the moment the learner first
+  reaches a speaking exercise, with an explanation first. Notifications are requested at the point the
   user sets a reminder time, with a clear explanation.
 - **No dark-pattern paywalls.** Not applicable yet (the app is fully free),
   but the data model is kept clean of any "locked content you already
   started" pattern for whenever monetization is considered.
-- **Honest, narrow age targeting.** Rather than one experience trying to
-  serve every age, there are two distinct tracks (see Section 5) chosen
-  automatically by age, never manually toggled.
+- **Honest, narrow age targeting.** Adults only: a self-declared date of
+  birth is checked before an account is created (see Section 5), and an
+  under-18 date is never stored.
 - **No compulsive-engagement optimization.** Spaced repetition and review
   exist to help retention, not to maximize time-in-app — no streaks, no
   "don't break the chain," review is opt-in-by-being-due, not forced.
@@ -91,18 +89,19 @@ Applied via `supabase/migrations/0001_init.sql` through `0006_content_verificati
 in numeric order, plus `supabase/seed.sql` for content.
 
 - **`accounts`** — one row per Supabase Auth user (auto-created by a
-  trigger on signup). One account can hold multiple profiles.
-- **`profiles`** — one per learner (adult or child) under an account: name,
-  `date_of_birth`, `native_language`, `country`, `starting_proficiency`,
-  optional `learning_goal`, a `track` (`kid`/`adult`) derived once from age
-  at creation time, and an unused-for-now `is_premium` flag reserved for
-  future monetization.
+  trigger on signup). The app uses one profile per account (older accounts
+  may still have several — see "Profiles" in Section 6).
+- **`profiles`** — the learner under an account: name, `date_of_birth`,
+  `native_language`, `country`, `starting_proficiency`, optional
+  `learning_goal`, and `is_premium`. A legacy `track` column (NOT NULL,
+  `kid`/`adult`) is still in the schema; the app always writes `'adult'` and
+  never reads it.
 - **`daily_goal_settings`** — one-to-one with a profile: daily time goal
   (5/10/15 min), one daily reminder time, and whether the reminder is
   enabled. Editable anytime from that profile's settings.
 - **`consent_records`** — one per profile, capturing when Terms &
-  Privacy consent was given during that profile's onboarding, and whether
-  the adult was consenting on a child's behalf (`is_for_child`).
+  Privacy consent was given during onboarding. The legacy `is_for_child`
+  column (NOT NULL) is always written as `false`.
 - **`units`** → **`lessons`** — the coarse content structure (a lesson
   belongs to a unit and has a `lesson_number`). Lessons currently map
   1:1 with units (one lesson per unit) but the schema doesn't assume that.
@@ -162,51 +161,40 @@ App behavior built on top of this:
   screen, favorites, and review — it's the one unit of content the whole
   app reasons about, not just lessons.
 
-## 5. The two tracks
+## 5. Adults only, one experience
 
-Track is derived automatically from date of birth at profile-creation time
-— never a manual toggle.
+The app is for adults (18+). The age gate asks for a date of birth once,
+before sign-up; under 18 shows a friendly "adults only" message and nothing
+is created, stored, logged or sent. The check is self-declared
+(`isAdult` in `src/lib/age.ts` — exactly 18 passes, one day short fails).
+There is no kid track: every learner gets the same three exercise types,
+cycled through, plus Talk to a Tunisian:
 
-**Kid track (age ≤ 12):**
-- Listen-and-tap exercises only (listen to audio, tap the matching
-  picture). No reading or typing required to progress.
-- Arabic script is shown alongside words for passive exposure, but never
-  tested.
-- No microphone permission is ever requested for a kid profile.
-- Larger touch targets and simpler visuals (see `kidTrackSizing` in
-  `src/constants/theme.ts`).
-
-**Adult/teen track (age 13+):**
-- Everything the kid track has, plus three exercise types, cycled through:
-  - **Reading match** — hear a word, tap the matching written Arabic
-    script.
-  - **Typing/spelling** — hear a word and its English meaning, type the
-    transliteration.
-  - **Speaking practice** — hear the native word, record yourself saying
-    it, play the recording back to compare. Microphone permission is
-    requested only the first time this exercise type is reached (with an
-    explanation screen first), and a denial is handled gracefully — the
-    learner can still hear the word and continue.
-    Automated pronunciation scoring (via the same `talk-stt`
-    Whisper-backed function "Talk to a Tunisian" uses) only runs when a
-    live AI provider is configured (`EXPO_PUBLIC_TALK_AI_MODE=live`); in
-    mock mode — the default with no AI provider configured — this falls
-    back to the original self-comparison-only behavior, so the exercise
-    still works out of the box. Whisper has no dedicated Tunisian Derja
-    mode, so its accuracy on spoken Derja specifically is unproven; when
-    scoring is active the matching is deliberately lenient (fuzzy, and
-    accepting any variant in the word group — also_heard, either gender
-    form — same rule every other exercise type's answer-checking already
-    follows) precisely to reduce false "wrong" results from that
-    uncertainty. Up to 3 attempts; running out still counts as correct
-    rather than penalizing mastery/spaced-repetition, since this is spoken
-    self-practice, not a gate, and a miss here is as likely to be a
-    recognition quirk as an actual mispronunciation. A technical failure to
-    reach the STT service never blocks progress either.
-
-Both tracks pull from the same underlying `word_groups`/`word_variants`
-data — the adult track just unlocks more exercise *types* against the same
-content.
+- **Reading match** — hear a word, tap the matching written Arabic
+  script.
+- **Typing/spelling** — hear a word and its English meaning, type the
+  transliteration.
+- **Speaking practice** — hear the native word, record yourself saying
+  it, play the recording back to compare. Microphone permission is
+  requested only the first time this exercise type is reached (with an
+  explanation screen first), and a denial is handled gracefully — the
+  learner can still hear the word and continue.
+  Automated pronunciation scoring (via the same `talk-stt`
+  Whisper-backed function "Talk to a Tunisian" uses) only runs when a
+  live AI provider is configured (`EXPO_PUBLIC_TALK_AI_MODE=live`); in
+  mock mode — the default with no AI provider configured — this falls
+  back to the original self-comparison-only behavior, so the exercise
+  still works out of the box. Whisper has no dedicated Tunisian Derja
+  mode, so its accuracy on spoken Derja specifically is unproven; when
+  scoring is active the matching is deliberately lenient (fuzzy, and
+  accepting any variant in the word group — also_heard, either gender
+  form — same rule every other exercise type's answer-checking already
+  follows) precisely to reduce false "wrong" results from that
+  uncertainty. Up to 3 attempts; running out still counts as correct
+  rather than penalizing mastery/spaced-repetition, since this is spoken
+  self-practice, not a gate, and a miss here is as likely to be a
+  recognition quirk as an actual mispronunciation. A technical failure to
+  reach the STT service never blocks progress either.
 
 ## 6. Full feature inventory (what's actually built)
 
@@ -217,27 +205,39 @@ content.
 - Auth is structured so Google/Apple sign-in can be added later as sibling
   methods without restructuring anything that already consumes the session.
 - Sign-out is reachable from Settings (always accessible via Home's gear
-  icon) and from the profile switcher, both behind a confirmation dialog.
+  icon) and from the legacy profile chooser, both behind a confirmation
+  dialog.
 
 **Onboarding** (`app/onboarding/*`)
-1. Welcome + "who is this for" (myself / my child).
-2. Terms & Privacy consent, with explicit "you're agreeing on your child's
-   behalf" copy when applicable.
-3. Profile setup: name, date of birth (native wheel-style date picker),
-   native language and country (type-to-search-or-pick autocomplete),
-   starting proficiency, optional learning goal.
-4. Daily goal setup: 5/10/15-minute daily goal, one daily reminder time
-   picked with a native scrolling wheel (same style as iOS
-   Reminders/Clock).
-5. On finish: creates the profile, consent record, and daily goal settings,
+1. Welcome.
+2. Date-of-birth age gate (`app/onboarding/age.tsx`), before sign-up. An
+   adult date stays in memory only until profile setup.
+3. Create account (sign-up redirects to the age gate if no date is held).
+4. Terms & Privacy consent. Declining keeps the account gated on this screen
+   without recording consent or deleting anything. **Open blocker: the
+   Terms/Privacy text is still placeholder copy; real policy documents are
+   needed before release.**
+5. Profile setup: name, the already-entered date of birth (read-only; if it
+   was lost, e.g. after an app restart, "Confirm your date of birth" goes
+   back to the age gate), native language and country, starting
+   proficiency, optional learning goal.
+6. Daily goal setup: 5/10/15-minute daily goal, one daily reminder time
+   picked with a native scrolling wheel.
+7. On finish: creates the profile, consent record, and daily goal settings,
    requests notification permission, schedules the reminder.
 
 Every onboarding step (and sign-in/sign-up) has a back button that
 auto-hides when there's nowhere meaningful to go back to.
 
 **Profiles**
-- One account can hold multiple profiles; a switcher lists them and lets
-  you add another. The active profile persists across app restarts.
+- One profile per account; there is no switcher and no "add profile".
+  The database enforces it (`0019_one_profile_per_account.sql` — a trigger,
+  not a unique index, so existing duplicates are left alone), and a refused
+  second profile shows a recoverable "Continue to my profile" message.
+- An account that already has several profiles from an earlier version
+  sees a one-time chooser (`app/profiles/index.tsx`). The choice persists
+  on the device; the other profiles are kept as they are (nothing is
+  merged or deleted).
 
 **Alphabet practice** (`app/alphabet*.tsx`, `src/lib/alphabet.ts`,
 `src/components/alphabet/`)
@@ -413,7 +413,7 @@ draft, not launch content**:
   `profiles` but is inert.
 - **Test coverage beyond spaced repetition.** `src/lib/spacedRepetition.ts`
   has real unit tests; nothing else does yet (exercise selection, answer
-  matching, age/track calculation, review-queue priority, and all
+  matching, the age check, review-queue priority, and all
   data/integration paths are untested).
 - **No admin/content-management UI.** Content edits are still direct SQL
   against `seed.sql` — appropriate for ~50 draft concepts, not for scaling
@@ -435,8 +435,7 @@ built upfront:
   (draft/verified/published, reviewer tracking).
 - Sentence and conversation exercises; a dictionary/search screen.
 - Large curriculum expansion (the draft plan sketches ~19 units).
-- Family collaborative goals, parent-teaching mode, family conversation
-  mode, real-world missions.
+- Real-world missions.
 - Large analytics/event-tracking infrastructure.
 - Achievement/badge systems beyond the existing non-streak celebration.
 - Advanced offline content sync (beyond the existing per-session audio
@@ -452,7 +451,6 @@ app/                        Expo Router routes only (screens + navigation)
   review.tsx                 review session (same engine as a lesson)
 src/
   components/
-    exercises/kid/            listen-and-tap
     exercises/adult/          reading-match, typing-spelling, speaking
     exercises/shared/          VariantCallout, WordPicture, AnswerFeedback, ExerciseRenderer
     session/                   SessionRunner (shared by lesson + review), SessionCompleteCard

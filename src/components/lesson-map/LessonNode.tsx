@@ -4,13 +4,12 @@ import { Animated, StyleSheet, Text, View } from 'react-native';
 
 import { PremiumBadge } from '@/components/premium/Premium';
 import { PressableScale } from '@/components/ui/PressableScale';
-import { adultTrackSizing, kidTrackSizing, shadows, spacing, type ThemeColors } from '@/constants/theme';
+import { exerciseSizing, shadows, spacing, type ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/lib/theme/ThemeContext';
-import type { LessonWithState, Track } from '@/types/models';
+import type { LessonWithState } from '@/types/models';
 
 interface LessonNodeProps {
   lesson: LessonWithState;
-  track: Track;
   onPress: () => void;
   /** Beyond the free plan — stays visible and tappable (onPress should open
    * the upgrade flow), marked Premium instead of as progress-locked. */
@@ -21,10 +20,10 @@ interface LessonNodeProps {
 // the theme system), so unlike most shared UI components it can react to
 // the live theme unconditionally — no risk of an unconverted screen
 // suddenly rendering it in the wrong palette.
-export function LessonNode({ lesson, track, onPress, premiumLocked = false }: LessonNodeProps) {
+export function LessonNode({ lesson, onPress, premiumLocked = false }: LessonNodeProps) {
   const { colors, gradients } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const sizing = track === 'kid' ? kidTrackSizing : adultTrackSizing;
+  const sizing = exerciseSizing;
   const isLocked = lesson.state === 'locked' && !premiumLocked;
   const isCompleted = lesson.state === 'completed';
   const isUnlocked = lesson.state === 'unlocked' && !premiumLocked;

@@ -11,7 +11,6 @@ import { sortScenariosByGoal, TALK_SCENARIOS } from '@/constants/talkScenarios';
 import { radii, spacing, type ThemeColors } from '@/constants/theme';
 import { fetchTalkLevel } from '@/data/talkContext';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
-import { canAccessTalkFeature } from '@/lib/ai/accessControl';
 import { meetsTalkLevel, type TalkLevel } from '@/lib/talkLevel';
 import { useTheme } from '@/lib/theme/ThemeContext';
 
@@ -41,22 +40,6 @@ export default function TalkScenarioPicker() {
 
   if (!activeProfile) return <LoadingScreen themed />;
 
-  // Defense in depth: the tab bar itself isn't hidden per-track, but if a
-  // kid profile reaches this tab, it must not expose the feature — handled
-  // gracefully, not with an error.
-  if (!canAccessTalkFeature(activeProfile.track)) {
-    return (
-      <ScreenContainer themed>
-        <View style={styles.unavailableContainer}>
-          <Text style={styles.unavailableEmoji}>🌱</Text>
-          <Text style={styles.unavailableTitle}>Coming soon!</Text>
-          <Text style={styles.unavailableBody}>
-            This part of the app is for older learners right now. Keep practicing your lessons — more is on the way!
-          </Text>
-        </View>
-      </ScreenContainer>
-    );
-  }
 
   if (loadError || level === null) {
     return (

@@ -21,7 +21,6 @@ export interface GroundedVocabularyItem {
 
 /** Minimal, non-identifying learner context — no email, no account info, nothing unrelated to learning. */
 export interface LearnerContext {
-  track: 'kid' | 'adult';
   level: TalkLevel;
   /** English meanings the learner already knows well (status = 'known'), for the tutor to reuse naturally. */
   knownWords: string[];
@@ -76,9 +75,24 @@ export interface AiProviderError {
     | 'provider_error'
     | 'not_configured'
     | 'daily_limit_reached'
+    | 'budget_exhausted'
+    | 'budget_check_failed'
+    | 'accounting_failed'
     | 'unauthorized'
     | 'forbidden';
   message: string;
+}
+
+/**
+ * Shown whenever the server's project-wide monthly AI budget is used up
+ * (supabase/functions/_shared/aiBudget.ts). Not the learner's fault and not
+ * fixed by retrying right away, so it says so plainly.
+ */
+export const BUDGET_EXHAUSTED_MESSAGE = 'Talk to a Tunisian is temporarily unavailable. Please try again later.';
+
+/** Gives budget_exhausted its one friendly message, whatever text the server sent; other errors pass through. */
+export function normalizeAiError(error: AiProviderError): AiProviderError {
+  return error.kind === 'budget_exhausted' ? { kind: 'budget_exhausted', message: BUDGET_EXHAUSTED_MESSAGE } : error;
 }
 
 export interface AiProvider {

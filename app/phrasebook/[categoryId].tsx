@@ -173,7 +173,7 @@ export default function PhrasebookCategoryScreen() {
         />
       </ScrollView>
 
-      <PhraseDetailModal phrase={selectedPhrase} track={activeProfile.track} onClose={() => setSelectedPhrase(null)} />
+      <PhraseDetailModal phrase={selectedPhrase} onClose={() => setSelectedPhrase(null)} />
     </ScreenContainer>
   );
 }

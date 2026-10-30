@@ -6,7 +6,7 @@ import { Alert } from 'react-native';
 const mockSendPasswordReset = jest.fn();
 const mockSignOut = jest.fn();
 let mockEmail: string | undefined = 'ramzi@example.com';
-const mockProfile = { id: 'p1', name: 'Ramzi', track: 'adult', isPremium: false };
+const mockProfile = { id: 'p1', name: 'Ramzi', isPremium: false };
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,

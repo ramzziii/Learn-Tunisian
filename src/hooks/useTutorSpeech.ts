@@ -5,6 +5,7 @@ import * as Speech from 'expo-speech';
 
 import { isUsingMockAiProvider } from '@/lib/ai';
 import { fetchTtsAudio } from '@/lib/ai/functionsClient';
+import { tutorSpeechFilePrefix } from '@/lib/localStorageKeys';
 
 export interface TutorSpeech {
   speak: (text: string) => void;
@@ -21,8 +22,11 @@ export interface TutorSpeech {
  * Function and plays the returned mp3; in mock mode it uses the on-device
  * expo-speech engine instead, so mock mode never makes a network call (the
  * same offline guarantee the rest of the mock AI provider already gives).
+ *
+ * `ownerProfileId` tags the cached audio file with the profile it was made
+ * for, so deleting that account can remove it without touching anyone else's.
  */
-export function useTutorSpeech(): TutorSpeech {
+export function useTutorSpeech(ownerProfileId?: string): TutorSpeech {
   const player = useAudioPlayer(null);
   const status = useAudioPlayerStatus(player);
   const [isResolving, setIsResolving] = useState(false);
@@ -45,7 +49,8 @@ export function useTutorSpeech(): TutorSpeech {
       }
       try {
         lastFileRef.current?.delete();
-        const file = new File(Paths.cache, `tutor-speech-${Date.now()}.mp3`);
+        const prefix = ownerProfileId ? tutorSpeechFilePrefix(ownerProfileId) : 'tutor-speech-';
+        const file = new File(Paths.cache, `${prefix}${Date.now()}.mp3`);
         // Async as of SDK 58 — must finish before the player reads the file.
         await file.write(result.bytes);
         lastFileRef.current = file;
@@ -59,7 +64,7 @@ export function useTutorSpeech(): TutorSpeech {
         setIsResolving(false);
       }
     },
-    [player]
+    [player, ownerProfileId]
   );
 
   const speakMock = useCallback((text: string) => {

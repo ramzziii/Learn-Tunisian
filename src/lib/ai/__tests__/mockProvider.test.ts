@@ -20,7 +20,7 @@ function request(overrides: Partial<ConversationRequest>): ConversationRequest {
     scenarioId: 'cafe',
     profileId: 'profile-1',
     vocabulary,
-    learnerContext: { track: 'adult', level: 'beginner', knownWords: [], strugglingWords: [] },
+    learnerContext: { level: 'beginner', knownWords: [], strugglingWords: [] },
     history: [],
     learnerMessage: null,
     retrievalQuery: 'water',
@@ -78,7 +78,7 @@ describe('mockAiProvider', () => {
 
   it('omits suggestedReplies at the advanced level, matching the live prompt rules', async () => {
     const result = await mockAiProvider.generateReply(
-      request({ learnerContext: { track: 'adult', level: 'advanced', knownWords: [], strugglingWords: [] } })
+      request({ learnerContext: { level: 'advanced', knownWords: [], strugglingWords: [] } })
     );
     if (!result.ok) throw new Error('expected ok');
     expect(result.response.suggestedReplies).toBeUndefined();

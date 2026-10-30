@@ -1,9 +1,56 @@
 # Learn Tunisian
 
-A Duolingo-style app for learning Tunisian Arabic, built for one account to hold
-multiple learner profiles (adult + kids) sharing one content library, with a
-kid track (listen/tap only) and an adult/teen track (+ reading, typing,
-speaking practice).
+A Duolingo-style app for learning Tunisian Arabic, for adults (18+). Each
+account has one learner profile; every learner gets the same exercise set
+(reading match, typing/spelling, speaking practice) and Talk to a Tunisian.
+
+## Onboarding (adults only)
+
+1. Welcome (`app/welcome.tsx`).
+2. Date-of-birth age gate (`app/onboarding/age.tsx`), before any account
+   exists. Under 18 shows a friendly "adults only" message; nothing is
+   created, and the under-18 date is never stored, logged or sent. An adult
+   date stays in memory (`OnboardingContext`) until profile setup. The check
+   is self-declared — `isAdult` in `src/lib/age.ts` (exactly 18 passes).
+3. Create account (`app/auth/sign-up.tsx` — redirects to the age gate if no
+   date has been entered).
+4. Terms & Privacy consent (`app/onboarding/consent.tsx`). Declining leaves
+   the account gated here; nothing is recorded or deleted. Acceptance is held
+   in memory and written to `consent_records` when the profile is created
+   (the table needs a profile id). **Blocker: the Terms/Privacy text on this
+   screen is still placeholder copy — real policy documents are needed before
+   release.**
+5. Profile setup: name, the already-entered date of birth (read-only),
+   country, mother tongue, proficiency and an optional learning goal.
+6. Daily goal (5/10/15 min) and a reminder.
+
+**One profile per account** (an account is one Supabase Auth user, so one
+login email). Enforced in the database by
+`supabase/migrations/0019_one_profile_per_account.sql`: a trigger rejects a
+second profile for any caller with `profile_already_exists` / SQLSTATE
+23505, which `createProfile` turns into `ProfileAlreadyExistsError`
+(`src/lib/account/profileLimit.ts`); onboarding then offers "Continue to my
+profile". An account that has a profile can't re-enter the setup steps.
+There is no profile switcher or "add profile". An account that already has
+several profiles from an earlier version sees a one-time chooser
+(`app/profiles/index.tsx`) until one is picked; the choice is remembered on
+the device and the other profiles are kept untouched. The trigger
+deliberately leaves such existing duplicates alone (a unique index would
+fail on them); `scripts/check-duplicate-profiles.sql` counts them, read-only. The database still has the
+old `profiles.track` and `consent_records.is_for_child` columns (NOT NULL), so
+the app always writes `'adult'` / `false` and ignores them otherwise.
+
+## Account deletion
+
+Profile → Account → **Delete account** (`app/account/delete.tsx`): the user
+types `DELETE`, and the `delete-account` Edge Function deletes the signed-in
+account, and only that one. It removes the private storage files first, then
+the database rows (`delete_account_data`, migration 0022), then the Auth user
+last. Every step is safe to retry, and success is shown only once the Auth
+user is gone. The account's data is deleted. Shared content and AI cost
+records are kept with the account's links removed. The device keeps nothing
+of that account's. Full table-by-table list, partial-failure recovery and
+admin/reviewer consequences: [docs/account-deletion.md](docs/account-deletion.md).
 
 ## Stack
 
@@ -108,7 +155,7 @@ system for review.
 
 ## Speaking practice
 
-Adult/teen track only. `src/components/exercises/adult/SpeakingPractice.tsx`
+`src/components/exercises/adult/SpeakingPractice.tsx`
 implements hear → record → play back → try again, with no automated
 pronunciation scoring by design. Microphone permission is requested
 contextually (only the first time this exercise type is reached, with an
@@ -124,9 +171,6 @@ progress, a one-word "Practice" drill, a favorite toggle, and an honest
 native review," which is accurate).
 
 ## Talk to a Tunisian (AI conversation, voice-first)
-
-Adult/teen track only — a kid profile never sees the entry point, and the
-route itself refuses the feature if reached directly (`src/lib/ai/accessControl.ts`).
 
 The learner's level (beginner/intermediate/advanced) is derived automatically
 from their existing progress (`src/lib/talkLevel.ts` — words mastered and
@@ -213,14 +257,18 @@ grounding, not instead of it.
   the way `talk-tts`/`talk-stt` still are; see the comment at the top of that
   function for why this is a deliberate, narrow exception.
 - **Reviewer workflow**: every AI-generated turn gets logged as a pending
-  candidate in `corrections`. `app/admin/corrections.tsx` — reachable only by
-  its direct route, not linked from Settings/Home nav, no new auth/role
-  system for now (a deliberate scope choice for this single-household app;
-  revisit if that ever changes) — lists pending turns, and either
+  candidate in `corrections`. Reviewing it is limited to an explicit
+  allowlist of language reviewers (`public.reviewers`, migration 0020) —
+  admin status alone doesn't count; see
+  [docs/language-review.md](docs/language-review.md) for who can do what and
+  how to add a reviewer. `app/admin/corrections.tsx` checks reviewer
+  membership before loading anything, lists pending turns, and either
   ("✅ Correct as shown") promotes the AI's text as-is or ("❌ Save
   correction") promotes an edited version, via the `talk-review` Edge
-  Function (embeds the final text, inserts into `phrases`/`sentences` with
-  `native_verified: true`). This is how the verified corpus grows from real
+  Function (verifies the caller's JWT and reviewer membership server-side,
+  embeds the final text, inserts into `phrases`/`sentences` with
+  `native_verified: true` using the service role — no client can write those
+  tables directly). This is how the verified corpus grows from real
   usage, not just manual seeding.
 - **Seed content**: `scripts/seed-talk-rag-content.mjs` inserts ~8 rows
   spanning the existing scenarios so retrieval has something to find while
@@ -246,10 +294,17 @@ grounding, not instead of it.
   public anon key alone can't spend. The tutor additionally caps prompt sizes
   and requires the `profileId` to belong to the caller. The client surfaces a
   `daily_limit_reached` error with its own copy, not the generic rate-limit
-  message. Every chat and embedding call logs its token usage to
-  `ai_usage_log` (`profile_id`, `call_type`, `model`, token counts; learners
-  see only their own rows, admins see all) — no dashboard for it yet, query
-  the table directly to see actual spend.
+  message. On top of that, a **project-wide monthly budget**
+  (`AI_MONTHLY_BUDGET_USD`, default 10 USD per UTC month,
+  `0021_ai_monthly_budget.sql`): every paid call — chat, embeddings
+  (including the reviewer's and the seed script's), TTS and STT — atomically
+  reserves a conservative cost estimate before it's sent, then logs its
+  actual units and estimated cost to `ai_usage_log` with the account id.
+  Over budget, the provider isn't called and the app shows "Talk to a
+  Tunisian is temporarily unavailable." Usage rows can't be written by
+  clients. It's an estimate, not a billing cap — also set a hard limit in
+  the OpenAI dashboard. Prices, failure handling and spend queries:
+  [docs/cost-controls.md](docs/cost-controls.md).
 
 ## Project structure
 
@@ -263,9 +318,8 @@ app/                     Expo Router routes only (screens + navigation)
 src/
   components/            UI components, grouped by feature
     exercises/
-      kid/                listen-and-tap
       adult/              reading-match, typing-spelling, speaking
-      shared/             exercise chrome shared by both tracks
+      shared/             exercise chrome (renderer, answer feedback)
     onboarding/, lesson-map/, session/, ui/
   data/                   Supabase queries + row->model mappers (data layer)
     talkContext.ts         scenario vocabulary, learner-context, and level fetching for Talk to a Tunisian
@@ -292,7 +346,7 @@ supabase/
   functions/talk-to-a-tunisian/   Edge Function: chat + RAG retrieval + daily quota + corrections logging
   functions/talk-tts/             Edge Function proxy: text-to-speech
   functions/talk-stt/             Edge Function proxy: speech-to-text
-  functions/talk-review/          Edge Function: reviewer's approve/reject-with-correction promotion
+  functions/talk-review/          Edge Function: reviewer's approve/reject-with-correction promotion (handler.ts holds the tested logic)
 scripts/
   seed-talk-rag-content.mjs   one-off: seeds draft RAG content with real embeddings (see "RAG grounding")
 ```
@@ -300,18 +354,22 @@ scripts/
 ## Testing
 
 ```bash
-npm test
+npm test         # Jest
+npm run test:db  # database tests: real migrations on a throwaway in-memory Postgres (PGlite)
 ```
+
+`test:db` (`supabase/tests/`) covers the daily AI quotas and the monthly AI
+budget against the actual SQL. It never connects to a real database.
 
 Runs Jest (`jest-expo` preset) against `src/**/__tests__` — 102 tests across
 13 suites, covering: spaced repetition, review-queue ordering, mastery
-status, lesson lock/unlock/completion, age → track derivation (including a
+status, lesson lock/unlock/completion, the 18+ age check (including a
 real timezone bug these tests caught — see `parseIsoDateLocal` in
 `src/lib/age.ts`), word-variant selection/answer-matching, talk-level
 calculation, and the Talk to a Tunisian AI layer (scenario config including
 per-scenario level gating, prompt building across all three levels, response
 validation including malformed-AI-output cases, the mock provider, word-help
-lookup, and child/adult access control — all against the mock provider,
+lookup — all against the mock provider,
 never a real AI call). No integration/E2E tests yet, and nothing exercises
 real audio recording/playback or the two new binary Edge Functions
 (talk-tts/talk-stt) — everything above is pure-function-level.
@@ -333,9 +391,9 @@ real audio recording/playback or the two new binary Edge Functions
   dashboard can be built later without a schema change. Mastery is per
   *concept*, not per variant — answering with any variant of a group counts.
 - **Consent**: recorded once per profile (`consent_records`), captured during
-  that profile's onboarding, with `is_for_child` set explicitly when a parent
-  is consenting on a child's behalf.
-- **Speaking practice** (adult/teen only) is record-and-playback for
+  onboarding and written when the profile is created; `is_for_child` is
+  always `false` (the app is adults-only).
+- **Speaking practice** is record-and-playback for
   self-comparison — no automated pronunciation scoring in v1, by design (see
   the product brief's rationale on this).
 - **`is_premium`** exists on `profiles` now but is unused — monetization is

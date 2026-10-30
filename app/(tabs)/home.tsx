@@ -10,8 +10,6 @@ import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Reveal } from '@/components/ui/Reveal';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { radii, spacing, type ThemeColors } from '@/constants/theme';
-import { KIDS_SECTION_ENABLED } from '@/constants/features';
-import { fetchBadgeStats } from '@/data/badgeStats';
 import { fetchLessonMap, type UnitWithLessons } from '@/data/content';
 import { fetchDailyGoalSettings } from '@/data/profiles';
 import {
@@ -23,13 +21,12 @@ import {
 } from '@/data/progress';
 import { fetchMinutesLearnedToday, fetchRecentActivityDates } from '@/data/sessionLogs';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
-import { evaluateBadges, type Badge } from '@/lib/badges';
 import { buildDailyChallenges, type DailyChallenge } from '@/lib/dailyChallenges';
 import { getTodayChallengeFlags } from '@/lib/dailyChallengeProgress';
 import { recommendNextStep, type NextStepRecommendation } from '@/lib/nextStepRecommendation';
 import { calculateStreak } from '@/lib/streak';
 import { useTheme } from '@/lib/theme/ThemeContext';
-import type { DailyGoalMinutes, LessonWithState } from '@/types/models';
+import type { DailyGoalMinutes } from '@/types/models';
 
 interface HomeData {
   unitsWithLessons: UnitWithLessons[];
@@ -40,15 +37,9 @@ interface HomeData {
   todayPractice: TodayPracticeSummary;
   streakDays: number;
   dailyChallenges: DailyChallenge[];
-  badges: Badge[];
 }
 
 const EMPTY_TODAY_PRACTICE: TodayPracticeSummary = { wordsPracticedToday: 0, wordsMasteredToday: 0 };
-
-function findContinueLesson(unitsWithLessons: UnitWithLessons[]): LessonWithState | null {
-  const allLessons = unitsWithLessons.flatMap((u) => u.lessons);
-  return allLessons.find((l) => l.state === 'unlocked') ?? allLessons[allLessons.length - 1] ?? null;
-}
 
 /**
  * Home is deliberately thin now — greeting, today's progress, one
@@ -98,7 +89,6 @@ export default function Home() {
       todayPractice,
       activityDates,
       challengeFlags,
-      badges,
     ] = await Promise.all([
       fetchReviewDueCount(activeProfile.id).catch(() => 0),
       fetchMinutesLearnedToday(activeProfile.id).catch(() => 0),
@@ -109,9 +99,6 @@ export default function Home() {
       fetchTodayPracticeSummary(activeProfile.id).catch(() => EMPTY_TODAY_PRACTICE),
       fetchRecentActivityDates(activeProfile.id).catch(() => [] as string[]),
       getTodayChallengeFlags(activeProfile.id).catch(() => ({ reviewCompleted: false, speakingCompleted: false })),
-      fetchBadgeStats(activeProfile.id)
-        .then(evaluateBadges)
-        .catch(() => [] as Badge[]),
     ]);
 
     setData({
@@ -128,7 +115,6 @@ export default function Home() {
         reviewCompletedToday: challengeFlags.reviewCompleted,
         speakingCompletedToday: challengeFlags.speakingCompleted,
       }),
-      badges,
     });
   }, [activeProfile]);
 
@@ -145,12 +131,6 @@ export default function Home() {
 
   if (!activeProfile) return <LoadingScreen themed />;
 
-  // Kids section is hidden for now (see src/constants/features.ts) — any
-  // kid-track profile falls back to the adult experience instead of kid
-  // UI/badges/celebration. Nothing kid-related is deleted; this is the one
-  // gate that makes it all unreachable while the flag is off.
-  const showKidUI = KIDS_SECTION_ENABLED && activeProfile.track === 'kid';
-
   return (
     <ScreenContainer themed style={{ padding: 0 }}>
       <HomeHeader name={activeProfile.name} />
@@ -166,7 +146,7 @@ export default function Home() {
           contentContainerStyle={styles.scrollContent}
           refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
         >
-          {showKidUI ? <KidHomeContent data={data} /> : <AdultHomeContent data={data} />}
+          <AdultHomeContent data={data} />
         </ScrollView>
       )}
     </ScreenContainer>
@@ -244,82 +224,6 @@ function AdultHomeContent({ data }: { data: HomeData }) {
         <DailyChallengesCard challenges={dailyChallenges} />
       </Reveal>
     </>
-  );
-}
-
-/** Kid: one big friendly action, a simple review nudge, badges — the full
- * curriculum map and other practice features live on the Learn/Practice
- * tabs now, same as for adults, instead of a second copy inlined here. */
-function KidHomeContent({ data }: { data: HomeData }) {
-  const { colors, gradients } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
-  const { unitsWithLessons, reviewDueCount, badges } = data;
-  const continueLesson = findContinueLesson(unitsWithLessons);
-
-  return (
-    <>
-      <Reveal delay={0}>
-        <BadgesShelf badges={badges} />
-      </Reveal>
-
-      {continueLesson ? (
-        <Reveal delay={30}>
-          <PressableScale
-            haptic
-            onPress={() => router.push(`/lesson/${continueLesson.id}`)}
-            style={[styles.kidHeroCard, styles.shadowRaised]}
-          >
-            <LinearGradient
-              colors={gradients.accent}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.kidHeroGradient}
-            >
-              <Text style={styles.kidHeroEmoji}>🚀</Text>
-              <Text style={styles.kidHeroLabel}>Let&apos;s learn!</Text>
-            </LinearGradient>
-          </PressableScale>
-        </Reveal>
-      ) : null}
-
-      {reviewDueCount > 0 ? (
-        <Reveal delay={60}>
-          <PressableScale
-            haptic
-            onPress={() => router.push('/review')}
-            style={[styles.kidReviewCard, styles.shadowCard]}
-          >
-            <Text style={styles.kidReviewEmoji}>🔄</Text>
-            <Text style={styles.kidReviewLabel}>Review</Text>
-          </PressableScale>
-        </Reveal>
-      ) : null}
-    </>
-  );
-}
-
-/** A horizontal shelf of earned/locked badge medallions — see src/lib/badges.ts
- * for how earned status is derived (always live, never stored). */
-function BadgesShelf({ badges }: { badges: Badge[] }) {
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
-  if (badges.length === 0) return null;
-  return (
-    <View style={{ marginBottom: spacing.lg }}>
-      <Text style={styles.badgesTitle}>My Badges</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.badgesRow}>
-        {badges.map((badge) => (
-          <View key={badge.id} style={styles.badgeItem}>
-            <View style={[styles.badgeCircle, badge.earned ? styles.badgeCircleEarned : styles.badgeCircleLocked]}>
-              <Text style={[styles.badgeEmoji, !badge.earned && styles.badgeEmojiLocked]}>{badge.emoji}</Text>
-            </View>
-            <Text style={styles.badgeLabel} numberOfLines={1}>
-              {badge.title}
-            </Text>
-          </View>
-        ))}
-      </ScrollView>
-    </View>
   );
 }
 
@@ -595,34 +499,6 @@ const makeStyles = (colors: ThemeColors) => {
     reviewTitle: { fontSize: 17, fontWeight: '700', color: colors.textPrimary },
     reviewSubtitle: { fontSize: 13, color: colors.textPrimary, opacity: 0.75, marginTop: 2 },
     reviewChevron: { fontSize: 28, color: colors.textPrimary, opacity: 0.5 },
-    kidHeroCard: { borderRadius: radii.lg, marginBottom: spacing.lg, overflow: 'hidden' },
-    kidHeroGradient: { alignItems: 'center', paddingVertical: spacing.xl },
-    kidHeroEmoji: { fontSize: 56 },
-    kidHeroLabel: { fontSize: 26, fontWeight: '800', color: colors.textPrimary, marginTop: spacing.xs },
-    kidReviewCard: {
-      borderRadius: radii.lg,
-      marginBottom: spacing.xl,
-      alignItems: 'center',
-      paddingVertical: spacing.md,
-      backgroundColor: colors.surface,
-    },
-    kidReviewEmoji: { fontSize: 32 },
-    kidReviewLabel: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.xs },
-    badgesTitle: { fontSize: 14, fontWeight: '700', color: colors.textSecondary, marginBottom: spacing.sm },
-    badgesRow: { gap: spacing.md, paddingRight: spacing.md },
-    badgeItem: { alignItems: 'center', width: 72 },
-    badgeCircle: {
-      width: 60,
-      height: 60,
-      borderRadius: 30,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    badgeCircleEarned: { backgroundColor: colors.accentLight },
-    badgeCircleLocked: { backgroundColor: colors.background, borderWidth: 1.5, borderColor: colors.border },
-    badgeEmoji: { fontSize: 28 },
-    badgeEmojiLocked: { opacity: 0.35 },
-    badgeLabel: { fontSize: 11, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.xs },
     errorContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm, padding: spacing.lg },
     errorEmoji: { fontSize: 48, marginBottom: spacing.sm },
     errorTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },

@@ -33,6 +33,7 @@
     "react-native-web": "^0.21.2"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.2.17",
     "@react-native/jest-preset": "^0.88.0",
     "@testing-library/react-native": "^14.1.0",
     "@types/jest": "30.0.0",
@@ -51,7 +52,8 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:ci": "jest --ci",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:db": "node --test \"supabase/tests/*.test.mjs\""
   },
   "private": true,
   "jest": {
@@ -59,7 +61,8 @@
     "testTimeout": 30000,
     "testPathIgnorePatterns": [
       "/node_modules/",
-      "/.expo/"
+      "/.expo/",
+      "/supabase/tests/"
     ]
   }
 }

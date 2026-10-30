@@ -32,7 +32,6 @@ const inputs = (overrides: Partial<TodaysPracticeInputs> = {}): TodaysPracticeIn
   repeatAfterMeItems: [],
   isPremium: true,
   freeReviewAvailable: true,
-  track: 'adult',
   ...overrides,
 });
 

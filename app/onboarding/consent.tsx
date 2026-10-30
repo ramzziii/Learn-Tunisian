@@ -8,8 +8,7 @@ import { colors, radii, spacing } from '@/constants/theme';
 import { useOnboarding } from '@/lib/onboarding/OnboardingContext';
 
 export default function Consent() {
-  const { state, update } = useOnboarding();
-  const isForChild = state.forWhom === 'child';
+  const { update } = useOnboarding();
   const [agreed, setAgreed] = useState(false);
 
   const handleContinue = () => {
@@ -20,13 +19,9 @@ export default function Consent() {
   return (
     <OnboardingStepLayout
       title="Before we start"
-      step={1}
-      totalSteps={4}
-      subtitle={
-        isForChild
-          ? 'Please review our Terms & Conditions and Privacy Policy. As the parent or guardian, you are agreeing to these on your child’s behalf.'
-          : 'Please review our Terms & Conditions and Privacy Policy before creating your profile.'
-      }
+      step={2}
+      totalSteps={5}
+      subtitle="Please review our Terms & Conditions and Privacy Policy before creating your profile."
       footer={
         <Button label="Agree and continue" onPress={handleContinue} disabled={!agreed} />
       }
@@ -40,20 +35,13 @@ export default function Consent() {
         <Text style={styles.boxTitle}>Privacy Policy</Text>
         <Text style={styles.boxText}>
           We store the profile information you enter (name, age, language, and learning progress) to run the app.
-          {isForChild
-            ? ' For a child profile, this data is provided and controlled by the parent or guardian, not the child.'
-            : ''}{' '}
           Full legal text goes here.
         </Text>
       </ScrollView>
 
       <Pressable style={styles.checkboxRow} onPress={() => setAgreed((v) => !v)}>
         <View style={[styles.checkbox, agreed && styles.checkboxChecked]} />
-        <Text style={styles.checkboxLabel}>
-          {isForChild
-            ? 'I am the parent/guardian and I agree to these terms on my child’s behalf.'
-            : 'I have read and agree to the Terms & Conditions and Privacy Policy.'}
-        </Text>
+        <Text style={styles.checkboxLabel}>I have read and agree to the Terms & Conditions and Privacy Policy.</Text>
       </Pressable>
     </OnboardingStepLayout>
   );

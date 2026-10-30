@@ -2,14 +2,20 @@ import { createContext, useContext, useMemo, useState, type ReactNode } from 're
 
 import { recordConsent } from '@/data/consent';
 import { createDailyGoalSettings, createProfile } from '@/data/profiles';
+import { isAdult } from '@/lib/age';
 import { requestNotificationPermission, scheduleDailyReminder } from '@/lib/notifications/reminders';
 import type { DailyGoalMinutes, LearningGoal, Profile, StartingProficiency } from '@/types/models';
 
+/**
+ * Draft onboarding answers, held in memory only (never AsyncStorage, never
+ * sent anywhere) until submit() creates the profile. The date of birth is
+ * entered once, at the pre-signup age gate (app/onboarding/age.tsx), and only
+ * stored here for someone 18 or older.
+ */
 export interface OnboardingState {
-  forWhom: 'myself' | 'child' | null;
   consentGiven: boolean;
   name: string;
-  /** ISO date string ("YYYY-MM-DD"), null until the user picks one. */
+  /** ISO date string ("YYYY-MM-DD") from the age gate; null until then. */
   dateOfBirth: string | null;
   nativeLanguage: string;
   country: string;
@@ -21,7 +27,6 @@ export interface OnboardingState {
 }
 
 const initialState: OnboardingState = {
-  forWhom: null,
   consentGiven: false,
   name: '',
   dateOfBirth: null,
@@ -71,9 +76,16 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
           dailyGoalMinutes,
           reminderHour,
           reminderMinute,
-          forWhom,
+          consentGiven,
         } = state;
 
+        if (!consentGiven) {
+          throw new Error('Terms and Privacy consent has not been given');
+        }
+        // Defence in depth: the age gate already stopped an under-18 here.
+        if (!dateOfBirth || !isAdult(dateOfBirth)) {
+          throw new Error('A date of birth showing the user is 18 or older is required');
+        }
         if (!name || !dateOfBirth || !nativeLanguage || !country || !startingProficiency) {
           throw new Error('Missing required profile fields');
         }
@@ -91,15 +103,13 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
           learningGoal,
         });
 
-        await recordConsent(accountId, profile.id, forWhom === 'child');
+        await recordConsent(accountId, profile.id);
 
         const reminderTime = `${String(reminderHour).padStart(2, '0')}:${String(reminderMinute).padStart(2, '0')}:00`;
         await createDailyGoalSettings(profile.id, dailyGoalMinutes, reminderTime);
 
         // Notifications are requested here, at the point the reminder time is
-        // set — not bundled into earlier onboarding steps — for both tracks;
-        // a parent grants it on a kid profile's behalf just like any other
-        // profile setting.
+        // set — not bundled into earlier onboarding steps.
         const granted = await requestNotificationPermission();
         if (granted) {
           await scheduleDailyReminder(profile.id, `${reminderHour}:${reminderMinute}`);

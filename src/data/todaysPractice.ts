@@ -6,7 +6,7 @@ import { canAccessLesson, computeFreeLessonIds } from '@/lib/premium/access';
 import { hasUsedFreeReviewToday } from '@/lib/premium/freeAllowance';
 import { getRepeatAfterMeProgress } from '@/lib/repeatAfterMe/progress';
 import { composeTodaysPractice, type TodaysPracticePlan } from '@/lib/todaysPractice';
-import type { Track, WordGroupWithVariants } from '@/types/models';
+import type { WordGroupWithVariants } from '@/types/models';
 
 /** Current lesson's words: all of them (distractor pool) and the unseen ones. */
 async function loadNewWords(
@@ -49,9 +49,8 @@ async function loadRepeatAfterMe(profileId: string, isPremium: boolean): Promise
 export async function loadTodaysPractice(options: {
   profileId: string;
   isPremium: boolean;
-  track: Track;
 }): Promise<TodaysPracticePlan> {
-  const { profileId, isPremium, track } = options;
+  const { profileId, isPremium } = options;
   const freeReviewAvailable = isPremium ? true : !(await hasUsedFreeReviewToday(profileId).catch(() => true));
 
   const [review, newWords, repeatAfterMe] = await Promise.allSettled([
@@ -70,6 +69,5 @@ export async function loadTodaysPractice(options: {
     repeatAfterMeItems: repeatAfterMe.status === 'fulfilled' ? repeatAfterMe.value : [],
     isPremium,
     freeReviewAvailable,
-    track,
   });
 }
