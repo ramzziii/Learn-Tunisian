@@ -38,7 +38,7 @@ export default function PreferencesSetup() {
       title="Just a couple more things"
       subtitle="You can change any of this anytime in Settings."
       step={4}
-      totalSteps={5}
+      totalSteps={6}
       footer={<Button label="Continue" onPress={() => router.push('/onboarding/goal')} disabled={!canContinue} />}
     >
       <Autocomplete

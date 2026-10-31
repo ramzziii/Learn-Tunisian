@@ -55,9 +55,10 @@ jest.mock('@/lib/onboarding/OnboardingContext', () => ({
   }),
 }));
 jest.mock('@/components/onboarding/TimeWheelPicker', () => ({ TimeWheelPicker: () => null }));
+jest.mock('@/lib/notifications/reminders', () => ({ requestNotificationPermission: jest.fn(async () => true) }));
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const DailyGoalSetup = require('../../../app/onboarding/goal').default;
+const ReminderSetup = require('../../../app/onboarding/reminder').default;
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const OnboardingLayout = require('../../../app/onboarding/_layout').default;
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -78,23 +79,23 @@ beforeEach(() => {
   mockActive = { profiles: [], activeProfile: null, isLoading: false };
 });
 
-describe('finishing onboarding (daily goal step)', () => {
+describe('finishing onboarding (reminder step)', () => {
   it('creates the first profile, makes it the active one and goes home', async () => {
     mockSubmit.mockResolvedValue(profile('p1'));
-    await renderThemed(<DailyGoalSetup />);
+    await renderThemed(<ReminderSetup />);
 
-    await fireEvent.press(screen.getByText('Finish setup'));
+    await fireEvent.press(screen.getByText('Not now'));
 
-    expect(mockSubmit).toHaveBeenCalledWith('acc-1');
+    expect(mockSubmit).toHaveBeenCalledWith('acc-1', { reminderEnabled: false });
     expect(mockSetActiveProfileId).toHaveBeenCalledWith('p1');
     expect(mockReplace).toHaveBeenCalledWith('/home');
   });
 
   it('a second profile is refused with a clear message that leads to the existing profile', async () => {
     mockSubmit.mockRejectedValue(new ProfileAlreadyExistsError());
-    await renderThemed(<DailyGoalSetup />);
+    await renderThemed(<ReminderSetup />);
 
-    await fireEvent.press(screen.getByText('Finish setup'));
+    await fireEvent.press(screen.getByText('Not now'));
 
     expect(screen.getByText(/already has a learner profile/i)).toBeOnTheScreen();
     expect(mockSetActiveProfileId).not.toHaveBeenCalled();
@@ -110,9 +111,9 @@ describe('finishing onboarding (daily goal step)', () => {
 
   it('other errors still show as a plain retryable error', async () => {
     mockSubmit.mockRejectedValue(new Error('Network request failed'));
-    await renderThemed(<DailyGoalSetup />);
+    await renderThemed(<ReminderSetup />);
 
-    await fireEvent.press(screen.getByText('Finish setup'));
+    await fireEvent.press(screen.getByText('Not now'));
 
     expect(screen.getByText('Network request failed')).toBeOnTheScreen();
     expect(screen.queryByText('Continue to my profile')).toBeNull();
@@ -120,7 +121,7 @@ describe('finishing onboarding (daily goal step)', () => {
 });
 
 describe('onboarding routes for an account that already has a profile', () => {
-  it.each([['age'], ['consent'], ['profile'], ['preferences'], ['goal']])(
+  it.each([['age'], ['consent'], ['profile'], ['preferences'], ['goal'], ['reminder']])(
     '/onboarding/%s sends it back to the app instead of setting up another profile',
     async (step) => {
       mockSegments = ['onboarding', step];

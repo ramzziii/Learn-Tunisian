@@ -11,6 +11,7 @@ import { Reveal } from '@/components/ui/Reveal';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { SelectableCard } from '@/components/ui/SelectableCard';
 import { TranslationRequestsEntry } from '@/components/translation/TranslationRequestsEntry';
+import { DAILY_GOAL_OPTIONS } from '@/constants/dailyGoal';
 import { radii, spacing, type ThemeColors } from '@/constants/theme';
 import { countCompletedLessons } from '@/data/content';
 import { fetchDailyGoalSettings, updateDailyGoalSettings } from '@/data/profiles';
@@ -25,7 +26,6 @@ import { cancelDailyReminder, requestNotificationPermission, scheduleDailyRemind
 import { useTheme, type ThemePreference } from '@/lib/theme/ThemeContext';
 import type { DailyGoalMinutes, DailyGoalSettings } from '@/types/models';
 
-const GOAL_OPTIONS: DailyGoalMinutes[] = [5, 10, 15];
 const THEME_OPTIONS: { value: ThemePreference; label: string; emoji: string }[] = [
   { value: 'light', label: 'Light', emoji: '☀️' },
   { value: 'dark', label: 'Dark', emoji: '🌙' },
@@ -67,6 +67,7 @@ export default function ProfileScreen() {
   const [reminderMinute, setReminderMinute] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [notificationsDenied, setNotificationsDenied] = useState(false);
 
   const load = useCallback(async () => {
     if (!activeProfile) return;
@@ -110,6 +111,7 @@ export default function ProfileScreen() {
     if (!activeProfile) return;
     setIsSaving(true);
     setSaved(false);
+    setNotificationsDenied(false);
     const reminderTime = `${String(reminderHour).padStart(2, '0')}:${String(reminderMinute).padStart(2, '0')}:00`;
     await updateDailyGoalSettings(activeProfile.id, {
       dailyGoalMinutes,
@@ -121,6 +123,8 @@ export default function ProfileScreen() {
       const granted = await requestNotificationPermission();
       if (granted) {
         await scheduleDailyReminder(activeProfile.id, `${reminderHour}:${reminderMinute}`);
+      } else {
+        setNotificationsDenied(true);
       }
     } else {
       await cancelDailyReminder(activeProfile.id);
@@ -227,7 +231,7 @@ export default function ProfileScreen() {
         <Button themed label="View favorites" variant="secondary" onPress={() => router.push('/favorites')} />
 
         <Text style={styles.sectionTitle}>Daily goal</Text>
-        {GOAL_OPTIONS.map((minutes) => (
+        {DAILY_GOAL_OPTIONS.map((minutes) => (
           <SelectableCard
             themed
             key={minutes}
@@ -240,6 +244,7 @@ export default function ProfileScreen() {
         <View style={styles.reminderHeader}>
           <Text style={styles.sectionTitle}>Daily reminder</Text>
           <Switch
+            accessibilityLabel="Daily reminder"
             value={reminderEnabled}
             onValueChange={setReminderEnabled}
             trackColor={{ false: colors.border, true: colors.primary }}
@@ -255,6 +260,12 @@ export default function ProfileScreen() {
               setReminderMinute(m);
             }}
           />
+        ) : null}
+        {notificationsDenied ? (
+          <Text style={styles.premiumStatus}>
+            Notifications are turned off for Learn Tunisian, so the reminder can’t be sent. You can allow them in your
+            device settings, then save again.
+          </Text>
         ) : null}
 
         <Button

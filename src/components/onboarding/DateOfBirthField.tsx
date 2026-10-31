@@ -1,54 +1,94 @@
-import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import { useState } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useRef, useState, type ComponentRef, type RefObject } from 'react';
+import { StyleSheet, Text, TextInput, View, type TextInputKeyPressEvent } from 'react-native';
 
 import { colors, radii, spacing } from '@/constants/theme';
-import { dateToIsoDate, formatDateOfBirth, parseIsoDateLocal } from '@/lib/age';
-
-const TODAY = new Date();
-const EARLIEST_BIRTH_DATE = new Date(TODAY.getFullYear() - 100, 0, 1);
-// The app is adults-only, so the picker opens on a typical adult age.
-const DEFAULT_PICKER_DATE = new Date(TODAY.getFullYear() - 25, TODAY.getMonth(), TODAY.getDate());
+import { checkDateOfBirth, digitsOnly, isCompleteDay, isCompleteMonth, type DateOfBirthParts } from '@/lib/dateOfBirthInput';
 
 interface DateOfBirthFieldProps {
   label: string;
-  value: string | null; // ISO date string
-  onChange: (isoDate: string) => void;
+  /** ISO date ("YYYY-MM-DD") of the last complete, valid date; null otherwise. */
+  value: string | null;
+  /** Called on every edit: the ISO date once the fields make a real, past date, otherwise null. */
+  onChange: (isoDate: string | null) => void;
 }
 
-export function DateOfBirthField({ label, value, onChange }: DateOfBirthFieldProps) {
-  const [isPickerOpen, setIsPickerOpen] = useState(false);
+type Part = keyof DateOfBirthParts;
+type InputRef = ComponentRef<typeof TextInput>;
 
-  const handleChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
-    if (Platform.OS === 'android') setIsPickerOpen(false);
-    if (event.type === 'set' && selectedDate) {
-      onChange(dateToIsoDate(selectedDate));
-    }
+/**
+ * Typed date of birth as MM / DD / YYYY. Focus moves to the next field after
+ * a valid two-digit month or day, and Backspace in an empty field goes back
+ * to the previous one. Only a complete, real, non-future date is reported.
+ */
+export function DateOfBirthField({ label, onChange }: DateOfBirthFieldProps) {
+  const [parts, setParts] = useState<DateOfBirthParts>({ month: '', day: '', year: '' });
+  const dayRef = useRef<InputRef>(null);
+  const yearRef = useRef<InputRef>(null);
+  const monthRef = useRef<InputRef>(null);
+
+  const result = checkDateOfBirth(parts);
+  const error = result.status === 'invalid' || result.status === 'future' ? result.message : null;
+
+  const setPart = (part: Part, text: string) => {
+    const next = { ...parts, [part]: digitsOnly(text, part === 'year' ? 4 : 2) };
+    setParts(next);
+    const checked = checkDateOfBirth(next);
+    onChange(checked.status === 'valid' ? checked.iso : null);
+    if (part === 'month' && isCompleteMonth(next.month)) dayRef.current?.focus();
+    if (part === 'day' && isCompleteDay(next.day)) yearRef.current?.focus();
   };
 
-  const pickerValue = value ? parseIsoDateLocal(value) : DEFAULT_PICKER_DATE;
+  const backTo = (part: Part, previous: RefObject<InputRef | null>) => (e: TextInputKeyPressEvent) => {
+    if (e.nativeEvent.key === 'Backspace' && parts[part] === '') previous.current?.focus();
+  };
 
   return (
     <View style={styles.container}>
       <Text style={styles.label}>{label}</Text>
-      <Pressable style={styles.button} onPress={() => setIsPickerOpen((open) => !open)}>
-        <Text style={value ? styles.valueText : styles.placeholderText}>
-          {value ? formatDateOfBirth(value) : 'Select date of birth'}
+      <View style={styles.row}>
+        <TextInput
+          ref={monthRef}
+          style={[styles.input, styles.short, error && styles.inputError]}
+          value={parts.month}
+          onChangeText={(t) => setPart('month', t)}
+          placeholder="MM"
+          placeholderTextColor={colors.textSecondary}
+          keyboardType="number-pad"
+          maxLength={2}
+          accessibilityLabel="Birth month, two digits"
+          textContentType="none"
+        />
+        <Text style={styles.separator}>/</Text>
+        <TextInput
+          ref={dayRef}
+          style={[styles.input, styles.short, error && styles.inputError]}
+          value={parts.day}
+          onChangeText={(t) => setPart('day', t)}
+          onKeyPress={backTo('day', monthRef)}
+          placeholder="DD"
+          placeholderTextColor={colors.textSecondary}
+          keyboardType="number-pad"
+          maxLength={2}
+          accessibilityLabel="Birth day, two digits"
+        />
+        <Text style={styles.separator}>/</Text>
+        <TextInput
+          ref={yearRef}
+          style={[styles.input, styles.long, error && styles.inputError]}
+          value={parts.year}
+          onChangeText={(t) => setPart('year', t)}
+          onKeyPress={backTo('year', dayRef)}
+          placeholder="YYYY"
+          placeholderTextColor={colors.textSecondary}
+          keyboardType="number-pad"
+          maxLength={4}
+          accessibilityLabel="Birth year, four digits"
+        />
+      </View>
+      {error ? (
+        <Text style={styles.error} accessibilityRole="alert" accessibilityLiveRegion="polite">
+          {error}
         </Text>
-      </Pressable>
-
-      {isPickerOpen ? (
-        <View style={Platform.OS === 'ios' ? styles.iosWrapper : undefined}>
-          <DateTimePicker
-            value={pickerValue}
-            mode="date"
-            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-            maximumDate={TODAY}
-            minimumDate={EARLIEST_BIRTH_DATE}
-            onChange={handleChange}
-            style={Platform.OS === 'ios' ? styles.iosPicker : undefined}
-          />
-        </View>
       ) : null}
     </View>
   );
@@ -57,23 +97,21 @@ export function DateOfBirthField({ label, value, onChange }: DateOfBirthFieldPro
 const styles = StyleSheet.create({
   container: { marginBottom: spacing.md },
   label: { fontSize: 14, fontWeight: '600', color: colors.textPrimary, marginBottom: spacing.xs },
-  button: {
+  row: { flexDirection: 'row', alignItems: 'center' },
+  input: {
     borderWidth: 1.5,
     borderColor: colors.border,
     borderRadius: radii.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm + 4,
     backgroundColor: colors.surface,
+    fontSize: 18,
+    color: colors.textPrimary,
+    textAlign: 'center',
   },
-  valueText: { fontSize: 16, color: colors.textPrimary },
-  placeholderText: { fontSize: 16, color: colors.textSecondary },
-  iosWrapper: {
-    marginTop: spacing.sm,
-    backgroundColor: colors.surface,
-    borderRadius: radii.md,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    alignItems: 'center',
-  },
-  iosPicker: { height: 170, width: '100%' },
+  inputError: { borderColor: colors.error },
+  short: { width: 64 },
+  long: { width: 92 },
+  separator: { fontSize: 18, color: colors.textSecondary, marginHorizontal: spacing.sm },
+  error: { color: colors.error, fontSize: 14, marginTop: spacing.sm },
 });

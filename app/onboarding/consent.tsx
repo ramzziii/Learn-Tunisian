@@ -20,7 +20,7 @@ export default function Consent() {
     <OnboardingStepLayout
       title="Before we start"
       step={2}
-      totalSteps={5}
+      totalSteps={6}
       subtitle="Please review our Terms & Conditions and Privacy Policy before creating your profile."
       footer={
         <Button label="Agree and continue" onPress={handleContinue} disabled={!agreed} />

@@ -23,7 +23,7 @@ export default function ProfileSetup() {
     <OnboardingStepLayout
       title="Tell us about you"
       step={3}
-      totalSteps={5}
+      totalSteps={6}
       footer={
         <Button label="Continue" onPress={() => router.push('/onboarding/preferences')} disabled={!canContinue} />
       }

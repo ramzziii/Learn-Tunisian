@@ -22,7 +22,12 @@ account has one learner profile; every learner gets the same exercise set
    release.**
 5. Profile setup: name, the already-entered date of birth (read-only),
    country, mother tongue, proficiency and an optional learning goal.
-6. Daily goal (5/10/15 min) and a reminder.
+6. Daily goal: 5, 10 or 15 minutes (the shared `DAILY_GOAL_OPTIONS` in
+   `src/constants/dailyGoal.ts`). A target, not a limit — "Add more time" at
+   the end of a session extends that session without changing the goal.
+7. Optional daily reminder: "Set reminder" asks for notification permission
+   only then; "Not now" finishes signup with the reminder saved as off.
+   Profile can turn it on, off or change the time later.
 
 **One profile per account** (an account is one Supabase Auth user, so one
 login email). Enforced in the database by

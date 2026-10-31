@@ -21,7 +21,7 @@ export function OnboardingStepLayout({ title, subtitle, children, footer, step, 
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         <BackButton />
         {step && totalSteps ? (
-          <View style={styles.dots}>
+          <View style={styles.dots} accessible accessibilityLabel={`Step ${step} of ${totalSteps}`}>
             {Array.from({ length: totalSteps }, (_, i) => (
               <View key={i} style={[styles.dot, i < step && styles.dotFilled]} />
             ))}

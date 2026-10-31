@@ -7,7 +7,8 @@
   `is_for_child` logic. `src/__tests__/noKidsTrack.test.ts` guards this.
 - Onboarding order: welcome → date-of-birth age gate (`app/onboarding/age.tsx`,
   before sign-up) → create account → Terms/Privacy consent → profile setup
-  (DOB shown read-only) → daily goal + reminder. Use `isAdult`/`ADULT_MIN_AGE`
+  (DOB shown read-only) → daily goal → optional reminder. The age gate's DOB
+  is typed (MM/DD/YYYY, `src/lib/dateOfBirthInput.ts`), not a picker. Use `isAdult`/`ADULT_MIN_AGE`
   from `src/lib/age.ts`; an under-18 DOB is never persisted, logged or sent.
 - One profile per account: no switcher, no "add profile". The database
   enforces it (trigger in `0019_one_profile_per_account.sql`, error

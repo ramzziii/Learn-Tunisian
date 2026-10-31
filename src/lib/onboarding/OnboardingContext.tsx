@@ -1,10 +1,11 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
 
+import { isDailyGoalMinutes } from '@/constants/dailyGoal';
 import { recordConsent } from '@/data/consent';
 import { saveDisplayPreferences } from '@/data/displayPreferences';
 import { createDailyGoalSettings, createProfile } from '@/data/profiles';
 import { isAdult } from '@/lib/age';
-import { requestNotificationPermission, scheduleDailyReminder } from '@/lib/notifications/reminders';
+import { scheduleDailyReminder } from '@/lib/notifications/reminders';
 import type { DailyGoalMinutes, FormPreference, LearningGoal, Profile, StartingProficiency } from '@/types/models';
 
 /**
@@ -43,7 +44,7 @@ const initialState: OnboardingState = {
   formPreference: 'both',
   dailyGoalMinutes: 10,
   // Pre-selected to match the 6:00 PM default the reminder-time picker
-  // already *displays* (see app/onboarding/goal.tsx) — previously these
+  // already *displays* (see app/onboarding/reminder.tsx) — previously these
   // stayed null until the user actually touched the picker, so finishing
   // onboarding without changing the time silently failed submit()'s
   // "missing reminder settings" check even though the screen showed a time.
@@ -55,8 +56,12 @@ interface OnboardingContextValue {
   state: OnboardingState;
   update: (patch: Partial<OnboardingState>) => void;
   reset: () => void;
-  /** Persists the profile, consent record, and daily goal settings, then schedules the reminder. */
-  submit: (accountId: string) => Promise<Profile>;
+  /**
+   * Persists the profile, consent record, and daily goal settings. Schedules
+   * the reminder only when reminderEnabled (the reminder step asks for
+   * notification permission first); otherwise it is saved as off.
+   */
+  submit: (accountId: string, options?: { reminderEnabled?: boolean }) => Promise<Profile>;
 }
 
 const OnboardingContext = createContext<OnboardingContextValue | undefined>(undefined);
@@ -69,7 +74,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       state,
       update: (patch) => setState((prev) => ({ ...prev, ...patch })),
       reset: () => setState(initialState),
-      submit: async (accountId: string) => {
+      submit: async (accountId: string, { reminderEnabled = false } = {}) => {
         const {
           name,
           dateOfBirth,
@@ -94,7 +99,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
         if (!name || !dateOfBirth || !nativeLanguage || !country || !startingProficiency) {
           throw new Error('Missing required profile fields');
         }
-        if (!dailyGoalMinutes || reminderHour === null || reminderMinute === null) {
+        if (!isDailyGoalMinutes(dailyGoalMinutes) || reminderHour === null || reminderMinute === null) {
           throw new Error('Missing daily goal / reminder settings');
         }
 
@@ -111,7 +116,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
         await recordConsent(accountId, profile.id);
 
         const reminderTime = `${String(reminderHour).padStart(2, '0')}:${String(reminderMinute).padStart(2, '0')}:00`;
-        await createDailyGoalSettings(profile.id, dailyGoalMinutes, reminderTime);
+        await createDailyGoalSettings(profile.id, dailyGoalMinutes, reminderTime, reminderEnabled);
 
         // Display preference only. "Show both" is the default with no row,
         // so there's nothing to save for it. A failed save doesn't fail
@@ -120,10 +125,9 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
           await saveDisplayPreferences(profile.id, { script: 'both', form: formPreference }).catch(() => undefined);
         }
 
-        // Notifications are requested here, at the point the reminder time is
-        // set — not bundled into earlier onboarding steps.
-        const granted = await requestNotificationPermission();
-        if (granted) {
+        // Permission was already granted on the reminder step; a skipped
+        // reminder is never scheduled.
+        if (reminderEnabled) {
           await scheduleDailyReminder(profile.id, `${reminderHour}:${reminderMinute}`);
         }
 
