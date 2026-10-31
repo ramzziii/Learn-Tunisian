@@ -61,6 +61,11 @@ jest.mock('@/data/profiles', () => ({
   createDailyGoalSettings: (...a: unknown[]) => mockCreateDailyGoal(...a),
 }));
 jest.mock('@/data/consent', () => ({ recordConsent: (...a: unknown[]) => mockRecordConsent(...a) }));
+const mockSaveDisplay = jest.fn(async () => undefined);
+jest.mock('@/data/displayPreferences', () => ({
+  saveDisplayPreferences: (...a: unknown[]) => (mockSaveDisplay as jest.Mock)(...a),
+  fetchDisplayPreferences: jest.fn(async () => ({ script: 'both', form: 'both' })),
+}));
 jest.mock('@/lib/notifications/reminders', () => ({
   requestNotificationPermission: jest.fn(async () => false),
   scheduleDailyReminder: jest.fn(),
@@ -315,3 +320,68 @@ describe('app entry routing', () => {
 
 // Keeps TextInput referenced for the type import above.
 void TextInput;
+
+describe('which form to practice by default', () => {
+  it('asks once, with the explanation, defaulting to Show both — and never asks the learner’s gender', async () => {
+    await renderWith(<Preferences />, { nativeLanguage: 'English', country: 'United States' });
+
+    expect(screen.getByText('Which form would you like to practice by default?')).toBeOnTheScreen();
+    expect(
+      screen.getByText(
+        'Some Tunisian Arabic words and phrases change depending on the form used. This choice controls which form we show first; it does not define your gender.'
+      )
+    ).toBeOnTheScreen();
+    for (const label of ['Masculine', 'Feminine', 'Show both']) {
+      expect(screen.getByRole('radio', { name: label })).toBeOnTheScreen();
+    }
+    expect(screen.getByRole('radio', { name: 'Show both' }).props.accessibilityState).toMatchObject({ selected: true });
+    expect(screen.queryByText(/what is your gender|are you (male|female|a man|a woman)/i)).toBeNull();
+  });
+
+  it('the choice is kept in onboarding state', async () => {
+    await renderWith(<Preferences />, { nativeLanguage: 'English', country: 'United States' });
+    await fireEvent.press(screen.getByRole('radio', { name: 'Feminine' }));
+    expect(onboarding.state.formPreference).toBe('feminine');
+    expect(screen.getByRole('radio', { name: 'Feminine' }).props.accessibilityState).toMatchObject({ selected: true });
+  });
+
+  const full = {
+    consentGiven: true,
+    name: 'Sam',
+    dateOfBirth: '1990-05-05',
+    nativeLanguage: 'English',
+    country: 'United States',
+    startingProficiency: 'none',
+    learningGoal: null,
+  };
+
+  it('is saved as a display preference for the new profile when onboarding finishes', async () => {
+    mockSaveDisplay.mockClear();
+    await renderWith(<></>, { ...full, formPreference: 'masculine' });
+    await act(async () => {
+      await onboarding.submit('acc-1');
+    });
+    expect(mockSaveDisplay).toHaveBeenCalledWith('p1', { script: 'both', form: 'masculine' });
+  });
+
+  it('left at Show both: nothing needs saving (no row means both/both)', async () => {
+    mockSaveDisplay.mockClear();
+    await renderWith(<></>, full);
+    await act(async () => {
+      await onboarding.submit('acc-1');
+    });
+    expect(mockSaveDisplay).not.toHaveBeenCalled();
+  });
+
+  it('if saving it fails, the account is still set up (it can be changed in Settings)', async () => {
+    mockSaveDisplay.mockClear();
+    mockSaveDisplay.mockRejectedValueOnce(new Error('offline') as never);
+    await renderWith(<></>, { ...full, formPreference: 'feminine' });
+    let profile: unknown;
+    await act(async () => {
+      profile = await onboarding.submit('acc-1');
+    });
+    expect(profile).toMatchObject({ id: 'p1' });
+    expect(mockCreateDailyGoal).toHaveBeenCalled();
+  });
+});

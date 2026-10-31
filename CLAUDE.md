@@ -65,3 +65,16 @@
 - New per-profile device storage must use `learn-tunisian.<feature>.<profileId>`
   keys so `clearLocalAccountData` finds them; shared/device-wide keys go in
   `src/lib/localStorageKeys.ts`.
+
+## Script and form display
+
+- Render Tunisian text with `TunisianText` (script preference, RTL/LTR) and
+  two-form words with `FormDisplay`; don't hand-roll Arabic/transliteration
+  Text pairs on learner screens. Use `alwaysShowArabic` / `alwaysShowLatin`
+  only for exercises that test that script.
+- The form preference (0023, `learner_display_preferences`) is display-only:
+  never a gender field, never on `profiles`, never sent to analytics or the
+  AI tutor (`src/__tests__/noGenderIdentity.test.ts` guards this). Answer
+  checking ignores it — every variant of a word group counts.
+- A form without a recording shows "No recording for this form yet"; never
+  play another form's audio or a device voice in its place.

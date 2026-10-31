@@ -80,6 +80,7 @@ Decided from the schema's actual foreign keys and verified in
 | `translation_requests` | Their questions and the answers to them. |
 | Storage `translation-audio/<request id>/…` | The answer and explanation recordings for their requests. |
 | `ai_daily_usage` | Their daily AI counters. |
+| `learner_display_preferences` | Their script and default-form display settings (cascades with the profile). |
 | `reviewers` | Their language-reviewer allowlist entry. |
 | Auth user | Sign-in identity and email (hard delete). |
 

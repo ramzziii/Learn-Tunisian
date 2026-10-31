@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { TimeWheelPicker } from '@/components/onboarding/TimeWheelPicker';
+import { DisplaySettings } from '@/components/settings/DisplaySettings';
 import { Button } from '@/components/ui/Button';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { PressableScale } from '@/components/ui/PressableScale';
@@ -206,6 +207,9 @@ export default function ProfileScreen() {
             onPress={() => setPreference(option.value)}
           />
         ))}
+
+        <Text style={styles.sectionTitle}>Display</Text>
+        <DisplaySettings />
 
         <Text style={styles.sectionTitle}>What they&apos;ve learned</Text>
         <Reveal style={styles.progressGrid}>

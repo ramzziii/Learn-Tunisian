@@ -21,8 +21,10 @@ const CARDS: HubCard[] = [
   { emoji: '📖', color: '#3E7CB1', title: 'Phrasebook', subtitle: 'Real phrases for everyday situations', href: '/phrasebook' },
   { emoji: '🗂️', color: '#4A90A4', title: 'Flashcards', subtitle: 'Browse and listen to every phrase', href: '/phrasebook/flashcards' },
   { emoji: '📝', color: '#8B6BAE', title: 'Grammar Notes', subtitle: 'Tounsi patterns explained simply', href: '/grammar' },
-  { emoji: '🎧', color: '#4A90A4', title: 'Repeat After Me', subtitle: 'Imitate native recordings, then compare', href: '/repeat-after-me' },
-  { emoji: '🎙️', color: '#C0567D', title: 'Speaking Practice', subtitle: 'Say 5 phrases out loud', href: '/speaking-practice' },
+  { emoji: '👂', color: '#3E7CB1', title: 'Listening Practice', subtitle: 'Match meanings to native recordings', href: '/listening-practice' },
+  // Opens a choice between Practice words (/speaking-practice) and Repeat
+  // native recordings (/repeat-after-me) — two separate flows, one entry.
+  { emoji: '🎙️', color: '#C0567D', title: 'Speaking Practice', subtitle: 'Practise words or repeat native recordings', href: '/speaking' },
   { emoji: '🅰️', color: '#D9A441', title: 'Alphabet Practice', subtitle: 'Learn letters and sounds', href: '/alphabet' },
   { emoji: '🔄', color: '#4CA771', title: 'Review', subtitle: 'Keep your weak words fresh', href: '/review' },
   { emoji: '📜', color: '#B15C4A', title: 'Culture Corner', subtitle: 'Real Tunisian proverbs & sayings', href: '/culture' },

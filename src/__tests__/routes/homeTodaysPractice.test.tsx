@@ -85,7 +85,7 @@ describe('Practice tab (unchanged)', () => {
       'Phrasebook',
       'Flashcards',
       'Grammar Notes',
-      'Repeat After Me',
+      // Repeat After Me is reached through Speaking Practice now (app/speaking.tsx).
       'Speaking Practice',
       'Alphabet Practice',
       'Review',
@@ -98,7 +98,9 @@ describe('Practice tab (unchanged)', () => {
 
   it('activities still launch individually', async () => {
     await render(withTheme(<PracticeHub />));
-    await fireEvent.press(screen.getByText('Repeat After Me'));
-    expect(mockRouter.push).toHaveBeenCalledWith('/repeat-after-me');
+    await fireEvent.press(screen.getByText('Review'));
+    expect(mockRouter.push).toHaveBeenCalledWith('/review');
+    await fireEvent.press(screen.getByText('Speaking Practice'));
+    expect(mockRouter.push).toHaveBeenCalledWith('/speaking');
   });
 });

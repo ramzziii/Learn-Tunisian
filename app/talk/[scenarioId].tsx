@@ -21,6 +21,7 @@ import { transcribeAudio } from '@/lib/ai/functionsClient';
 import { buildWordHelp } from '@/lib/ai/buildWordHelp';
 import type { GroundedVocabularyItem, SuggestedReply, TutorResponse } from '@/lib/ai/types';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
+import { TunisianText } from '@/components/tunisian/TunisianText';
 
 const ERROR_MESSAGES: Record<string, string> = {
   network: "Couldn't connect. Check your internet and try again.",
@@ -312,8 +313,7 @@ function TutorBubble({
           )}
         </PressableScale>
       </View>
-      <Text style={styles.tunisianText}>{response.tunisian}</Text>
-      {response.transliteration ? <Text style={styles.transliterationText}>{response.transliteration}</Text> : null}
+      <TunisianText arabic={response.tunisian} latin={response.transliteration} arabicStyle={styles.tunisianText} latinStyle={styles.transliterationText} />
       <Text style={styles.englishText}>{response.english}</Text>
 
       {response.correction ? (

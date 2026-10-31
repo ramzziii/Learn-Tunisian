@@ -18,7 +18,9 @@ import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
 import { usePremium } from '@/lib/premium/PremiumContext';
 import { getViewedPhraseIds, markPhraseViewed } from '@/lib/phrasebookProgress';
 import { useTheme } from '@/lib/theme/ThemeContext';
-import { getPrimaryVariant } from '@/lib/wordVariants';
+import { preferredVariant } from '@/lib/display/displayRules';
+import { useDisplayPreferences } from '@/lib/display/useDisplayPreferences';
+import { TunisianText } from '@/components/tunisian/TunisianText';
 import type { WordGroupWithVariants } from '@/types/models';
 
 interface CategoryData {
@@ -31,6 +33,7 @@ export default function PhrasebookCategoryScreen() {
   const { categoryId } = useLocalSearchParams<{ categoryId: string }>();
   const { activeProfile } = useActiveProfile();
   const { colors, gradients } = useTheme();
+  const { preferences: display } = useDisplayPreferences();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [data, setData] = useState<CategoryData | null>(null);
   const [loadError, setLoadError] = useState(false);
@@ -133,7 +136,7 @@ export default function PhrasebookCategoryScreen() {
 
         <View style={styles.list}>
           {data.phrases.map((phrase, index) => {
-            const variant = getPrimaryVariant(phrase);
+            const variant = preferredVariant(phrase, display.form);
             const isViewed = viewedIds.includes(phrase.id);
             const hasRealAudio = !!variant?.audioPath;
             return (
@@ -145,7 +148,9 @@ export default function PhrasebookCategoryScreen() {
                 >
                   <View style={{ flex: 1 }}>
                     <Text style={styles.rowEnglish}>{phrase.englishMeaning}</Text>
-                    {variant ? <Text style={styles.rowTransliteration}>{variant.transliteration}</Text> : null}
+                    {variant ? (
+                      <TunisianText arabic={variant.wordArabic} latin={variant.transliteration} size="sm" layout="inline" arabicStyle={styles.rowTransliteration} latinStyle={styles.rowTransliteration} />
+                    ) : null}
                   </View>
                   {hasRealAudio ? (
                     <View style={styles.audioBadge}>

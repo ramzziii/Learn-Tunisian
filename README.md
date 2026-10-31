@@ -40,6 +40,27 @@ fail on them); `scripts/check-duplicate-profiles.sql` counts them, read-only. Th
 old `profiles.track` and `consent_records.is_for_child` columns (NOT NULL), so
 the app always writes `'adult'` / `false` and ignores them otherwise.
 
+## Script and form display preferences
+
+Two display-only settings per profile (Profile → Display; table
+`learner_display_preferences`, migration 0023):
+
+- **Script:** Arabic, Latin transliteration, or both (default both).
+- **Default form:** for words with masculine and feminine forms (separate
+  `word_variants`, each with its own recording and approval), show the
+  masculine form first, the feminine form first, or both (default both).
+  Asked once in onboarding as "Which form would you like to practice by
+  default?". It is a display preference, never the learner's gender: it's
+  not a profile field, admins can't read it, and it's never sent to analytics
+  or the AI tutor. Learners without a saved row get both/both.
+
+All Tunisian text goes through `TunisianText` (script, Arabic right-to-left,
+Latin left-to-right) and `FormDisplay` (preferred form first, a "Show the
+other form" toggle, each form playing its own recording, "No recording for
+this form yet" instead of another form's audio). Reading match always shows
+Arabic and typing always shows Latin, with a short note when the preference
+would have hidden it. Answer checking still accepts every variant.
+
 ## Account deletion
 
 Profile → Account → **Delete account** (`app/account/delete.tsx`): the user

@@ -81,6 +81,15 @@ export interface Lesson {
 
 export type VariantLabel = 'primary' | 'also_heard' | 'masculine' | 'feminine';
 
+/** Learner display settings (0023, learner_display_preferences). Display only — never a gender field. */
+export type ScriptPreference = 'arabic' | 'latin' | 'both';
+/** Which grammatical form of two-form words to show first. 'both' shows both. */
+export type FormPreference = 'masculine' | 'feminine' | 'both';
+export interface DisplayPreferences {
+  script: ScriptPreference;
+  form: FormPreference;
+}
+
 /** One concept (e.g. "let's go", "I'm hungry") — a lesson teaches/quizzes one word_group at a time. */
 export interface WordGroup {
   id: string;

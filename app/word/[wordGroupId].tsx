@@ -21,6 +21,8 @@ import { fetchProgressForWordGroup, recordWordGroupResult } from '@/data/progres
 import { useWordAudioPlayer } from '@/hooks/useWordAudioPlayer';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
 import { getPromptVariant } from '@/lib/wordVariants';
+import { useDisplayPreferences } from '@/lib/display/useDisplayPreferences';
+import { TunisianText } from '@/components/tunisian/TunisianText';
 import type { ExerciseItem, ExerciseOption } from '@/types/exercises';
 import type { Progress, WordGroupWithVariants } from '@/types/models';
 
@@ -41,6 +43,7 @@ const PROGRESS_STATUS_LABEL: Record<Progress['status'], string> = {
 
 export default function WordDetail() {
   const { colors } = useTheme();
+  const { preferences: display } = useDisplayPreferences();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { wordGroupId } = useLocalSearchParams<{ wordGroupId: string }>();
   const { activeProfile } = useActiveProfile();
@@ -67,7 +70,7 @@ export default function WordDetail() {
     })();
   }, [activeProfile, wordGroupId]);
 
-  const displayVariant = group ? getPromptVariant(group, 0) : null;
+  const displayVariant = group ? getPromptVariant(group, 0, display.form) : null;
   const { play, hasAudio, isResolving, hasError, retry } = useWordAudioPlayer(displayVariant);
 
   if (!activeProfile || !group || !displayVariant) return <LoadingScreen themed />;
@@ -87,7 +90,7 @@ export default function WordDetail() {
 
   const startPractice = () => {
     setJustPracticed(false);
-    const promptVariant = getPromptVariant(group, Date.now());
+    const promptVariant = getPromptVariant(group, Date.now(), display.form);
     const distractors: ExerciseOption[] = shuffled(siblings)
       .slice(0, 3)
       .map((siblingGroup) => ({ group: siblingGroup, variant: getPromptVariant(siblingGroup, Date.now()) }));
@@ -131,8 +134,14 @@ export default function WordDetail() {
 
         <Reveal style={styles.heroCard}>
           <WordPicture group={group} size={100} />
-          <Text style={[styles.arabic, { marginTop: spacing.md }]}>{displayVariant.wordArabic}</Text>
-          <Text style={styles.transliteration}>{displayVariant.transliteration}</Text>
+          <TunisianText
+            arabic={displayVariant.wordArabic}
+            latin={displayVariant.transliteration}
+            size="xl"
+            arabicStyle={styles.arabic}
+            latinStyle={styles.transliteration}
+            style={{ marginTop: spacing.md, alignItems: 'center' }}
+          />
           <Text style={styles.meaning}>{group.englishMeaning}</Text>
           <AudioPlayButton
             onPress={play}

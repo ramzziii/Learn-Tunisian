@@ -1,9 +1,12 @@
 import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { FormDisplay } from '@/components/tunisian/FormDisplay';
+import { TunisianText } from '@/components/tunisian/TunisianText';
 import { radii, spacing, type ThemeColors } from '@/constants/theme';
+import { hasTwoForms } from '@/lib/display/displayRules';
 import { useTheme } from '@/lib/theme/ThemeContext';
-import { getAlsoHeardVariants, getFeminineVariant, getMasculineVariant } from '@/lib/wordVariants';
+import { getAlsoHeardVariants } from '@/lib/wordVariants';
 import type { WordGroupWithVariants } from '@/types/models';
 
 interface VariantCalloutProps {
@@ -12,40 +15,40 @@ interface VariantCalloutProps {
 
 /**
  * Shows a word_group's supplementary variants alongside the main exercise:
- * a "you might also hear" note for also_heard synonyms, and both forms
- * together for masculine/feminine pairs (never one preferred over the
- * other — the app never asks the learner's gender). Renders nothing if the
- * group has neither.
+ * "you might also hear" synonyms, and — for words with masculine and
+ * feminine forms — the forms, labelled as forms (never as the learner),
+ * in the order of the learner's display preference with the other form one
+ * tap away. Renders nothing if the group has neither.
  */
 export function VariantCallout({ group }: VariantCalloutProps) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const alsoHeard = getAlsoHeardVariants(group);
-  const masculine = getMasculineVariant(group);
-  const feminine = getFeminineVariant(group);
-  const showGenderPair = masculine !== null && feminine !== null;
 
-  if (alsoHeard.length === 0 && !showGenderPair) return null;
+  const alsoHeard = getAlsoHeardVariants(group);
+  const twoForms = hasTwoForms(group);
+
+  if (alsoHeard.length === 0 && !twoForms) return null;
 
   return (
     <View style={styles.container}>
-      {showGenderPair ? (
+      {twoForms ? (
         <>
-          <Text style={styles.line}>
-            👦 If you&apos;re a boy: <Text style={styles.arabic}>{masculine.wordArabic}</Text> (
-            {masculine.transliteration})
-          </Text>
-          <Text style={styles.line}>
-            👧 If you&apos;re a girl: <Text style={styles.arabic}>{feminine.wordArabic}</Text> (
-            {feminine.transliteration})
-          </Text>
+          <Text style={styles.line}>This changes with the form used:</Text>
+          <FormDisplay group={group} size="sm" arabicStyle={styles.arabic} latinStyle={styles.latin} />
         </>
       ) : null}
       {alsoHeard.map((variant) => (
-        <Text key={variant.id} style={styles.line}>
-          💡 You might also hear: <Text style={styles.arabic}>{variant.wordArabic}</Text> (
-          {variant.transliteration})
-        </Text>
+        <View key={variant.id} style={styles.alsoHeard}>
+          <Text style={styles.line}>💡 You might also hear:</Text>
+          <TunisianText
+            arabic={variant.wordArabic}
+            latin={variant.transliteration}
+            size="sm"
+            layout="inline"
+            arabicStyle={styles.arabic}
+            latinStyle={styles.latin}
+          />
+        </View>
       ))}
     </View>
   );
@@ -62,5 +65,7 @@ const makeStyles = (colors: ThemeColors) =>
       width: '100%',
     },
     line: { fontSize: 13, color: colors.textPrimary, lineHeight: 19 },
-    arabic: { fontWeight: '700' },
+    alsoHeard: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 6 },
+    arabic: { fontWeight: '700', color: colors.textPrimary },
+    latin: { color: colors.textSecondary },
   });

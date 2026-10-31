@@ -15,6 +15,7 @@ import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
 import { usePremium } from '@/lib/premium/PremiumContext';
 import { canAccessProverb } from '@/lib/premium/access';
 import { getViewedProverbIds, markProverbViewed } from '@/lib/proverbProgress';
+import { TunisianText } from '@/components/tunisian/TunisianText';
 import { useColumnWidth } from '@/hooks/useColumnWidth';
 
 const GRID_COLUMNS = 2;
@@ -93,9 +94,7 @@ export default function CultureScreen() {
                 >
                   {isLocked ? <PremiumBadge style={styles.cardBadge} /> : null}
                   <Text style={styles.cardEmoji}>{proverb.emoji}</Text>
-                  <Text style={styles.cardTransliteration} numberOfLines={2}>
-                    {proverb.transliteration}
-                  </Text>
+                  <TunisianText arabic={proverb.arabic} latin={proverb.transliteration} size="sm" numberOfLines={2} arabicStyle={styles.cardTransliteration} latinStyle={styles.cardTransliteration} />
                 </PressableScale>
               </Reveal>
             );

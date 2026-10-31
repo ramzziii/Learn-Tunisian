@@ -2,6 +2,7 @@ import * as Haptics from 'expo-haptics';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { TunisianText } from '@/components/tunisian/TunisianText';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { radii, shadows, spacing, type ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/lib/theme/ThemeContext';
@@ -73,8 +74,7 @@ export function ProverbDetailModal({ proverb, onClose }: ProverbDetailModalProps
                   <Text style={styles.categoryText}>{CATEGORY_LABEL[proverb.category]}</Text>
                 </View>
 
-                <Text style={styles.arabic}>{proverb.arabic}</Text>
-                <Text style={styles.transliteration}>{proverb.transliteration}</Text>
+                <TunisianText arabic={proverb.arabic} latin={proverb.transliteration} arabicStyle={styles.arabic} latinStyle={styles.transliteration} />
 
                 <PressableScale onPress={play} style={[styles.playButton, isActive && styles.playButtonActive]}>
                   <Text style={styles.playIcon}>{isActive ? '🔊' : '▶'}</Text>

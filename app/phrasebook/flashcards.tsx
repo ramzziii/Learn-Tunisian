@@ -16,7 +16,10 @@ import { useFadeInOnChange } from '@/hooks/useFadeInOnChange';
 import { useLetterSpeech } from '@/hooks/useLetterSpeech';
 import { useWordAudioPlayer } from '@/hooks/useWordAudioPlayer';
 import { useTheme } from '@/lib/theme/ThemeContext';
-import { getPrimaryVariant } from '@/lib/wordVariants';
+import { hasTwoForms, preferredVariant } from '@/lib/display/displayRules';
+import { useDisplayPreferences } from '@/lib/display/useDisplayPreferences';
+import { FormDisplay } from '@/components/tunisian/FormDisplay';
+import { TunisianText } from '@/components/tunisian/TunisianText';
 import type { WordGroupWithVariants } from '@/types/models';
 
 /**
@@ -27,6 +30,7 @@ import type { WordGroupWithVariants } from '@/types/models';
  */
 export default function PhrasebookFlashcardsScreen() {
   const { colors } = useTheme();
+  const { preferences: display } = useDisplayPreferences();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { isPremium } = usePremium();
   const [cards, setCards] = useState<WordGroupWithVariants[] | null>(null);
@@ -40,7 +44,7 @@ export default function PhrasebookFlashcardsScreen() {
   // can be called unconditionally every render, same requirement as every
   // other hook above it.
   const card = cards?.[index] ?? null;
-  const variant = card ? getPrimaryVariant(card) : null;
+  const variant = card ? preferredVariant(card, display.form) : null;
   const wordPlayer = useWordAudioPlayer(variant);
 
   const load = useCallback(async () => {
@@ -130,8 +134,11 @@ export default function PhrasebookFlashcardsScreen() {
           <Text style={styles.english}>{card.englishMeaning}</Text>
           {variant ? (
             <>
-              <Text style={styles.arabic}>{variant.wordArabic}</Text>
-              <Text style={styles.transliteration}>{variant.transliteration}</Text>
+              {card && hasTwoForms(card) ? (
+                <FormDisplay group={card} size="lg" arabicStyle={styles.arabic} latinStyle={styles.transliteration} />
+              ) : (
+                <TunisianText arabic={variant.wordArabic} latin={variant.transliteration} size="xl" arabicStyle={styles.arabic} latinStyle={styles.transliteration} style={{ alignItems: 'center' }} />
+              )}
             </>
           ) : null}
           <View style={[styles.playBadge, (wordPlayer.isPlaying || isSpeaking) && styles.playBadgeActive]}>

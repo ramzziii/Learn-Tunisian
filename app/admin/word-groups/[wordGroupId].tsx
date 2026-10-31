@@ -32,8 +32,8 @@ const CONTENT_STATUS_OPTIONS: { value: ContentStatus; label: string }[] = [
 const VARIANT_LABEL_OPTIONS: { value: VariantLabel; label: string }[] = [
   { value: 'primary', label: 'Primary' },
   { value: 'also_heard', label: 'Also heard' },
-  { value: 'masculine', label: 'Masculine' },
-  { value: 'feminine', label: 'Feminine' },
+  { value: 'masculine', label: 'Masculine form' },
+  { value: 'feminine', label: 'Feminine form' },
 ];
 
 export default function AdminWordGroupDetail() {

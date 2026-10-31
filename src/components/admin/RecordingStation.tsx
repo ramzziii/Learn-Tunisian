@@ -19,8 +19,8 @@ import type { VariantLabel, WordVariant } from '@/types/models';
 const FORM_LABEL: Record<VariantLabel, string> = {
   primary: 'Primary',
   also_heard: 'Also heard',
-  masculine: 'Masculine',
-  feminine: 'Feminine',
+  masculine: 'Masculine form',
+  feminine: 'Feminine form',
 };
 
 const NEED_LABEL: Record<RecordingNeed, string> = {
@@ -263,6 +263,11 @@ export function RecordingStation(props: StationProps) {
           </>
         )}
       </View>
+      {variant.variantLabel === 'masculine' || variant.variantLabel === 'feminine' ? (
+        <Text style={styles.formNote}>
+          Pronunciation for this form only — the other form has its own recording and its own approval.
+        </Text>
+      ) : null}
       <Text style={styles.meaning}>{item.englishMeaning}</Text>
       <Text style={styles.arabic}>{variant.wordArabic}</Text>
       <Text style={styles.transliteration}>{variant.transliteration}</Text>
@@ -372,6 +377,7 @@ export function RecordingStation(props: StationProps) {
 const styles = StyleSheet.create({
   card: { backgroundColor: colors.surface, borderRadius: radii.lg, padding: spacing.lg, gap: spacing.sm },
   badges: { flexDirection: 'row', gap: spacing.xs, flexWrap: 'wrap' },
+  formNote: { fontSize: 13, color: colors.textSecondary },
   badge: {
     fontSize: 11,
     fontWeight: '700',

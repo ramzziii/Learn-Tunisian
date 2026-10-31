@@ -3,6 +3,8 @@ import { Animated, StyleSheet, Text, View } from 'react-native';
 
 import { AnswerFeedback } from '@/components/exercises/shared/AnswerFeedback';
 import { VariantCallout } from '@/components/exercises/shared/VariantCallout';
+import { ScriptExemptionNote } from '@/components/tunisian/ScriptExemptionNote';
+import { TunisianText } from '@/components/tunisian/TunisianText';
 import { AudioPlayButton } from '@/components/ui/AudioPlayButton';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Reveal } from '@/components/ui/Reveal';
@@ -53,6 +55,7 @@ export function ReadingMatch({ exercise, onComplete }: ReadingMatchProps) {
         style={{ marginTop: spacing.lg }}
       />
       <Text style={styles.instructions}>Tap the word you hear</Text>
+      <ScriptExemptionNote exempt="arabic" />
       <VariantCallout group={exercise.targetGroup} />
 
       <View style={styles.list}>
@@ -72,8 +75,16 @@ export function ReadingMatch({ exercise, onComplete }: ReadingMatchProps) {
                     revealCorrect && !isSelected && styles.optionCorrect,
                   ]}
                 >
-                  <Text style={styles.arabicScript}>{option.variant.wordArabic}</Text>
-                  <Text style={styles.transliteration}>{option.variant.transliteration}</Text>
+                  {/* Reading match tests reading Arabic: the Arabic is always shown. */}
+                  <TunisianText
+                    arabic={option.variant.wordArabic}
+                    latin={option.variant.transliteration}
+                    layout="inline"
+                    alwaysShowArabic
+                    arabicStyle={styles.arabicScript}
+                    latinStyle={styles.transliteration}
+                    style={styles.optionText}
+                  />
                 </PressableScale>
               </Animated.View>
             </Reveal>
@@ -87,6 +98,7 @@ export function ReadingMatch({ exercise, onComplete }: ReadingMatchProps) {
           correctWordArabic={exercise.promptVariant.wordArabic}
           correctTransliteration={exercise.promptVariant.transliteration}
           correctMeaning={exercise.targetGroup.englishMeaning}
+          alwaysShowArabic
           onNext={() => onComplete(isCorrectSelection)}
         />
       ) : null}
@@ -117,6 +129,7 @@ const makeStyles = (colors: ThemeColors) =>
     },
     optionCorrect: { borderColor: colors.success, backgroundColor: `${colors.success}1F` },
     optionIncorrect: { borderColor: colors.error, backgroundColor: `${colors.error}1F` },
+    optionText: { flex: 1, justifyContent: 'space-between' },
     arabicScript: { fontSize: 24, color: colors.textPrimary },
     transliteration: { fontSize: 14, color: colors.textSecondary, fontStyle: 'italic' },
   });

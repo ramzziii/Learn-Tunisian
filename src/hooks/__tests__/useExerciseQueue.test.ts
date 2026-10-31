@@ -90,3 +90,37 @@ it('an empty lesson yields no exercise rather than crashing', async () => {
   const { result } = await renderHook(() => useExerciseQueue(NO_GROUPS));
   expect(result.current.currentExercise).toBeNull();
 });
+
+// --- Listening questions -----------------------------------------------------
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { makeGroup } = require('@/test-utils/wordGroupFixtures');
+
+const listenable: WordGroupWithVariants[] = ['a', 'b', 'c', 'd', 'e'].map((id) => makeGroup(id, { listenable: true }));
+
+async function take(groupsIn: WordGroupWithVariants[], count: number, mode?: 'mixed' | 'listening') {
+  const { result } = await renderHook(() => useExerciseQueue(groupsIn, mode));
+  const seen = [];
+  for (let i = 0; i < count; i++) {
+    seen.push(result.current.currentExercise);
+    await act(async () => result.current.next());
+  }
+  return seen;
+}
+
+it('lessons with native recordings get one listening question after every 3 regular ones', async () => {
+  const exercises = await take(listenable, 12);
+  const isListening = exercises.map((e) => e!.type === 'listen_recording' || e!.type === 'listen_meaning');
+  expect(isListening).toEqual([false, false, false, true, false, false, false, true, false, false, false, true]);
+});
+
+it('listening-only mode (standalone practice) serves only listening questions, endlessly', async () => {
+  const exercises = await take(listenable, 11, 'listening');
+  expect(exercises.every((e) => e && (e.type === 'listen_recording' || e.type === 'listen_meaning'))).toBe(true);
+  expect(new Set(exercises.map((e) => e!.key)).size).toBe(exercises.length);
+});
+
+it('listening-only mode with too few recordings yields no exercise (the screen shows its empty state)', async () => {
+  const twoOnly = listenable.slice(0, 2);
+  const { result } = await renderHook(() => useExerciseQueue(twoOnly, 'listening'));
+  expect(result.current.currentExercise).toBeNull();
+});

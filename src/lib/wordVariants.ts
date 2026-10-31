@@ -1,4 +1,4 @@
-import type { WordGroupWithVariants, WordVariant } from '@/types/models';
+import type { FormPreference, WordGroupWithVariants, WordVariant } from '@/types/models';
 
 export function getPrimaryVariant(group: WordGroupWithVariants): WordVariant | null {
   return group.variants.find((v) => v.variantLabel === 'primary') ?? null;
@@ -27,18 +27,28 @@ export function hasGenderPair(group: WordGroupWithVariants): boolean {
  * check_word_group_has_primary_or_gender_pair) — for the latter case, this
  * alternates between the two based on `alternateSeed` so exercises stay
  * gender-neutral across a session rather than always leading with one form.
- * The "You might also hear" / gender-pair callout (VariantCallout) always
- * shows both forms regardless of which one was picked here as the prompt.
+ * With a form preference (the learner's display setting, never their
+ * gender), a two-form group leads with that form instead; 'both' keeps the
+ * alternation. Answer checking ignores this — every variant still counts.
  */
-export function getPromptVariant(group: WordGroupWithVariants, alternateSeed: number): WordVariant {
+export function getPromptVariant(
+  group: WordGroupWithVariants,
+  alternateSeed: number,
+  form: FormPreference = 'both'
+): WordVariant {
   const primary = getPrimaryVariant(group);
   if (primary) return primary;
 
   const masculine = getMasculineVariant(group);
   const feminine = getFeminineVariant(group);
   if (masculine && feminine) {
+    if (form === 'masculine') return masculine;
+    if (form === 'feminine') return feminine;
     return alternateSeed % 2 === 0 ? masculine : feminine;
   }
+  // Only one gendered form available: use it rather than nothing.
+  if (masculine) return masculine;
+  if (feminine) return feminine;
 
   // Unreachable given the DB constraint, but keeps this total rather than throwing.
   return group.variants[0];

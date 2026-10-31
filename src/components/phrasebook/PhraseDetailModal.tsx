@@ -9,7 +9,10 @@ import { useLetterSpeech } from '@/hooks/useLetterSpeech';
 import { ExplanationPlayButton } from '@/components/ui/ExplanationPlayButton';
 import { useWordAudioPlayer } from '@/hooks/useWordAudioPlayer';
 import { useTheme } from '@/lib/theme/ThemeContext';
-import { getPrimaryVariant } from '@/lib/wordVariants';
+import { hasTwoForms, preferredVariant } from '@/lib/display/displayRules';
+import { useDisplayPreferences } from '@/lib/display/useDisplayPreferences';
+import { FormDisplay } from '@/components/tunisian/FormDisplay';
+import { TunisianText } from '@/components/tunisian/TunisianText';
 import type { WordGroupWithVariants } from '@/types/models';
 
 interface PhraseDetailModalProps {
@@ -39,6 +42,7 @@ interface PhraseDetailModalProps {
  */
 export function PhraseDetailModal({ phrase, onClose }: PhraseDetailModalProps) {
   const { colors } = useTheme();
+  const { preferences: display } = useDisplayPreferences();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { speak, isSpeaking } = useLetterSpeech();
   // Bumped to restart practice after finishing a go (a new phrase remounts it via the key).
@@ -50,7 +54,7 @@ export function PhraseDetailModal({ phrase, onClose }: PhraseDetailModalProps) {
   // Computed here (not after the early returns below) so useWordAudioPlayer
   // can be called unconditionally every render, same requirement as every
   // other hook above it.
-  const variant = phrase ? getPrimaryVariant(phrase) : null;
+  const variant = phrase ? preferredVariant(phrase, display.form) : null;
   const wordPlayer = useWordAudioPlayer(variant);
 
   useEffect(() => {
@@ -95,8 +99,11 @@ export function PhraseDetailModal({ phrase, onClose }: PhraseDetailModalProps) {
               }}
             >
               <Text style={styles.english}>{phrase.englishMeaning}</Text>
-              <Text style={styles.arabic}>{variant.wordArabic}</Text>
-              <Text style={styles.transliteration}>{variant.transliteration}</Text>
+              {hasTwoForms(phrase) ? (
+                <FormDisplay group={phrase} size="lg" arabicStyle={styles.arabic} latinStyle={styles.transliteration} />
+              ) : (
+                <TunisianText arabic={variant.wordArabic} latin={variant.transliteration} size="xl" arabicStyle={styles.arabic} latinStyle={styles.transliteration} style={{ alignItems: 'center' }} />
+              )}
 
               <PressableScale
                 onPress={playPhrase}

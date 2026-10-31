@@ -14,7 +14,8 @@ import { useTheme } from '@/lib/theme/ThemeContext';
 import { fetchLessonMap } from '@/data/content';
 import { recordWordGroupResult } from '@/data/progress';
 import { recordSessionLog } from '@/data/sessionLogs';
-import { useExerciseQueue } from '@/hooks/useExerciseQueue';
+import { useExerciseQueue, type ExerciseMode } from '@/hooks/useExerciseQueue';
+import { useDisplayPreferences } from '@/lib/display/useDisplayPreferences';
 import { useSlideInOnChange } from '@/hooks/useSlideInOnChange';
 import { useSessionTimer } from '@/hooks/useSessionTimer';
 import { masteryLabel, type MasteryLabel } from '@/lib/masteryStatus';
@@ -46,6 +47,10 @@ interface SessionRunnerProps {
   /** Fires once, the moment the session's time goal is reached (before the
    * user necessarily taps Close) — e.g. for marking a daily challenge done. */
   onComplete?: () => void;
+  /** 'mixed' (default): lessons/review, with a listening question after
+   * every 3 regular ones when native recordings exist. 'listening':
+   * standalone Listening practice. */
+  exerciseMode?: ExerciseMode;
 }
 
 /**
@@ -63,11 +68,13 @@ export function SessionRunner({
   exitHref,
   currentLessonId,
   onComplete,
+  exerciseMode = 'mixed',
 }: SessionRunnerProps) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const timer = useSessionTimer(goalMinutes);
-  const { currentExercise: queuedExercise, next } = useExerciseQueue(groups);
+  const { preferences } = useDisplayPreferences();
+  const { currentExercise: queuedExercise, next } = useExerciseQueue(groups, exerciseMode, preferences.form);
 
   // Words left mispronounced in speaking exercises are replayed once the time
   // goal is reached, before the summary — see src/lib/speakingRevisit.ts.
