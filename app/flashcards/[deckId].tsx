@@ -33,7 +33,7 @@ type State =
   | { kind: 'missing' }
   | { kind: 'allowance-used' }
   | { kind: 'empty'; deck: FlashcardDeck }
-  | { kind: 'ready'; cards: WordGroupWithVariants[]; goalMinutes: number };
+  | { kind: 'ready'; cards: WordGroupWithVariants[]; pool: WordGroupWithVariants[]; goalMinutes: number };
 
 /**
  * One deck's study session. Due today shares the free plan's daily review
@@ -71,9 +71,14 @@ export default function FlashcardDeckScreen() {
         if (!isPremium) await markFreeReviewStarted(activeProfile.id);
       }
 
-      const [cards, goal] = await Promise.all([fetchFlashcards(ids), fetchDailyGoalSettings(activeProfile.id)]);
+      // Every word in the learner's decks, fetched once: the deck's cards plus
+      // the wrong answers for the quiz — only words they've already met.
+      const allIds = [...new Set(decks.flatMap((d) => d.cardIds))];
+      const [pool, goal] = await Promise.all([fetchFlashcards(allIds), fetchDailyGoalSettings(activeProfile.id)]);
       if (cancelled) return;
-      setState({ kind: 'ready', cards, goalMinutes: goal?.dailyGoalMinutes ?? DEFAULT_GOAL_MINUTES });
+      const byId = new Map(pool.map((c) => [c.id, c]));
+      const cards = ids.map((id) => byId.get(id)).filter((c): c is WordGroupWithVariants => c !== undefined);
+      setState({ kind: 'ready', cards, pool, goalMinutes: goal?.dailyGoalMinutes ?? DEFAULT_GOAL_MINUTES });
       prefetchLessonAudio(cards.flatMap((c) => c.variants));
     })().catch(() => !cancelled && setState({ kind: 'missing' }));
     return () => {
@@ -91,7 +96,9 @@ export default function FlashcardDeckScreen() {
   }
   if (state.kind === 'ready' && activeProfile) {
     if (state.cards.length > 0) {
-      return <FlashcardSession cards={state.cards} profileId={activeProfile.id} goalMinutes={state.goalMinutes} />;
+      return (
+        <FlashcardSession cards={state.cards} distractorPool={state.pool} profileId={activeProfile.id} goalMinutes={state.goalMinutes} />
+      );
     }
   }
   if (state.kind === 'loading') return <LoadingScreen themed />;

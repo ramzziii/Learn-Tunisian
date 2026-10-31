@@ -2,7 +2,7 @@
 // spaced-repetition schedule (no second review system):
 // - decks come only from words the learner has already practised (a
 //   progress row) or saved as a favorite — never future content;
-// - Missed it / Almost / Got it map onto the scheduler's right/wrong input;
+// - quiz questions: choices from other words only; the app checks the answer;
 // - a session stops at a batch, then offers another.
 import { calculateNextReview, INITIAL_SPACED_REPETITION_STATE } from '@/lib/spacedRepetition';
 
@@ -45,27 +45,93 @@ const build = (over: Record<string, unknown> = {}) =>
   );
 const deck = (decks: { id: string }[], id: string) => decks.find((d) => d.id === id);
 
-describe('rating → scheduler', () => {
-  it('Missed it and Almost are recorded as not remembered; Got it as remembered', () => {
-    expect(fc.ratingWasCorrect('missed')).toBe(false);
-    expect(fc.ratingWasCorrect('almost')).toBe(false);
-    expect(fc.ratingWasCorrect('got_it')).toBe(true);
-  });
-
-  it('offers exactly Missed it, Almost, Got it', () => {
-    expect(fc.FLASHCARD_RATINGS.map((r: { label: string }) => r.label)).toEqual(['Missed it', 'Almost', 'Got it']);
-  });
-
-  it('next due dates come from the existing scheduler', () => {
+describe('answer → scheduler', () => {
+  it('next due dates come from the existing scheduler: a right answer is "correct", a wrong one "incorrect"', () => {
     const day = 24 * 60 * 60 * 1000;
-    const almost = calculateNextReview(INITIAL_SPACED_REPETITION_STATE, fc.ratingWasCorrect('almost'), NOW);
-    expect(almost.nextReviewAt.getTime() - NOW.getTime()).toBe(day);
+    const wrong = calculateNextReview(INITIAL_SPACED_REPETITION_STATE, false, NOW);
+    expect(wrong.nextReviewAt.getTime() - NOW.getTime()).toBe(day);
     const second = calculateNextReview(
       { reviewIntervalDays: 1, easeFactor: 2.5, consecutiveCorrect: 1, consecutiveIncorrect: 0 },
-      fc.ratingWasCorrect('got_it'),
+      true,
       NOW
     );
     expect(second.reviewIntervalDays).toBe(6);
+  });
+
+  it('no self-rating buttons any more', () => {
+    expect(fc.FLASHCARD_RATINGS).toBeUndefined();
+  });
+});
+
+describe('quiz questions', () => {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { makeGroup, makeVariant } = require('@/test-utils/wordGroupFixtures');
+  const twoForms = (id: string) =>
+    makeGroup(id, {
+      variants: [
+        makeVariant(id, { id: `${id}-m`, variantLabel: 'masculine', wordArabic: `${id}-مذكر`, transliteration: `${id}-m` }),
+        makeVariant(id, { id: `${id}-f`, variantLabel: 'feminine', wordArabic: `${id}-مؤنث`, transliteration: `${id}-f` }),
+      ],
+    });
+  const pool = ['a', 'b', 'c', 'd', 'e', 'f'].map((id) => makeGroup(id));
+  const fixedRandom = () => 0.42;
+
+  it('Tunisian → meaning: choices are meanings, the right one plus 3 from other words', () => {
+    const q = fc.buildFlashcardQuestion(pool[0], pool, 'tunisian-first', 'both', fixedRandom);
+    expect(q.choices).toHaveLength(4);
+    expect(q.choices.map((c: { label: string }) => c.label)).toContain('meaning a');
+    expect(new Set(q.choices.map((c: { groupId: string }) => c.groupId)).size).toBe(4);
+    expect(q.choices.filter((c: { groupId: string }) => c.groupId === 'a')).toHaveLength(1);
+  });
+
+  it('meaning → Tunisian: choices are Tunisian words, shown in the preferred form', () => {
+    const target = twoForms('t');
+    const q = fc.buildFlashcardQuestion(target, [target, ...pool], 'meaning-first', 'feminine', fixedRandom);
+    const right = q.choices.find((c: { groupId: string }) => c.groupId === 't');
+    expect(right.variant.id).toBe('t-f');
+    expect(q.choices).toHaveLength(4);
+  });
+
+  it('never uses another form of the right word as a wrong answer', () => {
+    const target = twoForms('t');
+    for (const direction of ['tunisian-first', 'meaning-first']) {
+      const q = fc.buildFlashcardQuestion(target, [target, ...pool], direction, 'masculine', Math.random);
+      const wrong = q.choices.filter((c: { groupId: string }) => c.groupId !== 't');
+      expect(wrong.every((c: { variant: { wordGroupId: string } | null }) => c.variant?.wordGroupId !== 't')).toBe(true);
+    }
+  });
+
+  it('any form of the right word counts as correct; any other word does not', () => {
+    const target = twoForms('t');
+    const q = fc.buildFlashcardQuestion(target, [target, ...pool], 'meaning-first', 'both', fixedRandom);
+    expect(fc.isCorrectChoice(q, 't')).toBe(true);
+    expect(fc.isCorrectChoice(q, 'a')).toBe(false);
+  });
+
+  it('skips look-alikes in either direction: same meaning, or the same Tunisian text (both could be right)', () => {
+    const sameMeaning = makeGroup('dup', { englishMeaning: 'meaning a' });
+    const sameText = makeGroup('dup2', { variants: [makeVariant('dup2', { wordArabic: 'عربي-a' })] });
+    for (const direction of ['tunisian-first', 'meaning-first']) {
+      const q = fc.buildFlashcardQuestion(pool[0], [...pool, sameMeaning, sameText], direction, 'both', Math.random);
+      const ids = q.choices.map((c: { groupId: string }) => c.groupId);
+      expect(ids).not.toContain('dup');
+      expect(ids).not.toContain('dup2');
+    }
+  });
+
+  it('wrong answers never repeat each other', () => {
+    const twins = [makeGroup('t1', { englishMeaning: 'same' }), makeGroup('t2', { englishMeaning: 'same' })];
+    const q = fc.buildFlashcardQuestion(pool[0], [pool[0], pool[1], ...twins], 'tunisian-first', 'both', Math.random);
+    const labels = q.choices.map((c: { label: string }) => c.label);
+    expect(new Set(labels).size).toBe(labels.length);
+    expect(labels).toHaveLength(3);
+  });
+
+  it('with only two other words it still asks (3 choices); with fewer it can’t be fair', () => {
+    expect(fc.buildFlashcardQuestion(pool[0], pool.slice(0, 3), 'tunisian-first', 'both', fixedRandom).choices).toHaveLength(3);
+    expect(fc.buildFlashcardQuestion(pool[0], pool.slice(0, 2), 'tunisian-first', 'both', fixedRandom)).toBeNull();
+    expect(fc.canQuiz(pool[0], pool.slice(0, 2), 'both')).toBe(false);
+    expect(fc.canQuiz(pool[0], pool, 'both')).toBe(true);
   });
 });
 

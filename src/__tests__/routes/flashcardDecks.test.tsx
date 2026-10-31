@@ -36,10 +36,20 @@ jest.mock('@/data/flashcards', () => ({
 jest.mock('@/data/profiles', () => ({ fetchDailyGoalSettings: jest.fn(async () => ({ dailyGoalMinutes: 10 })) }));
 jest.mock('@/lib/offline/audioCache', () => ({ prefetchLessonAudio: jest.fn() }));
 jest.mock('@/components/flashcards/FlashcardSession', () => ({
-  FlashcardSession: ({ cards, goalMinutes }: { cards: { id: string }[]; goalMinutes: number }) => {
+  FlashcardSession: ({
+    cards,
+    distractorPool,
+    goalMinutes,
+  }: {
+    cards: { id: string }[];
+    distractorPool: { id: string }[];
+    goalMinutes: number;
+  }) => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { Text } = require('react-native');
-    return <Text>{`[session ${cards.map((c) => c.id).join(',')} goal=${goalMinutes}]`}</Text>;
+    return (
+      <Text>{`[session ${cards.map((c) => c.id).join(',')} goal=${goalMinutes} pool=${distractorPool.length}]`}</Text>
+    );
   },
 }));
 
@@ -105,8 +115,14 @@ describe('deck list', () => {
 describe('a deck', () => {
   it('loads its cards and starts a session with the saved daily goal', async () => {
     await themed(<DeckScreen />);
-    expect(await screen.findByText('[session a,b goal=10]')).toBeOnTheScreen();
-    expect(mockFetchCards).toHaveBeenCalledWith(['a', 'b']);
+    expect(await screen.findByText('[session a,b goal=10 pool=12]')).toBeOnTheScreen();
+  });
+
+  it('wrong answers come from every word in the learner’s decks — nothing they haven’t met', async () => {
+    await themed(<DeckScreen />);
+    await screen.findByText(/\[session/);
+    expect(mockFetchCards).toHaveBeenCalledTimes(1);
+    expect(mockFetchCards).toHaveBeenCalledWith(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l']);
   });
 
   it('an empty deck shows a friendly empty state, not a session', async () => {
@@ -127,7 +143,7 @@ describe('a deck', () => {
   it('free plan: Due today uses the day’s free review — up to 10 cards, and marks it used', async () => {
     mockDeckId = 'due';
     await themed(<DeckScreen />);
-    expect(await screen.findByText('[session a,b,c,d,e,f,g,h,i,j goal=10]')).toBeOnTheScreen();
+    expect(await screen.findByText('[session a,b,c,d,e,f,g,h,i,j goal=10 pool=12]')).toBeOnTheScreen();
     expect(mockMarkFreeReview).toHaveBeenCalledWith('p1');
   });
 
@@ -142,7 +158,7 @@ describe('a deck', () => {
   it('free plan: category and favorites decks aren’t limited', async () => {
     mockUsedFreeReview = true;
     await themed(<DeckScreen />);
-    expect(await screen.findByText('[session a,b goal=10]')).toBeOnTheScreen();
+    expect(await screen.findByText('[session a,b goal=10 pool=12]')).toBeOnTheScreen();
     expect(mockMarkFreeReview).not.toHaveBeenCalled();
   });
 
@@ -150,7 +166,7 @@ describe('a deck', () => {
     mockDeckId = 'due';
     mockIsPremium = true;
     await themed(<DeckScreen />);
-    expect(await screen.findByText('[session a,b,c,d,e,f,g,h,i,j,k,l goal=10]')).toBeOnTheScreen();
+    expect(await screen.findByText('[session a,b,c,d,e,f,g,h,i,j,k,l goal=10 pool=12]')).toBeOnTheScreen();
     expect(mockMarkFreeReview).not.toHaveBeenCalled();
   });
 
