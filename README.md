@@ -1,5 +1,7 @@
 # Learn Tunisian
 
+> **New here?** [docs/APP_GUIDE.md](docs/APP_GUIDE.md) describes everything the app does, how navigation is structured, the data model, current status and known gaps.
+
 A Duolingo-style app for learning Tunisian Arabic, for adults (18+). Each
 account has one learner profile; every learner gets the same exercise set
 (reading match, typing/spelling, speaking practice) and Talk to a Tunisian.
@@ -201,17 +203,27 @@ learner has already met — no second review system:
 - **Approved content only**: `src/data/flashcards.ts` filters
   `content_status = 'approved'` on words and forms (RLS doesn't), and drops
   anything else returned.
-- **Ratings** go through `recordWordGroupResult`, once per card shown:
-  Missed it → wrong, **Almost → wrong**, Got it → right (the scheduler only
-  takes right/wrong).
+- **Quiz**: each card is a multiple-choice question — "What does this
+  mean?" (Tunisian → meaning) or "Which is the Tunisian?" (meaning →
+  Tunisian), switchable per deck. Up to 4 choices (at least 3); wrong answers
+  come from other words the learner has met, never another form of the right
+  word and never a look-alike (same meaning or same Tunisian text). Any form
+  of the right word counts. A card without enough fair choices is skipped.
+- **Audio**: the word's own recording plays by itself as the card appears
+  (Tunisian → meaning), or after answering (meaning → Tunisian, where playing
+  first would give it away). No recording → silent, never a device voice.
+- **Results**: the app checks the answer and shows the standard result sheet
+  (`AnswerFeedback`: "Great job!" / "Not quite" with the right answer, Next
+  with a countdown), and records one result per card through
+  `recordWordGroupResult` — right → correct, wrong → incorrect.
 - **Sessions**: batches of 15 on the standard timer and completion card
   (Another batch, Add more time, Back to home); minutes are logged as a
   `'review'` session, so they count toward the daily goal.
 - **Free plan**: Due today shares Review's daily free allowance; category and
   favorites decks are open.
 - **Offline**: decks need a connection to load (content isn't cached). Audio
-  already played plays offline. There's no offline queue for ratings — a
-  rating that can't be saved is reported on screen.
+  already played plays offline. There's no offline queue for results — a
+  result that can't be saved is reported on screen.
 
 The phrasebook browse deck (`app/phrasebook/flashcards.tsx`) is unchanged and
 linked from the deck list.
