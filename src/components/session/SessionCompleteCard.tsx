@@ -17,7 +17,11 @@ interface SessionCompleteCardProps {
   incorrectCount: number;
   sessionType: SessionType;
   onClose: () => void;
-  onAddMore: (minutes: DailyGoalMinutes) => void;
+  /** "Add more time" — extends this session only, never the saved goal.
+   * Omitted when there's nothing left to continue with. */
+  onAddMore?: (minutes: DailyGoalMinutes) => void;
+  /** Flashcards: start the next batch of cards (only when there is one). */
+  onAnotherBatch?: () => void;
   /** Only offered when there's something to review — a completed review
    * session doesn't offer to review itself again. */
   onReviewWeakWords?: () => void;
@@ -45,6 +49,7 @@ export function SessionCompleteCard({
   sessionType,
   onClose,
   onAddMore,
+  onAnotherBatch,
   onReviewWeakWords,
   onContinueLesson,
   continueLessonReason,
@@ -109,6 +114,14 @@ export function SessionCompleteCard({
             {continueLessonReason ? <Text style={styles.continueReasonText}>{continueLessonReason}</Text> : null}
           </>
         ) : null}
+        {onAnotherBatch ? (
+          <Button themed
+            label="Another batch"
+            variant="secondary"
+            onPress={onAnotherBatch}
+            style={{ marginTop: spacing.sm, width: '100%' }}
+          />
+        ) : null}
         {onReviewWeakWords ? (
           <Button themed
             label="Review weak words"
@@ -118,14 +131,18 @@ export function SessionCompleteCard({
           />
         ) : null}
 
-        <Text style={styles.addMoreLabel}>Want to keep going?</Text>
-        <View style={styles.addMoreRow}>
-          {ADD_MORE_OPTIONS.map((minutes) => (
-            <PressableScale key={minutes} haptic style={styles.addMoreButton} onPress={() => onAddMore(minutes)}>
-              <Text style={styles.addMoreButtonText}>+{minutes} min</Text>
-            </PressableScale>
-          ))}
-        </View>
+        {onAddMore ? (
+          <>
+            <Text style={styles.addMoreLabel}>Want to keep going?</Text>
+            <View style={styles.addMoreRow}>
+              {ADD_MORE_OPTIONS.map((minutes) => (
+                <PressableScale key={minutes} haptic style={styles.addMoreButton} onPress={() => onAddMore(minutes)}>
+                  <Text style={styles.addMoreButtonText}>+{minutes} min</Text>
+                </PressableScale>
+              ))}
+            </View>
+          </>
+        ) : null}
       </Animated.View>
     </View>
   );
