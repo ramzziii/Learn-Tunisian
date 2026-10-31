@@ -11,6 +11,7 @@ import { Reveal } from '@/components/ui/Reveal';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { SelectableCard } from '@/components/ui/SelectableCard';
 import { TranslationRequestsEntry } from '@/components/translation/TranslationRequestsEntry';
+import { WHY_TUNISIAN_LINK } from '@/constants/appCopy';
 import { DAILY_GOAL_OPTIONS } from '@/constants/dailyGoal';
 import { radii, spacing, type ThemeColors } from '@/constants/theme';
 import { countCompletedLessons } from '@/data/content';
@@ -281,6 +282,9 @@ export default function ProfileScreen() {
           {isPremium ? '⭐ Premium — everything is unlocked.' : 'Free plan — some content is marked 🔒 Premium.'}
         </Text>
         <Button themed label="See plans & pricing" variant="secondary" onPress={() => router.push('/onboarding/plans')} />
+
+        <Text style={styles.sectionTitle}>About</Text>
+        <Button themed label={WHY_TUNISIAN_LINK} variant="secondary" onPress={() => router.push('/why-tunisian')} />
 
         <Text style={styles.sectionTitle}>Account</Text>
         <Button

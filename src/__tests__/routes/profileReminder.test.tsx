@@ -132,3 +132,12 @@ it('the daily goal can still be changed after signup', async () => {
   await fireEvent.press(screen.getByText('Save changes'));
   expect(mockUpdateSettings).toHaveBeenCalledWith('p1', expect.objectContaining({ dailyGoalMinutes: 15 }));
 });
+
+// Profile → About links to the "Why Tunisian, not MSA?" explanation.
+it('About opens “Why Tunisian, not MSA?”', async () => {
+  await renderProfile();
+  await screen.findByText('Save changes');
+  expect(screen.getByText('About')).toBeOnTheScreen();
+  await fireEvent.press(screen.getByText('Why Tunisian, not MSA?'));
+  expect(mockPush).toHaveBeenCalledWith('/why-tunisian');
+});
