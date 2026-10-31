@@ -22,7 +22,12 @@ account has one learner profile; every learner gets the same exercise set
    release.**
 5. Profile setup: name, the already-entered date of birth (read-only),
    country, mother tongue, proficiency and an optional learning goal.
-6. Daily goal (5/10/15 min) and a reminder.
+6. Daily goal: 5, 10 or 15 minutes (the shared `DAILY_GOAL_OPTIONS` in
+   `src/constants/dailyGoal.ts`). A target, not a limit — "Add more time" at
+   the end of a session extends that session without changing the goal.
+7. Optional daily reminder: "Set reminder" asks for notification permission
+   only then; "Not now" finishes signup with the reminder saved as off.
+   Profile can turn it on, off or change the time later.
 
 **One profile per account** (an account is one Supabase Auth user, so one
 login email). Enforced in the database by
@@ -72,6 +77,16 @@ user is gone. The account's data is deleted. Shared content and AI cost
 records are kept with the account's links removed. The device keeps nothing
 of that account's. Full table-by-table list, partial-failure recovery and
 admin/reviewer consequences: [docs/account-deletion.md](docs/account-deletion.md).
+
+## App copy and store listing
+
+Marketing copy — the Welcome value statement, the "Why Tunisian, not MSA?"
+screen (`app/why-tunisian.tsx`, reached from Welcome and Profile → About) and
+the store-listing draft — lives in one place: `src/constants/appCopy.ts`.
+`docs/store-listing.md` holds the App Store / Google Play draft, the claims
+audit and the owner checklist for submission;
+`src/constants/__tests__/appCopy.test.ts` checks the store limits and that the
+doc matches the source.
 
 ## Stack
 
@@ -173,6 +188,33 @@ screen (linked from a "Review time" card on Home whenever something is due)
 pulls only strictly-due items, most-overdue first, and runs them through
 the exact same session engine as a lesson — there's no separate progress
 system for review.
+
+## Flashcards (decks)
+
+Practice → Flashcards (`app/flashcards/`) studies decks built from what the
+learner has already met — no second review system:
+
+- **Decks** (`buildFlashcardDecks` in `src/lib/flashcards.ts`): Due today
+  (due or struggling — the same rule as Review), My favorites, and one deck per
+  category with words that have a `progress` row. Nothing from a lesson not
+  reached yet. Due cards come first in every deck.
+- **Approved content only**: `src/data/flashcards.ts` filters
+  `content_status = 'approved'` on words and forms (RLS doesn't), and drops
+  anything else returned.
+- **Ratings** go through `recordWordGroupResult`, once per card shown:
+  Missed it → wrong, **Almost → wrong**, Got it → right (the scheduler only
+  takes right/wrong).
+- **Sessions**: batches of 15 on the standard timer and completion card
+  (Another batch, Add more time, Back to home); minutes are logged as a
+  `'review'` session, so they count toward the daily goal.
+- **Free plan**: Due today shares Review's daily free allowance; category and
+  favorites decks are open.
+- **Offline**: decks need a connection to load (content isn't cached). Audio
+  already played plays offline. There's no offline queue for ratings — a
+  rating that can't be saved is reported on screen.
+
+The phrasebook browse deck (`app/phrasebook/flashcards.tsx`) is unchanged and
+linked from the deck list.
 
 ## Speaking practice
 

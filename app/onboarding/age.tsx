@@ -59,7 +59,7 @@ export default function AgeGate() {
         title="Thanks for your interest!"
         subtitle="Learn Tunisian is only for adults (18 and over), so we can't set up an account for you. We haven't saved the date you entered."
         step={1}
-        totalSteps={5}
+        totalSteps={6}
         footer={
           isSignedIn ? (
             <Button label="Sign out" variant="secondary" onPress={() => signOut()} />
@@ -80,7 +80,7 @@ export default function AgeGate() {
       title="When were you born?"
       subtitle="Learn Tunisian is for adults — you need to be 18 or older to use it. We use your date of birth only to check this and to set up your profile."
       step={1}
-      totalSteps={5}
+      totalSteps={6}
       footer={<Button label="Continue" onPress={handleContinue} disabled={!dateOfBirth} />}
     >
       <DateOfBirthField label="Date of birth" value={dateOfBirth} onChange={setDateOfBirth} />

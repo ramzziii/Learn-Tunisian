@@ -19,7 +19,8 @@ interface HubCard {
 
 const CARDS: HubCard[] = [
   { emoji: '📖', color: '#3E7CB1', title: 'Phrasebook', subtitle: 'Real phrases for everyday situations', href: '/phrasebook' },
-  { emoji: '🗂️', color: '#4A90A4', title: 'Flashcards', subtitle: 'Browse and listen to every phrase', href: '/phrasebook/flashcards' },
+  // Study decks (spaced repetition); the phrasebook browse deck is linked from there.
+  { emoji: '🗂️', color: '#4A90A4', title: 'Flashcards', subtitle: 'Study decks of words you’ve met', href: '/flashcards' },
   { emoji: '📝', color: '#8B6BAE', title: 'Grammar Notes', subtitle: 'Tounsi patterns explained simply', href: '/grammar' },
   { emoji: '👂', color: '#3E7CB1', title: 'Listening Practice', subtitle: 'Match meanings to native recordings', href: '/listening-practice' },
   // Opens a choice between Practice words (/speaking-practice) and Repeat

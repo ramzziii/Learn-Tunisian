@@ -67,7 +67,7 @@ not in progress. See Section 9.
 | Audio playback & recording | **expo-audio** (the modern replacement for the deprecated expo-av) |
 | Local notifications | **expo-notifications** |
 | Offline audio caching | **expo-file-system**'s newer `File`/`Directory`/`Paths` API |
-| Native date/time pickers | **@react-native-community/datetimepicker** (native iOS scroll wheel / Android dialog) |
+| Native time picker | **@react-native-community/datetimepicker** (reminder time only; date of birth is typed as MM/DD/YYYY) |
 | Gradients & visual polish | **expo-linear-gradient**; press-feedback and animations via React Native's core `Animated` API (no Reanimated) |
 | Local session persistence | **@react-native-async-storage/async-storage** |
 | Local state/data fetching | Plain React Context + hooks — no Redux/Zustand/React Query; deliberately lightweight for a solo-dev codebase |
@@ -221,10 +221,14 @@ cycled through, plus Talk to a Tunisian:
    was lost, e.g. after an app restart, "Confirm your date of birth" goes
    back to the age gate), native language and country, starting
    proficiency, optional learning goal.
-6. Daily goal setup: 5/10/15-minute daily goal, one daily reminder time
-   picked with a native scrolling wheel.
-7. On finish: creates the profile, consent record, and daily goal settings,
-   requests notification permission, schedules the reminder.
+6. Daily goal (`app/onboarding/goal.tsx`): 5/10/15 minutes, from the shared
+   `DAILY_GOAL_OPTIONS`; 10 is pre-selected. A target, not a limit.
+7. Optional reminder (`app/onboarding/reminder.tsx`): pick a time and "Set
+   reminder" (notification permission is requested only then), or "Not
+   now". A denied permission is explained and signup can still finish
+   without a reminder. Finishing creates the profile, consent record and
+   daily goal settings (`reminder_enabled` saved explicitly), and schedules
+   the reminder only if it was set.
 
 Every onboarding step (and sign-in/sign-up) has a back button that
 auto-hides when there's nowhere meaningful to go back to.

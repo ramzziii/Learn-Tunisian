@@ -64,7 +64,8 @@ export async function createProfile(input: NewProfileInput): Promise<Profile> {
 export async function createDailyGoalSettings(
   profileId: string,
   dailyGoalMinutes: DailyGoalMinutes,
-  reminderTime: string
+  reminderTime: string,
+  reminderEnabled: boolean
 ): Promise<DailyGoalSettings> {
   const { data, error } = await supabase
     .from('daily_goal_settings')
@@ -72,6 +73,7 @@ export async function createDailyGoalSettings(
       profile_id: profileId,
       daily_goal_minutes: dailyGoalMinutes,
       reminder_time: reminderTime,
+      reminder_enabled: reminderEnabled,
     })
     .select('*')
     .single<DailyGoalSettingsRow>();
