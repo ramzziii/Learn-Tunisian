@@ -71,6 +71,15 @@ export default function PhrasebookScreen() {
       <Text style={styles.eyebrow}>Real-life Tunisian</Text>
       <Text style={styles.title}>Phrasebook</Text>
       <Text style={styles.subtitle}>Real lines for real moments — pick a situation and learn what to say.</Text>
+      {/* The browse-and-listen cards for every phrase (a separate flow from the
+          study quiz on Practice → Flashcards). */}
+      <Button
+        themed
+        label="Phrase cards — listen and browse"
+        variant="secondary"
+        onPress={() => router.push('/phrasebook/flashcards')}
+        style={{ marginBottom: spacing.lg }}
+      />
 
       {categories === null ? (
         loadError ? (

@@ -13,7 +13,7 @@ import type { WordGroupWithVariants } from '@/types/models';
 
 const isApproved = (row: { content_status?: string }) => row.content_status === 'approved';
 
-/** This profile's decks: Due today, My favorites, and one per practised category. Read-only. */
+/** This profile's decks: My favorites and one per practised category. Read-only. */
 export async function fetchFlashcardDecks(profileId: string, now: Date = new Date()): Promise<FlashcardDeck[]> {
   const [{ data: progressRows, error: progressError }, { data: favoriteRows, error: favoritesError }] = await Promise.all([
     supabase

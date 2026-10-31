@@ -8,13 +8,12 @@ import { fetchMyTranslationRequests } from '@/data/translationRequests';
 import { useTheme } from '@/lib/theme/ThemeContext';
 
 /**
- * Profile's way into Request a Translation, and the in-app notice that an
- * answer is ready. The notice is deliberately generic — it never shows the
- * request or answer text. A failed check just leaves the notice off.
+ * How many of the learner's translation requests have a new answer — checked
+ * on focus. Drives the in-app "your translation is ready" notice, which is
+ * deliberately generic (never the request or answer text). A failed check
+ * just counts as none.
  */
-export function TranslationRequestsEntry() {
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+export function useNewTranslationAnswers(): number {
   const [newAnswers, setNewAnswers] = useState(0);
 
   useFocusEffect(
@@ -30,6 +29,23 @@ export function TranslationRequestsEntry() {
       };
     }, [])
   );
+  return newAnswers;
+}
+
+/** The notice line itself, e.g. "🔔 Your translation is ready". */
+export function translationReadyText(newAnswers: number): string | null {
+  if (newAnswers <= 0) return null;
+  return newAnswers === 1 ? '🔔 Your translation is ready' : `🔔 ${newAnswers} translations are ready`;
+}
+
+/**
+ * A card into Request a Translation with the "answer ready" notice. (Learn →
+ * Explore Tunisian is now the entry point; it uses the hook above.)
+ */
+export function TranslationRequestsEntry() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const newAnswers = useNewTranslationAnswers();
 
   return (
     <PressableScale haptic accessibilityRole="button" onPress={() => router.push('/translation-requests')} style={styles.entry}>
@@ -37,11 +53,7 @@ export function TranslationRequestsEntry() {
       <View style={{ flex: 1 }}>
         <Text style={styles.title}>Request a Translation</Text>
         <Text style={styles.body}>Ask for any English phrase — get it in Tunisian with a native recording.</Text>
-        {newAnswers > 0 ? (
-          <Text style={styles.ready}>
-            {newAnswers === 1 ? '🔔 Your translation is ready' : `🔔 ${newAnswers} translations are ready`}
-          </Text>
-        ) : null}
+        {newAnswers > 0 ? <Text style={styles.ready}>{translationReadyText(newAnswers)}</Text> : null}
       </View>
       <Text style={styles.chevron}>›</Text>
     </PressableScale>

@@ -10,7 +10,6 @@ import { PressableScale } from '@/components/ui/PressableScale';
 import { Reveal } from '@/components/ui/Reveal';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { SelectableCard } from '@/components/ui/SelectableCard';
-import { TranslationRequestsEntry } from '@/components/translation/TranslationRequestsEntry';
 import { WHY_TUNISIAN_LINK } from '@/constants/appCopy';
 import { DAILY_GOAL_OPTIONS } from '@/constants/dailyGoal';
 import { radii, spacing, type ThemeColors } from '@/constants/theme';
@@ -202,21 +201,7 @@ export default function ProfileScreen() {
           </PressableScale>
         ) : null}
 
-        <Text style={styles.sectionTitle}>Appearance</Text>
-        {THEME_OPTIONS.map((option) => (
-          <SelectableCard
-            themed
-            key={option.value}
-            title={`${option.emoji} ${option.label}`}
-            selected={preference === option.value}
-            onPress={() => setPreference(option.value)}
-          />
-        ))}
-
-        <Text style={styles.sectionTitle}>Display</Text>
-        <DisplaySettings />
-
-        <Text style={styles.sectionTitle}>What they&apos;ve learned</Text>
+        <Text style={styles.sectionTitle} accessibilityRole="header">What they&apos;ve learned</Text>
         <Reveal style={styles.progressGrid}>
           <ProgressStat label="Learning" value={progressStats.wordsLearning} emoji="🌱" />
           <ProgressStat label="Mastered" value={progressStats.wordsMastered} emoji="⭐" />
@@ -225,13 +210,7 @@ export default function ProfileScreen() {
           <ProgressStat label="Lessons done" value={progressStats.lessonsCompleted} emoji="🏁" />
         </Reveal>
 
-        <Text style={styles.sectionTitle}>Translations</Text>
-        <TranslationRequestsEntry />
-
-        <Text style={styles.sectionTitle}>Vocabulary</Text>
-        <Button themed label="View favorites" variant="secondary" onPress={() => router.push('/favorites')} />
-
-        <Text style={styles.sectionTitle}>Daily goal</Text>
+        <Text style={styles.sectionTitle} accessibilityRole="header">Daily goal &amp; reminder</Text>
         {DAILY_GOAL_OPTIONS.map((minutes) => (
           <SelectableCard
             themed
@@ -243,7 +222,7 @@ export default function ProfileScreen() {
         ))}
 
         <View style={styles.reminderHeader}>
-          <Text style={styles.sectionTitle}>Daily reminder</Text>
+          <Text style={styles.subsectionTitle}>Daily reminder</Text>
           <Switch
             accessibilityLabel="Daily reminder"
             value={reminderEnabled}
@@ -277,16 +256,29 @@ export default function ProfileScreen() {
           style={{ marginTop: spacing.xl }}
         />
 
-        <Text style={styles.sectionTitle}>Premium</Text>
+        <Text style={styles.sectionTitle} accessibilityRole="header">Display</Text>
+        <Text style={styles.subsectionTitle}>Appearance</Text>
+        {THEME_OPTIONS.map((option) => (
+          <SelectableCard
+            themed
+            key={option.value}
+            title={`${option.emoji} ${option.label}`}
+            selected={preference === option.value}
+            onPress={() => setPreference(option.value)}
+          />
+        ))}
+        <DisplaySettings />
+
+        <Text style={styles.sectionTitle} accessibilityRole="header">Premium</Text>
         <Text style={styles.premiumStatus}>
           {isPremium ? '⭐ Premium — everything is unlocked.' : 'Free plan — some content is marked 🔒 Premium.'}
         </Text>
         <Button themed label="See plans & pricing" variant="secondary" onPress={() => router.push('/onboarding/plans')} />
 
-        <Text style={styles.sectionTitle}>About</Text>
+        <Text style={styles.sectionTitle} accessibilityRole="header">About</Text>
         <Button themed label={WHY_TUNISIAN_LINK} variant="secondary" onPress={() => router.push('/why-tunisian')} />
 
-        <Text style={styles.sectionTitle}>Account</Text>
+        <Text style={styles.sectionTitle} accessibilityRole="header">Account</Text>
         <Button
           themed
           label="Change password"
@@ -313,7 +305,7 @@ export default function ProfileScreen() {
 
         {isAdmin ? (
           <>
-            <Text style={styles.sectionTitle}>Admin</Text>
+            <Text style={styles.sectionTitle} accessibilityRole="header">Admin</Text>
 
             {/* Admins always have Premium; this only changes what *they* see,
                 to check the free experience. Nothing is written to Supabase. */}
@@ -386,6 +378,7 @@ const makeStyles = (colors: ThemeColors) => {
       textTransform: 'uppercase',
       letterSpacing: 0.5,
     },
+    subsectionTitle: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md, marginBottom: spacing.sm },
     progressGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
     statCard: {
       width: '30%',

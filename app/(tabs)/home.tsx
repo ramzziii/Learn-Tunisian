@@ -1,56 +1,44 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '@/components/ui/Button';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
-import { PressableScale } from '@/components/ui/PressableScale';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Reveal } from '@/components/ui/Reveal';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { radii, spacing, type ThemeColors } from '@/constants/theme';
-import { fetchLessonMap, type UnitWithLessons } from '@/data/content';
 import { fetchDailyGoalSettings } from '@/data/profiles';
-import {
-  fetchProgressSummary,
-  fetchReviewDueCount,
-  fetchTodayPracticeSummary,
-  type ProfileProgressSummary,
-  type TodayPracticeSummary,
-} from '@/data/progress';
-import { fetchMinutesLearnedToday, fetchRecentActivityDates } from '@/data/sessionLogs';
+import { fetchReviewDueCount } from '@/data/progress';
+import { fetchMinutesLearnedToday } from '@/data/sessionLogs';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
-import { buildDailyChallenges, type DailyChallenge } from '@/lib/dailyChallenges';
-import { getTodayChallengeFlags } from '@/lib/dailyChallengeProgress';
-import { recommendNextStep, type NextStepRecommendation } from '@/lib/nextStepRecommendation';
-import { calculateStreak } from '@/lib/streak';
 import { useTheme } from '@/lib/theme/ThemeContext';
 import type { DailyGoalMinutes } from '@/types/models';
 
 interface HomeData {
-  unitsWithLessons: UnitWithLessons[];
   reviewDueCount: number;
   minutesToday: number;
   goalMinutes: DailyGoalMinutes;
-  progressSummary: ProfileProgressSummary;
-  todayPractice: TodayPracticeSummary;
-  streakDays: number;
-  dailyChallenges: DailyChallenge[];
 }
 
-const EMPTY_TODAY_PRACTICE: TodayPracticeSummary = { wordsPracticedToday: 0, wordsMasteredToday: 0 };
-
 /**
- * Home is deliberately thin now — greeting, today's progress, one
- * recommendation, quick actions to the other tabs, daily challenges.
- * Everything that used to live here (the full lesson map, Culture Corner,
- * Talk, Alphabet/Speaking practice, progress insights) now has its own
- * destination on the Learn/Practice/Talk/Profile tabs — see
- * app/(tabs)/_layout.tsx.
+ * Home answers one question — "what should I do now?" — with one primary
+ * action: Start today's practice (app/todays-practice.tsx). Below it, only
+ * when words are due, a quiet "N words due" link to Review. Greeting and
+ * today's minutes toward the daily goal stay; lessons live on Learn and
+ * individual activities on Practice.
  *
- * This screen (and its sub-components) is fully converted to the live
- * theme system — see src/lib/theme/ThemeContext.tsx.
+ * Today's Practice works for a brand-new learner too: it takes new words
+ * from the one unlocked lesson (lessons unlock in order, so there is only
+ * ever one), and for a new learner that is the first lesson, which the free
+ * plan always includes. So there is no separate "start your first lesson"
+ * fallback here — if that lesson had no words, a lesson session would have
+ * none either, and Today's Practice's own empty state points to Practice.
+ *
+ * The daily-challenge checklist and the day count are no longer shown here;
+ * their stored data and calculations (src/lib/dailyChallenges.ts,
+ * dailyChallengeProgress.ts, streak.ts) are left in place.
  */
 export default function Home() {
   const { activeProfile } = useActiveProfile();
@@ -58,64 +46,17 @@ export default function Home() {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [data, setData] = useState<HomeData | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [loadError, setLoadError] = useState(false);
 
   const load = useCallback(async () => {
     if (!activeProfile) return;
-    setLoadError(false);
-
-    // The lesson map data is only used here to compute the "Recommended
-    // next" pick (see recommendNextStep below) — the map itself now lives
-    // on the Learn tab — so its failure still shows the full-screen error
-    // state, since without it there's no recommendation to show either.
-    let unitsWithLessons: UnitWithLessons[];
-    try {
-      unitsWithLessons = await fetchLessonMap(activeProfile.id);
-    } catch {
-      setLoadError(true);
-      return;
-    }
-
-    // Everything else here is supplementary — a failure in any one of these
-    // (e.g. a migration that hasn't been run yet) shouldn't take down the
-    // whole screen with a misleading "couldn't load your lessons" message
-    // when the lessons themselves loaded fine. Each just falls back to a
-    // sensible default instead.
-    const [
-      reviewDueCount,
-      minutesToday,
-      goalSettings,
-      progressSummary,
-      todayPractice,
-      activityDates,
-      challengeFlags,
-    ] = await Promise.all([
+    // Each falls back to a sensible default — none of them should take the
+    // whole screen down, and the primary action works without any of them.
+    const [reviewDueCount, minutesToday, goalSettings] = await Promise.all([
       fetchReviewDueCount(activeProfile.id).catch(() => 0),
       fetchMinutesLearnedToday(activeProfile.id).catch(() => 0),
       fetchDailyGoalSettings(activeProfile.id).catch(() => null),
-      fetchProgressSummary(activeProfile.id).catch(
-        () => ({ wordsLearning: 0, wordsMastered: 0, wordsReviewed: 0, totalWordsSeen: 0 }) satisfies ProfileProgressSummary
-      ),
-      fetchTodayPracticeSummary(activeProfile.id).catch(() => EMPTY_TODAY_PRACTICE),
-      fetchRecentActivityDates(activeProfile.id).catch(() => [] as string[]),
-      getTodayChallengeFlags(activeProfile.id).catch(() => ({ reviewCompleted: false, speakingCompleted: false })),
     ]);
-
-    setData({
-      unitsWithLessons,
-      reviewDueCount,
-      minutesToday,
-      goalMinutes: goalSettings?.dailyGoalMinutes ?? 5,
-      progressSummary,
-      todayPractice,
-      streakDays: calculateStreak(activityDates),
-      dailyChallenges: buildDailyChallenges({
-        minutesToday,
-        wordsPracticedToday: todayPractice.wordsPracticedToday,
-        reviewCompletedToday: challengeFlags.reviewCompleted,
-        speakingCompletedToday: challengeFlags.speakingCompleted,
-      }),
-    });
+    setData({ reviewDueCount, minutesToday, goalMinutes: goalSettings?.dailyGoalMinutes ?? 5 });
   }, [activeProfile]);
 
   useEffect(() => {
@@ -136,51 +77,40 @@ export default function Home() {
       <HomeHeader name={activeProfile.name} />
 
       {data === null ? (
-        loadError ? (
-          <ErrorState onRetry={load} />
-        ) : (
-          <LoadingScreen themed />
-        )
+        <LoadingScreen themed />
       ) : (
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
         >
-          <AdultHomeContent data={data} />
+          <HomeContent data={data} />
         </ScrollView>
       )}
     </ScreenContainer>
   );
 }
 
-/** No icons anymore — Settings/profile-switching live on the Profile tab now,
- * so there's nothing left for a header icon to launch. */
 function HomeHeader({ name }: { name: string }) {
   const { colors, gradients } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <LinearGradient colors={gradients.primary} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
       <Text style={styles.greeting}>Ahla, {name}!</Text>
-      <Text style={styles.subGreeting}>Ready for today&apos;s lesson?</Text>
+      <Text style={styles.subGreeting}>Ready for today&apos;s practice?</Text>
     </LinearGradient>
   );
 }
 
-/** Goal/streak progress, one recommendation, quick actions to the other
- * tabs, daily challenges — exactly four zones, nothing more. */
-function AdultHomeContent({ data }: { data: HomeData }) {
+/** Today's minutes toward the goal, the one primary action, and — only when
+ * something is due — a quiet link to Review. */
+function HomeContent({ data }: { data: HomeData }) {
   const { colors, gradients } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const { unitsWithLessons, reviewDueCount, minutesToday, goalMinutes, progressSummary, dailyChallenges } = data;
-
-  // A single decision, not two parallel ones: review outranks a new/weak
-  // lesson (spaced repetition only works if reviews actually happen), so
-  // this is the one thing Home tells the user to do next.
-  const allLessons = unitsWithLessons.flatMap((u) => u.lessons);
-  const recommendation = recommendNextStep(allLessons, reviewDueCount);
+  const { reviewDueCount, minutesToday, goalMinutes } = data;
 
   const goalProgress = goalMinutes > 0 ? minutesToday / goalMinutes : 0;
   const goalReached = minutesToday >= goalMinutes;
+  const dueLabel = `${reviewDueCount} ${reviewDueCount === 1 ? 'word' : 'words'} due`;
 
   return (
     <>
@@ -188,16 +118,9 @@ function AdultHomeContent({ data }: { data: HomeData }) {
         <View style={[styles.goalCard, styles.shadowCard]}>
           <View style={styles.goalHeaderRow}>
             <Text style={styles.goalLabel}>Today&apos;s goal</Text>
-            <View style={styles.goalHeaderRight}>
-              {data.streakDays > 0 ? (
-                <View style={styles.streakBadge}>
-                  <Text style={styles.streakBadgeText}>🔥 {data.streakDays}</Text>
-                </View>
-              ) : null}
-              <Text style={styles.goalValue}>
-                {minutesToday} / {goalMinutes} min
-              </Text>
-            </View>
+            <Text style={styles.goalValue}>
+              {minutesToday} / {goalMinutes} min
+            </Text>
           </View>
           <ProgressBar themed progress={goalProgress} gradientColors={goalReached ? gradients.success : gradients.primary} />
           {goalReached ? (
@@ -209,192 +132,30 @@ function AdultHomeContent({ data }: { data: HomeData }) {
       </Reveal>
 
       <Reveal delay={15}>
-        <TodaysPracticeCard reviewDueCount={reviewDueCount} />
+        <View style={[styles.todaysPracticeCard, styles.shadowCard]}>
+          <Text style={styles.todaysPracticeTitle}>Today’s Practice</Text>
+          <Text style={styles.todaysPracticeBody}>
+            A few minutes picked for you: words to review, a little new vocabulary and Repeat After Me.
+          </Text>
+          <Button themed label="Start today’s practice" onPress={() => router.push('/todays-practice')} />
+        </View>
       </Reveal>
 
-      <Reveal delay={30}>
-        <RecommendedNextCard recommendation={recommendation} isFirstLesson={progressSummary.totalWordsSeen === 0} />
-      </Reveal>
-
-      <Reveal delay={60}>
-        <QuickActionsRow />
-      </Reveal>
-
-      <Reveal delay={90}>
-        <DailyChallengesCard challenges={dailyChallenges} />
-      </Reveal>
-    </>
-  );
-}
-
-// One tint per action, same "colored icon tile" language already used on
-// the Phrasebook category cards — distinguishes the four actions from each
-// other instead of four identical gray boxes, and matches the rest of the
-// app's visual vocabulary instead of being a plainer one-off. '#8B6BAE' is
-// the exact violet Phrasebook already uses elsewhere, reused here rather
-// than inventing a new one-off color.
-const QUICK_ACTIONS: {
-  emoji: string;
-  label: string;
-  href: '/learn' | '/practice' | '/talk' | '/review';
-  tint: (colors: ThemeColors) => string;
-}[] = [
-  { emoji: '📚', label: 'Learn', href: '/learn', tint: (c) => c.primary },
-  { emoji: '🎯', label: 'Practice', href: '/practice', tint: (c) => c.accent },
-  { emoji: '💬', label: 'Talk', href: '/talk', tint: (c) => c.success },
-  // Deliberately not 🔄 — on iOS that's one of Apple's "button" glyphs
-  // (like 🔼🔀) with a solid dark square baked into the artwork itself, so
-  // it clashed with the tinted circle tile behind it. 🧠 is a plain
-  // pictograph like the other three and fits "review" just as well.
-  { emoji: '🧠', label: 'Review', href: '/review', tint: () => '#8B6BAE' },
-];
-
-/** Four compact shortcuts straight to the other tabs/features — denser than
- * a full card, exactly the "a few quick actions" zone Home is meant to have. */
-function QuickActionsRow() {
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
-  return (
-    <View style={styles.quickActionsRow}>
-      {QUICK_ACTIONS.map((action) => {
-        const tint = action.tint(colors);
-        return (
-          <PressableScale
-            key={action.label}
-            haptic
-            onPress={() => router.push(action.href)}
-            style={[styles.quickActionButton, styles.shadowCard]}
+      {reviewDueCount > 0 ? (
+        <Reveal delay={30}>
+          <Pressable
+            accessibilityRole="link"
+            accessibilityLabel={`${dueLabel}. Open Review`}
+            onPress={() => router.push('/review')}
+            hitSlop={8}
+            style={({ pressed }) => [styles.dueLink, pressed && { opacity: 0.6 }]}
           >
-            <View style={[styles.quickActionIconTile, { backgroundColor: `${tint}26` }]}>
-              <Text style={styles.quickActionEmoji}>{action.emoji}</Text>
-            </View>
-            <Text style={styles.quickActionLabel}>{action.label}</Text>
-          </PressableScale>
-        );
-      })}
-    </View>
-  );
-}
-
-/** A compact, always-4-item checklist of the day's micro-challenges — done
- * items get a check and a strikethrough rather than disappearing, so
- * progress stays visible through the whole day instead of the list
- * shrinking as you go. */
-function DailyChallengesCard({ challenges }: { challenges: DailyChallenge[] }) {
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
-  const completedCount = challenges.filter((c) => c.isComplete).length;
-  const allComplete = completedCount === challenges.length;
-
-  return (
-    <View style={[styles.recapCard, styles.shadowCard]}>
-      <View style={styles.challengesHeaderRow}>
-        <Text style={styles.recapTitle}>Today&apos;s challenges</Text>
-        <Text style={styles.challengesCount}>
-          {completedCount}/{challenges.length}
-        </Text>
-      </View>
-      {allComplete ? (
-        <Text style={styles.challengesAllDone}>🎉 All done for today — amazing!</Text>
-      ) : (
-        <View style={styles.challengesList}>
-          {challenges.map((challenge) => (
-            <View key={challenge.id} style={styles.challengeRow}>
-              <Text style={styles.challengeCheck}>{challenge.isComplete ? '✅' : challenge.emoji}</Text>
-              <Text style={[styles.challengeLabel, challenge.isComplete && styles.challengeLabelDone]}>
-                {challenge.label}
-              </Text>
-            </View>
-          ))}
-        </View>
-      )}
-    </View>
-  );
-}
-
-/** The one thing worth doing next: review if anything's due, otherwise the
- * weakest unlocked lesson — a single card with a single reason, replacing
- * what used to be a lesson CTA and a separate review card shown together.
- * For a learner with zero progress anywhere, this becomes their "Start
- * Here" moment instead of generic "pick up where you left off" copy that
- * makes no sense before they've started anything. */
-/** One clear entry point to a short guided session (app/todays-practice.tsx).
- * Activities are still browsed and launched individually from the Practice tab. */
-function TodaysPracticeCard({ reviewDueCount }: { reviewDueCount: number }) {
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
-  return (
-    <View style={[styles.todaysPracticeCard, styles.shadowCard]}>
-      <Text style={styles.todaysPracticeTitle}>Today’s Practice</Text>
-      <Text style={styles.todaysPracticeBody}>
-        {reviewDueCount > 0
-          ? `${reviewDueCount} ${reviewDueCount === 1 ? 'word' : 'words'} due for review, plus a little new practice.`
-          : 'A few minutes of new words and Repeat After Me.'}
-      </Text>
-      <Button themed label="Start today’s practice" onPress={() => router.push('/todays-practice')} />
-    </View>
-  );
-}
-
-function RecommendedNextCard({
-  recommendation,
-  isFirstLesson,
-}: {
-  recommendation: NextStepRecommendation | null;
-  isFirstLesson: boolean;
-}) {
-  const { colors, gradients } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
-  if (!recommendation) return null;
-
-  const isReview = recommendation.type === 'review';
-  const showAsFirstLesson = !isReview && isFirstLesson;
-
-  const title = isReview ? 'Review time' : recommendation.lesson.title ?? recommendation.lesson.unitName;
-  const eyebrow = showAsFirstLesson ? 'Your first lesson' : 'Recommended next';
-  const emoji = isReview ? '🔄' : showAsFirstLesson ? '🌱' : '📚';
-  const reasonText = isReview
-    ? `${recommendation.dueCount} ${recommendation.dueCount === 1 ? 'word' : 'words'} due — a quick review keeps them fresh`
-    : showAsFirstLesson
-      ? "Everyday phrases you'll actually use — no experience needed"
-      : recommendation.reason === 'weak_spot'
-        ? 'Keep building up an area that needs more practice'
-        : 'Pick up right where you left off';
-
-  return (
-    <PressableScale
-      haptic
-      onPress={() => router.push(isReview ? '/review' : `/lesson/${recommendation.lesson.id}`)}
-      style={[styles.reviewCard, styles.shadowCard]}
-    >
-      <LinearGradient
-        colors={gradients.primary}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.reviewCardGradient}
-      >
-        <Text style={styles.reviewEmoji}>{emoji}</Text>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.recommendEyebrow}>{eyebrow}</Text>
-          <Text style={[styles.reviewTitle, { color: colors.textOnPrimary }]}>{title}</Text>
-          <Text style={[styles.reviewSubtitle, { color: colors.textOnPrimary }]}>{reasonText}</Text>
-        </View>
-        <Text style={[styles.reviewChevron, { color: colors.textOnPrimary }]}>›</Text>
-      </LinearGradient>
-    </PressableScale>
-  );
-}
-
-function ErrorState({ onRetry }: { onRetry: () => void }) {
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
-  return (
-    <View style={styles.errorContainer}>
-      <Text style={styles.errorEmoji}>😕</Text>
-      <Text style={styles.errorTitle}>Couldn&apos;t load your lessons</Text>
-      <Text style={styles.errorBody}>Check your connection and try again.</Text>
-      <Button themed label="Try again" variant="secondary" onPress={onRetry} />
-    </View>
+            <Text style={styles.dueLinkText}>{dueLabel}</Text>
+            <Text style={styles.dueLinkAction}>Review ›</Text>
+          </Pressable>
+        </Reveal>
+      ) : null}
+    </>
   );
 }
 
@@ -402,11 +163,9 @@ const makeStyles = (colors: ThemeColors) => {
   // Elevation shadows kept theme-independent in shape, since RN shadows
   // read fine on dark surfaces at low opacity too — see the redesign plan.
   const shadowCard = { shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 3 };
-  const shadowRaised = { shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 8 };
 
   return StyleSheet.create({
     shadowCard,
-    shadowRaised,
     header: {
       padding: spacing.lg,
       paddingBottom: spacing.xl,
@@ -428,9 +187,6 @@ const makeStyles = (colors: ThemeColors) => {
     goalCard: { backgroundColor: colors.surface, borderRadius: radii.lg, padding: spacing.md, marginBottom: spacing.lg },
     goalHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
     goalLabel: { fontSize: 14, fontWeight: '700', color: colors.textSecondary },
-    goalHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-    streakBadge: { backgroundColor: `${colors.accent}26`, borderRadius: radii.pill, paddingVertical: 2, paddingHorizontal: spacing.xs },
-    streakBadgeText: { fontSize: 13, fontWeight: '700', color: colors.accent },
     goalValue: { fontSize: 14, fontWeight: '700', color: colors.primary },
     goalReachedBanner: {
       backgroundColor: `${colors.success}1F`,
@@ -441,67 +197,20 @@ const makeStyles = (colors: ThemeColors) => {
       alignItems: 'center',
     },
     goalReachedText: { fontSize: 13, fontWeight: '700', color: colors.success },
-    recapCard: { backgroundColor: colors.surface, borderRadius: radii.lg, padding: spacing.md, marginBottom: spacing.lg },
-    recapTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
-    challengesHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    challengesCount: { fontSize: 13, fontWeight: '700', color: colors.textSecondary },
-    challengesAllDone: { fontSize: 14, fontWeight: '700', color: colors.success, marginTop: spacing.sm },
-    challengesList: { marginTop: spacing.sm, gap: spacing.xs },
-    challengeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-    challengeCheck: { fontSize: 16, width: 22, textAlign: 'center' },
-    challengeLabel: { fontSize: 14, color: colors.textPrimary, flex: 1 },
-    challengeLabelDone: { color: colors.textSecondary, textDecorationLine: 'line-through' },
-    quickActionsRow: { flexDirection: 'row', alignItems: 'stretch', gap: spacing.sm, marginBottom: spacing.lg },
-    quickActionButton: {
-      flex: 1,
-      minWidth: 0,
-      // 'stretch' (not 'center') so the label below is constrained to the
-      // button's actual width and wraps/stays centered within it, instead
-      // of sizing to its own text width and spilling past the rounded
-      // background — which is what was happening with "Review".
-      alignItems: 'stretch',
-      justifyContent: 'center',
-      backgroundColor: colors.surface,
-      borderRadius: radii.md,
-      paddingVertical: spacing.sm,
-      paddingHorizontal: spacing.xs,
-      gap: spacing.xs,
-      overflow: 'hidden',
-    },
-    quickActionIconTile: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      alignSelf: 'center',
+    dueLink: {
+      flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'center',
+      justifyContent: 'space-between',
+      flexWrap: 'wrap',
+      gap: spacing.sm,
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.md,
+      borderRadius: radii.md,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      marginBottom: spacing.lg,
     },
-    quickActionEmoji: { fontSize: 18, lineHeight: 22, textAlign: 'center' },
-    quickActionLabel: {
-      fontSize: 12,
-      fontWeight: '700',
-      color: colors.textPrimary,
-      textAlign: 'center',
-      width: '100%',
-    },
-    reviewCard: { borderRadius: radii.lg, marginBottom: spacing.lg, overflow: 'hidden' },
-    reviewCardGradient: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md },
-    reviewEmoji: { fontSize: 32 },
-    recommendEyebrow: {
-      fontSize: 11,
-      fontWeight: '700',
-      color: colors.textOnPrimary,
-      opacity: 0.75,
-      textTransform: 'uppercase',
-      letterSpacing: 0.5,
-      marginBottom: 2,
-    },
-    reviewTitle: { fontSize: 17, fontWeight: '700', color: colors.textPrimary },
-    reviewSubtitle: { fontSize: 13, color: colors.textPrimary, opacity: 0.75, marginTop: 2 },
-    reviewChevron: { fontSize: 28, color: colors.textPrimary, opacity: 0.5 },
-    errorContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm, padding: spacing.lg },
-    errorEmoji: { fontSize: 48, marginBottom: spacing.sm },
-    errorTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
-    errorBody: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', marginBottom: spacing.md },
+    dueLinkText: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
+    dueLinkAction: { fontSize: 15, fontWeight: '700', color: colors.primary },
   });
 };

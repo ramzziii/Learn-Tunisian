@@ -136,9 +136,10 @@ describe('quiz questions', () => {
 });
 
 describe('decks', () => {
-  it('Due today, My favorites, then one deck per category in curriculum order', () => {
+  it('My favorites, then one deck per category in curriculum order — no Due today deck (Review does that)', () => {
     const decks = build();
-    expect(decks.map((d: { id: string }) => d.id)).toEqual(['due', 'favorites', 'category-greet', 'category-food']);
+    expect(decks.map((d: { id: string }) => d.id)).toEqual(['favorites', 'category-greet', 'category-food']);
+    expect(deck(decks, 'due')).toBeUndefined();
     expect(deck(decks, 'category-greet')).toMatchObject({ title: 'Greetings', kind: 'category' });
   });
 
@@ -156,16 +157,14 @@ describe('decks', () => {
     expect(all).not.toContain('unseen');
   });
 
-  it('Due today: due now or struggling (same rule as Review), most overdue first', () => {
+  it('due counts use the same rule as Review (due now or struggling), most overdue first', () => {
     const decks = build({
       progress: [
-        progress('hello', past),
+        progress('hello', future, 2), // struggling: missed twice in a row
         progress('bye', new Date(2026, 9, 20).toISOString()),
-        progress('bread', future, 2), // struggling: missed twice in a row
-        progress('water', future),
       ],
     });
-    expect(deck(decks, 'due')).toMatchObject({ cardIds: ['bye', 'hello', 'bread'], dueCount: 3 });
+    expect(deck(decks, 'category-greet')).toMatchObject({ cardIds: ['bye', 'hello'], dueCount: 2 });
   });
 
   it('My favorites: saved words (due first, then most recently saved), with their due count', () => {
@@ -180,12 +179,9 @@ describe('decks', () => {
     expect(all).not.toContain('hello');
   });
 
-  it('Due today and My favorites are always listed, even when empty', () => {
+  it('My favorites is always listed, even when empty', () => {
     const decks = build({ progress: [], favoriteIds: [] });
-    expect(decks).toEqual([
-      expect.objectContaining({ id: 'due', cardIds: [], dueCount: 0 }),
-      expect.objectContaining({ id: 'favorites', cardIds: [], dueCount: 0 }),
-    ]);
+    expect(decks).toEqual([expect.objectContaining({ id: 'favorites', cardIds: [], dueCount: 0 })]);
   });
 
   it('due cards come first inside a deck', () => {

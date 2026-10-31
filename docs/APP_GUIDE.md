@@ -82,7 +82,7 @@ Pushed full-screen on top of the tabs
   /review                 Spaced-repetition review session
   /flashcards             Flashcard decks
   /flashcards/[deckId]    Flashcard quiz session
-  /phrasebook             Phrasebook categories
+  /phrasebook             Phrasebook categories (+ link to phrase cards)
   /phrasebook/[categoryId]  Phrases in a category
   /phrasebook/flashcards  Browse-and-listen phrase cards
   /grammar                Grammar notes
@@ -144,12 +144,21 @@ Onboarding draft state.
 
 ## 4. The tabs
 
+The tabs answer two questions: **"What should I learn next?"** (Home's one
+action, and Learn) and **"How do I practise?"** (Practice).
+
 ### Home (`/home`)
-Deliberately short, in four zones:
-1. Greeting, today's minutes toward the daily goal, and a 🔥 day count (consecutive days with practice; shown only when > 0, never a "you'll lose it" warning).
-2. **One recommendation**: review if words are due, otherwise the next lesson (with a reason).
-3. Quick actions, including **Start today's practice**.
-4. **Today's challenges**: a 4-item checklist (learn N minutes, practise N words, finish a review, say 3 phrases out loud).
+Deliberately minimal:
+1. Greeting and today's minutes toward the daily goal.
+2. **One primary action: Start today's practice** (→ `/todays-practice`). It
+   also works for a brand-new learner, using the first lesson's words.
+3. Only when words are due: a quiet secondary link, **"N words due"** →
+   Review.
+
+(Removed from Home: the daily-challenges checklist, the quick-action row, the
+"recommended next" card and the 🔥 day count. Challenge flags are still
+recorded by Review and Speaking Practice, and the day-count calculation
+still exists, but nothing displays them now.)
 
 ### Learn (`/learn`)
 The curriculum map: units → lessons, each lesson **completed / unlocked /
@@ -158,9 +167,18 @@ word in it has been answered correctly at least once, which unlocks the next.
 Progress teasers (words learning / mastered). Each lesson can be started or
 its word list browsed.
 
+- **Start here** (only before any lesson is completed): an Alphabet card at
+  the top.
+- **Explore Tunisian** (below the curriculum): Alphabet, Phrasebook, Grammar
+  Notes, Culture Corner and **Ask for a translation** (with a "your
+  translation is ready" notice when an answer has arrived).
+
 ### Practice (`/practice`)
-A hub of cards: Phrasebook, **Flashcards**, Grammar Notes, Listening
-Practice, Speaking Practice, Alphabet Practice, Review, Culture Corner.
+Three groups:
+- **Review & remember**: Review, Flashcards.
+- **Listen**: Listening Practice.
+- **Speak**: Speaking Practice (opens the chooser: Practice words / Repeat
+  after me).
 
 ### Talk (`/talk`)
 "Talk to a Tunisian": conversation scenarios (At a Café, At the Market,
@@ -170,12 +188,13 @@ completed and **unlocks scenarios**; scenarios matching the learner's goal
 are marked "For you". See §6.10.
 
 ### Profile (`/profile`)
-Appearance (light / dark / match device) · Display (script and form
-preferences) · progress stats · translation requests · favorites · **daily
-goal & reminder** (change goal, turn reminder on/off, pick the time) ·
-Premium status and plans preview · **About** ("Why Tunisian, not MSA?") ·
-Account (change password, sign out, **delete account**) · admin entry and a
-"view as free/Premium" preview for admins.
+Settings only, under headings: admin entry (admins only, at the top) ·
+progress stats · **Daily goal & reminder** (goal, reminder on/off and time,
+Save) · **Display** (appearance light/dark/match device, script and form
+preferences) · **Premium** (status, plans preview) · **About** ("Why
+Tunisian, not MSA?") · **Account** (change password, sign out, delete
+account) · admin-only "view as free/Premium" preview. Favorites moved to
+Flashcards → *Saved words*; translation requests moved to Learn.
 
 ---
 
@@ -247,10 +266,12 @@ when nothing is due. Free plan: one review a day, up to 10 words.
 
 ### 6.5 Flashcards (`/flashcards`, `/flashcards/[deckId]`)
 A **quiz**, not a self-rating deck:
-- **Decks**: *Due today* (same rule as Review), *My favorites*, and one deck
-  per category containing words the learner has **already practised** —
-  nothing from lessons not reached. Each deck shows card and due counts;
-  empty decks have friendly empty states.
+- **Decks**: *My favorites* and one deck per category containing words the
+  learner has **already practised** — nothing from lessons not reached. Each
+  deck shows card and due counts (due cards come first); empty decks have
+  friendly empty states. There is no "due" deck: Review handles due words.
+- **More ways to study** (links): *Phrase cards — listen and browse*
+  (`/phrasebook/flashcards`) and *Saved words* (`/favorites`).
 - **Questions**: per deck, a direction toggle — *Tunisian → meaning* ("What
   does this mean?") or *meaning → Tunisian* ("Which is the Tunisian?").
   3–4 answer choices; wrong answers come from other words the learner has
@@ -263,10 +284,11 @@ A **quiz**, not a self-rating deck:
   answer"), a wrong pick red ("✗ Your answer"), plus the standard result
   sheet. One result per card is recorded through the shared scheduler.
 - Batches of 15, then the completion card with **Another batch**. Minutes
-  count toward the daily goal (logged as a review session). Free plan: *Due
-  today* shares Review's daily allowance.
-- The older **Phrasebook browse cards** (`/phrasebook/flashcards`) still exist:
-  browse-and-listen only, no quiz.
+  count toward the daily goal (logged as a review session). Decks aren't
+  limited on the free plan.
+- The **Phrasebook browse cards** (`/phrasebook/flashcards`) are a separate
+  flow: browse-and-listen only, no quiz. Reached from Phrasebook and from
+  Flashcards.
 
 ### 6.6 Today's Practice (`/todays-practice`)
 One short guided session from Home: up to 5 due review words + 2 new words
@@ -348,7 +370,7 @@ Set at signup or in Profile; permission requested only on opt-in.
 | Curriculum | first lesson | all |
 | Phrasebook | 1 category | all |
 | Grammar / Alphabet / Proverbs | 1 note / 3 letters / 2 proverbs | all |
-| Review & flashcards *Due today* | 1 session/day, ≤ 10 words | unlimited |
+| Review | 1 session/day, ≤ 10 words | unlimited |
 | Repeat after me | 5 items/session | unlimited |
 | Translation requests | 1 | unlimited |
 
@@ -429,15 +451,16 @@ no invented claims); grammatical form is display-only, never identity.
    removing the locks for launch.
 3. **Legal**: real Terms of Use and Privacy Policy are missing.
 4. **Offline**: no content cache and no queued progress writes.
-5. **Overlap**: *Review*, *Flashcards → Due today* and *Today's Practice* all
-   serve due words in different formats — worth a product decision on
-   whether to merge or differentiate.
+5. **Overlap**: *Review* and *Today's Practice* both serve due words (Today's
+   Practice mixes in new words and Repeat After Me); Flashcards also show due
+   counts per deck.
 6. **Speech**: no automatic pronunciation scoring; speech-to-text has no
    dedicated Tunisian mode (transcribes into standard Arabic script).
 7. **Small-content edge cases**: quizzes need ≥ 3 words practised; early
    users see many empty states.
-8. **The 🔥 day count** is positive-only, but any streak display is worth
-   re-checking against the "no streak pressure" principle.
+8. **Unused calculations**: the 🔥 day count and daily challenges are no
+   longer displayed; their code and stored data remain (could be removed or
+   reused later).
 9. **No analytics/crash reporting** wired for production.
 10. **Store submission**: see [store-listing.md](store-listing.md) owner checklist.
 11. **Device-only progress**: Repeat After Me, alphabet, proverb and

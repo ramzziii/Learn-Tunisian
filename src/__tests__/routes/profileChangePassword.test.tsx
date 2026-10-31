@@ -169,9 +169,9 @@ it('Sign out still asks to confirm, as before', async () => {
   alertSpy.mockRestore();
 });
 
-it('the rest of Profile is unchanged (settings sections still render)', async () => {
+it('the rest of Profile still renders (settings grouped; translations moved to Learn)', async () => {
   await renderProfile();
   expect(await screen.findByText('Appearance')).toBeOnTheScreen();
-  expect(screen.getByText('Daily goal')).toBeOnTheScreen();
-  expect(screen.getByText('[translation requests entry]')).toBeOnTheScreen();
+  expect(screen.getByText('Daily goal & reminder')).toBeOnTheScreen();
+  expect(screen.queryByText('[translation requests entry]')).toBeNull();
 });

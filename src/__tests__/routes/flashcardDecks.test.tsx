@@ -65,9 +65,9 @@ const { ThemeProvider } = require('@/lib/theme/ThemeContext');
 const themed = (el: React.ReactElement) => render(<ThemeProvider>{el}</ThemeProvider>);
 
 const DECKS = [
-  { id: 'due', kind: 'due', title: 'Due today', cardIds: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l'], dueCount: 12 },
   { id: 'favorites', kind: 'favorites', title: 'My favorites', cardIds: [], dueCount: 0 },
   { id: 'category-greet', kind: 'category', title: 'Greetings', cardIds: ['a', 'b'], dueCount: 1 },
+  { id: 'category-food', kind: 'category', title: 'Food', cardIds: ['c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n'], dueCount: 0 },
 ];
 
 beforeEach(() => {
@@ -80,11 +80,11 @@ beforeEach(() => {
 });
 
 describe('deck list', () => {
-  it('shows each deck with its card and due counts', async () => {
+  it('shows the favorites and category decks with their card and due counts — no Due today deck', async () => {
     await themed(<DeckList />);
-    expect(await screen.findByText('Due today')).toBeOnTheScreen();
-    expect(screen.getByText('12 cards · 12 due')).toBeOnTheScreen();
-    expect(screen.getByText('My favorites')).toBeOnTheScreen();
+    expect(await screen.findByText('My favorites')).toBeOnTheScreen();
+    expect(screen.queryByText('Due today')).toBeNull();
+    expect(screen.getByText('12 cards · 0 due')).toBeOnTheScreen();
     expect(screen.getByText('Greetings')).toBeOnTheScreen();
     expect(screen.getByText('2 cards · 1 due')).toBeOnTheScreen();
     expect(mockFetchDecks).toHaveBeenCalledWith('p1');
@@ -96,17 +96,26 @@ describe('deck list', () => {
     expect(mockPush).toHaveBeenCalledWith('/flashcards/category-greet');
   });
 
-  it('still links to browsing every phrasebook phrase', async () => {
+  it('links to the Phrasebook browse cards, a separate flow', async () => {
     await themed(<DeckList />);
-    await fireEvent.press(await screen.findByText('Browse all phrasebook phrases'));
+    await fireEvent.press(await screen.findByRole('button', { name: /^Phrase cards — listen and browse/ }));
     expect(mockPush).toHaveBeenCalledWith('/phrasebook/flashcards');
   });
 
+  it('links to the full saved-words list', async () => {
+    await themed(<DeckList />);
+    await fireEvent.press(await screen.findByRole('button', { name: /^Saved words/ }));
+    expect(mockPush).toHaveBeenCalledWith('/favorites');
+  });
+
+  it('no copy about sharing Review’s daily allowance', async () => {
+    await themed(<DeckList />);
+    await screen.findByText('My favorites');
+    expect(screen.queryByText(/allowance|Due today/i)).toBeNull();
+  });
+
   it('explains where decks come from when nothing has been practised yet', async () => {
-    mockFetchDecks.mockResolvedValue([
-      { id: 'due', kind: 'due', title: 'Due today', cardIds: [], dueCount: 0 },
-      { id: 'favorites', kind: 'favorites', title: 'My favorites', cardIds: [], dueCount: 0 },
-    ]);
+    mockFetchDecks.mockResolvedValue([{ id: 'favorites', kind: 'favorites', title: 'My favorites', cardIds: [], dueCount: 0 }]);
     await themed(<DeckList />);
     expect(await screen.findByText(/words you practise in lessons/i)).toBeOnTheScreen();
   });
@@ -115,14 +124,14 @@ describe('deck list', () => {
 describe('a deck', () => {
   it('loads its cards and starts a session with the saved daily goal', async () => {
     await themed(<DeckScreen />);
-    expect(await screen.findByText('[session a,b goal=10 pool=12]')).toBeOnTheScreen();
+    expect(await screen.findByText('[session a,b goal=10 pool=14]')).toBeOnTheScreen();
   });
 
   it('wrong answers come from every word in the learner’s decks — nothing they haven’t met', async () => {
     await themed(<DeckScreen />);
     await screen.findByText(/\[session/);
     expect(mockFetchCards).toHaveBeenCalledTimes(1);
-    expect(mockFetchCards).toHaveBeenCalledWith(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l']);
+    expect(mockFetchCards).toHaveBeenCalledWith(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n']);
   });
 
   it('an empty deck shows a friendly empty state, not a session', async () => {
@@ -133,40 +142,18 @@ describe('a deck', () => {
     expect(mockFetchCards).not.toHaveBeenCalled();
   });
 
-  it('Due today with nothing due says you’re caught up', async () => {
-    mockDeckId = 'due';
-    mockFetchDecks.mockResolvedValue([{ id: 'due', kind: 'due', title: 'Due today', cardIds: [], dueCount: 0 }]);
+  it('decks aren’t limited on the free plan and never use up Review’s daily allowance', async () => {
+    mockDeckId = 'category-food';
     await themed(<DeckScreen />);
-    expect(await screen.findByText('All caught up')).toBeOnTheScreen();
-  });
-
-  it('free plan: Due today uses the day’s free review — up to 10 cards, and marks it used', async () => {
-    mockDeckId = 'due';
-    await themed(<DeckScreen />);
-    expect(await screen.findByText('[session a,b,c,d,e,f,g,h,i,j goal=10 pool=12]')).toBeOnTheScreen();
-    expect(mockMarkFreeReview).toHaveBeenCalledWith('p1');
-  });
-
-  it('free plan: once today’s free review is used, Due today says so', async () => {
-    mockDeckId = 'due';
-    mockUsedFreeReview = true;
-    await themed(<DeckScreen />);
-    expect(await screen.findByText(/used today's free review/i)).toBeOnTheScreen();
-    expect(mockFetchCards).not.toHaveBeenCalled();
-  });
-
-  it('free plan: category and favorites decks aren’t limited', async () => {
-    mockUsedFreeReview = true;
-    await themed(<DeckScreen />);
-    expect(await screen.findByText('[session a,b goal=10 pool=12]')).toBeOnTheScreen();
+    expect(await screen.findByText('[session c,d,e,f,g,h,i,j,k,l,m,n goal=10 pool=14]')).toBeOnTheScreen();
     expect(mockMarkFreeReview).not.toHaveBeenCalled();
   });
 
-  it('Premium: Due today is unlimited', async () => {
+  it('an old link to the removed Due today deck explains itself (Review is the place for due words)', async () => {
     mockDeckId = 'due';
-    mockIsPremium = true;
     await themed(<DeckScreen />);
-    expect(await screen.findByText('[session a,b,c,d,e,f,g,h,i,j,k,l goal=10 pool=12]')).toBeOnTheScreen();
+    expect(await screen.findByText('Deck not found')).toBeOnTheScreen();
+    expect(mockFetchCards).not.toHaveBeenCalled();
     expect(mockMarkFreeReview).not.toHaveBeenCalled();
   });
 

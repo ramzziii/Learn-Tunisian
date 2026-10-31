@@ -196,10 +196,12 @@ system for review.
 Practice → Flashcards (`app/flashcards/`) studies decks built from what the
 learner has already met — no second review system:
 
-- **Decks** (`buildFlashcardDecks` in `src/lib/flashcards.ts`): Due today
-  (due or struggling — the same rule as Review), My favorites, and one deck per
-  category with words that have a `progress` row. Nothing from a lesson not
-  reached yet. Due cards come first in every deck.
+- **Decks** (`buildFlashcardDecks` in `src/lib/flashcards.ts`): My favorites
+  and one deck per category with words that have a `progress` row. Nothing
+  from a lesson not reached yet. Due cards (due or struggling — the same rule
+  as Review) come first in every deck; there's no separate "due" deck, since
+  Review does that. The deck list also links to the Phrasebook browse cards
+  and to Saved words (`/favorites`).
 - **Approved content only**: `src/data/flashcards.ts` filters
   `content_status = 'approved'` on words and forms (RLS doesn't), and drops
   anything else returned.
@@ -219,8 +221,7 @@ learner has already met — no second review system:
 - **Sessions**: batches of 15 on the standard timer and completion card
   (Another batch, Add more time, Back to home); minutes are logged as a
   `'review'` session, so they count toward the daily goal.
-- **Free plan**: Due today shares Review's daily free allowance; category and
-  favorites decks are open.
+- **Free plan**: decks are open (Review keeps its own daily free allowance).
 - **Offline**: decks need a connection to load (content isn't cached). Audio
   already played plays offline. There's no offline queue for results — a
   result that can't be saved is reported on screen.

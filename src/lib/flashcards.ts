@@ -116,7 +116,7 @@ export function nextBatch<T>(cards: readonly T[], shownCount: number, size = FLA
 
 export interface FlashcardDeck {
   id: string;
-  kind: 'due' | 'favorites' | 'category';
+  kind: 'favorites' | 'category';
   title: string;
   /** Word group ids, due cards first. */
   cardIds: string[];
@@ -139,9 +139,11 @@ export function isDue(row: Pick<ReviewCandidate, 'nextReviewAt' | 'consecutiveIn
 }
 
 /**
- * Due today, My favorites (both always listed), then one deck per category
- * the learner has practised words in, in curriculum order. Category decks
- * hold only practised words, so nothing from a lesson not reached yet.
+ * My favorites (always listed), then one deck per category the learner has
+ * practised words in, in curriculum order. Category decks hold only
+ * practised words, so nothing from a lesson not reached yet. There's no
+ * "due" deck: Review is the place for due words; here due cards just come
+ * first in each deck and are counted.
  */
 export function buildFlashcardDecks({ progress, favoriteIds, groups, units }: DeckInput, now: Date = new Date()): FlashcardDeck[] {
   const groupById = new Map(groups.map((g) => [g.id, g]));
@@ -173,5 +175,5 @@ export function buildFlashcardDecks({ progress, favoriteIds, groups, units }: De
     .filter((unit) => practisedByUnit.has(unit.id))
     .map((unit) => deckOf(`category-${unit.id}`, 'category', unit.name, practisedByUnit.get(unit.id)!));
 
-  return [deckOf('due', 'due', 'Due today', dueIds), deckOf('favorites', 'favorites', 'My favorites', favorites), ...categories];
+  return [deckOf('favorites', 'favorites', 'My favorites', favorites), ...categories];
 }

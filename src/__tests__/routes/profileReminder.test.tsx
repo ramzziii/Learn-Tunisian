@@ -30,7 +30,8 @@ jest.mock('expo-router', () => ({ router: { push: (...a: unknown[]) => mockPush(
 jest.mock('@/lib/account/ActiveProfileContext', () => ({
   useActiveProfile: () => ({ activeProfile: mockProfile, profiles: [mockProfile] }),
 }));
-jest.mock('@/lib/admin/AdminContext', () => ({ useIsAdmin: () => ({ isAdmin: false, isLoading: false }) }));
+let mockIsAdmin = false;
+jest.mock('@/lib/admin/AdminContext', () => ({ useIsAdmin: () => ({ isAdmin: mockIsAdmin, isLoading: false }) }));
 jest.mock('@/lib/premium/PremiumContext', () => ({
   usePremium: () => ({ isPremium: false, isResolved: true, isAdmin: false, adminPreview: 'premium', setAdminPreview: jest.fn() }),
 }));
@@ -78,6 +79,7 @@ beforeEach(() => {
   [mockCancel, mockPermission, mockSchedule, mockUpdateSettings].forEach((m) => m.mockReset());
   mockUpdateSettings.mockResolvedValue(undefined);
   mockSettings = { dailyGoalMinutes: 10, reminderEnabled: false, reminderTime: '18:00:00' };
+  mockIsAdmin = false;
 });
 
 const reminderSwitch = () => screen.getByLabelText('Daily reminder');
@@ -140,4 +142,55 @@ it('About opens “Why Tunisian, not MSA?”', async () => {
   expect(screen.getByText('About')).toBeOnTheScreen();
   await fireEvent.press(screen.getByText('Why Tunisian, not MSA?'));
   expect(mockPush).toHaveBeenCalledWith('/why-tunisian');
+});
+
+// Profile is settings only: grouped under clear headings, with Favorites and
+// Translation requests moved out (Flashcards → Saved words, Learn → Ask for
+// a translation). The admin entry stays admin-only, at the top.
+describe('Profile layout', () => {
+  const texts = () => screen.getAllByText(/.+/).map((el) => [el.props.children].flat(Infinity).join(''));
+
+  it('settings grouped in order: Daily goal & reminder, Display, Premium, About, Account', async () => {
+    await renderProfile();
+    await screen.findByText('Save changes');
+    const order = ['Daily goal & reminder', 'Display', 'Premium', 'About', 'Account'].map((h) => texts().indexOf(h));
+    expect(order.every((i) => i > -1)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    // Display holds both appearance and the script/form preferences.
+    const display = texts().indexOf('Display');
+    expect(texts().indexOf('Appearance')).toBeGreaterThan(display);
+    expect(texts().indexOf('Appearance')).toBeLessThan(texts().indexOf('Premium'));
+  });
+
+  it('no Favorites or Translation requests entries', async () => {
+    await renderProfile();
+    await screen.findByText('Save changes');
+    expect(screen.queryByText('View favorites')).toBeNull();
+    expect(screen.queryByText('Vocabulary')).toBeNull();
+    expect(screen.queryByText('Translations')).toBeNull();
+    expect(screen.queryByText('[translation requests entry]')).toBeNull();
+  });
+
+  it('account actions stay: change password, sign out, delete account', async () => {
+    await renderProfile();
+    await screen.findByText('Save changes');
+    for (const label of ['Change password', 'Sign out', 'Delete account']) expect(screen.getByText(label)).toBeOnTheScreen();
+    await fireEvent.press(screen.getByText('Delete account'));
+    expect(mockPush).toHaveBeenCalledWith('/account/delete');
+  });
+
+  it('no admin entry for a learner', async () => {
+    await renderProfile();
+    await screen.findByText('Save changes');
+    expect(screen.queryByText('Admin dashboard')).toBeNull();
+  });
+
+  it('for an admin, the admin entry is at the top and opens the dashboard', async () => {
+    mockIsAdmin = true;
+    await renderProfile();
+    await screen.findByText('Save changes');
+    expect(texts().indexOf('Admin dashboard')).toBeLessThan(texts().indexOf('Daily goal & reminder'));
+    await fireEvent.press(screen.getByText('Admin dashboard'));
+    expect(mockPush).toHaveBeenCalledWith('/admin');
+  });
 });

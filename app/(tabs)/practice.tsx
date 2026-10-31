@@ -17,24 +17,36 @@ interface HubCard {
   href: Parameters<typeof router.push>[0];
 }
 
-const CARDS: HubCard[] = [
-  { emoji: '📖', color: '#3E7CB1', title: 'Phrasebook', subtitle: 'Real phrases for everyday situations', href: '/phrasebook' },
-  // Study decks (spaced repetition); the phrasebook browse deck is linked from there.
-  { emoji: '🗂️', color: '#4A90A4', title: 'Flashcards', subtitle: 'Study decks of words you’ve met', href: '/flashcards' },
-  { emoji: '📝', color: '#8B6BAE', title: 'Grammar Notes', subtitle: 'Tounsi patterns explained simply', href: '/grammar' },
-  { emoji: '👂', color: '#3E7CB1', title: 'Listening Practice', subtitle: 'Match meanings to native recordings', href: '/listening-practice' },
-  // Opens a choice between Practice words (/speaking-practice) and Repeat
-  // native recordings (/repeat-after-me) — two separate flows, one entry.
-  { emoji: '🎙️', color: '#C0567D', title: 'Speaking Practice', subtitle: 'Practise words or repeat native recordings', href: '/speaking' },
-  { emoji: '🅰️', color: '#D9A441', title: 'Alphabet Practice', subtitle: 'Learn letters and sounds', href: '/alphabet' },
-  { emoji: '🔄', color: '#4CA771', title: 'Review', subtitle: 'Keep your weak words fresh', href: '/review' },
-  { emoji: '📜', color: '#B15C4A', title: 'Culture Corner', subtitle: 'Real Tunisian proverbs & sayings', href: '/culture' },
+/** Three short groups answering "how do I practise?". Reference features
+ * (Alphabet, Phrasebook, Grammar Notes, Culture Corner) live on Learn →
+ * Explore Tunisian; their routes are unchanged. */
+const GROUPS: { heading: string; cards: HubCard[] }[] = [
+  {
+    heading: 'Review & remember',
+    cards: [
+      { emoji: '🔄', color: '#4CA771', title: 'Review', subtitle: 'Words that are due, brought back at the right time', href: '/review' },
+      { emoji: '🗂️', color: '#4A90A4', title: 'Flashcards', subtitle: 'Quiz yourself on decks of words you’ve met', href: '/flashcards' },
+    ],
+  },
+  {
+    heading: 'Listen',
+    cards: [
+      { emoji: '👂', color: '#3E7CB1', title: 'Listening Practice', subtitle: 'Match meanings to native recordings', href: '/listening-practice' },
+    ],
+  },
+  {
+    heading: 'Speak',
+    cards: [
+      // Opens a choice between Practice words (/speaking-practice) and Repeat
+      // native recordings (/repeat-after-me) — two separate flows, one entry.
+      { emoji: '🎙️', color: '#C0567D', title: 'Speaking Practice', subtitle: 'Practise words or repeat native recordings', href: '/speaking' },
+    ],
+  },
 ];
 
 /**
- * Every standalone practice/reference feature, one destination — this is a
- * real tab now (see app/(tabs)/_layout.tsx). Fully converted to the live
- * theme system.
+ * The practice activities, in three groups — this is a real tab (see
+ * app/(tabs)/_layout.tsx). Fully converted to the live theme system.
  */
 export default function PracticeHubScreen() {
   const { colors } = useTheme();
@@ -44,24 +56,37 @@ export default function PracticeHubScreen() {
     <ScreenContainer themed>
       <Text style={styles.eyebrow}>Sharpen your skills</Text>
       <Text style={styles.title}>Practice</Text>
-      <Text style={styles.subtitle}>Everything to sharpen your Tunisian, in one place.</Text>
+      <Text style={styles.subtitle}>Keep what you’ve learned fresh — review it, hear it, say it.</Text>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.list}>
-        {CARDS.map((card, index) => (
-          <Reveal key={card.title} delay={Math.min(index * 50, 400)}>
-            <PressableScale haptic onPress={() => router.push(card.href)} style={[styles.card, styles.shadowCard]}>
-              <View style={[styles.iconTile, { backgroundColor: `${card.color}26` }]}>
-                <Text style={styles.cardEmoji}>{card.emoji}</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.cardTitle}>{card.title}</Text>
-                <Text style={styles.cardSubtitle}>{card.subtitle}</Text>
-              </View>
-              <View style={[styles.chevronCircle, { borderColor: card.color }]}>
-                <Text style={[styles.chevron, { color: card.color }]}>›</Text>
-              </View>
-            </PressableScale>
-          </Reveal>
+        {GROUPS.map((group, groupIndex) => (
+          <View key={group.heading} accessibilityLabel={`${group.heading} activities`} style={styles.group}>
+            <Text style={styles.groupHeading} accessibilityRole="header">
+              {group.heading}
+            </Text>
+            {group.cards.map((card, index) => (
+              <Reveal key={card.title} delay={Math.min((groupIndex * 2 + index) * 50, 400)}>
+                <PressableScale
+                  haptic
+                  accessibilityRole="button"
+                  accessibilityLabel={`${card.title}. ${card.subtitle}`}
+                  onPress={() => router.push(card.href)}
+                  style={[styles.card, styles.shadowCard]}
+                >
+                  <View style={[styles.iconTile, { backgroundColor: `${card.color}26` }]}>
+                    <Text style={styles.cardEmoji}>{card.emoji}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.cardTitle}>{card.title}</Text>
+                    <Text style={styles.cardSubtitle}>{card.subtitle}</Text>
+                  </View>
+                  <View style={[styles.chevronCircle, { borderColor: card.color }]}>
+                    <Text style={[styles.chevron, { color: card.color }]}>›</Text>
+                  </View>
+                </PressableScale>
+              </Reveal>
+            ))}
+          </View>
         ))}
       </ScrollView>
     </ScreenContainer>
@@ -83,7 +108,9 @@ const makeStyles = (colors: ThemeColors) => {
     },
     title: { fontSize: 30, fontWeight: '800', color: colors.textPrimary, marginTop: spacing.xs },
     subtitle: { fontSize: 14, color: colors.textSecondary, marginTop: spacing.xs, marginBottom: spacing.lg, lineHeight: 20 },
-    list: { gap: spacing.md, paddingBottom: spacing.xxl },
+    list: { gap: spacing.lg, paddingBottom: spacing.xxl },
+    group: { gap: spacing.sm },
+    groupHeading: { fontSize: 18, fontWeight: '800', color: colors.textPrimary },
     card: {
       flexDirection: 'row',
       alignItems: 'center',

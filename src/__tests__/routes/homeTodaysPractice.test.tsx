@@ -1,9 +1,13 @@
-// Home: a Today's Practice card sits right below the daily goal and starts
-// the guided session. Practice tab: individual activities are unchanged.
+// Home answers "what should I do now?" with one primary action — Start
+// today's practice — plus a quiet "N words due" link to Review only when
+// something is due. The greeting and today's minutes toward the goal stay.
+// No challenges checklist, no quick-action row, no 🔥 day count.
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 const mockRouter = { push: jest.fn(), replace: jest.fn(), back: jest.fn(), canGoBack: () => true };
 const mockProfile = { id: 'p1', name: 'Ramzi' };
+let mockSummary = { wordsLearning: 2, wordsMastered: 1, wordsReviewed: 0, totalWordsSeen: 3 };
+let mockDue = 2;
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,
@@ -21,13 +25,13 @@ jest.mock('@/data/content', () => ({
 }));
 jest.mock('@/data/profiles', () => ({ fetchDailyGoalSettings: jest.fn(async () => ({ dailyGoalMinutes: 10 })) }));
 jest.mock('@/data/progress', () => ({
-  fetchProgressSummary: jest.fn(async () => ({ wordsLearning: 2, wordsMastered: 1, wordsReviewed: 0, totalWordsSeen: 3 })),
-  fetchReviewDueCount: jest.fn(async () => 2),
+  fetchProgressSummary: jest.fn(async () => mockSummary),
+  fetchReviewDueCount: jest.fn(async () => mockDue),
   fetchTodayPracticeSummary: jest.fn(async () => ({ wordsPracticedToday: 0, wordsMasteredToday: 0 })),
 }));
 jest.mock('@/data/sessionLogs', () => ({
   fetchMinutesLearnedToday: jest.fn(async () => 4),
-  fetchRecentActivityDates: jest.fn(async () => []),
+  fetchRecentActivityDates: jest.fn(async () => ['2026-10-29', '2026-10-30']),
 }));
 jest.mock('@/lib/dailyChallengeProgress', () => ({
   getTodayChallengeFlags: jest.fn(async () => ({ reviewCompleted: false, speakingCompleted: false })),
@@ -36,71 +40,70 @@ jest.mock('@/lib/dailyChallengeProgress', () => ({
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const Home = require('../../../app/(tabs)/home').default;
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const PracticeHub = require('../../../app/(tabs)/practice').default;
-// eslint-disable-next-line @typescript-eslint/no-var-requires
 const { ThemeProvider } = require('@/lib/theme/ThemeContext');
 
-const withTheme = (node: React.ReactNode) => <ThemeProvider>{node}</ThemeProvider>;
+const renderHome = () => render(<ThemeProvider><Home /></ThemeProvider>);
 
-beforeEach(() => mockRouter.push.mockReset());
-
-it('shows Today’s Practice with one clear start action, right below the daily goal', async () => {
-  await render(withTheme(<Home />));
-
-  expect(await screen.findByText('Today’s Practice')).toBeOnTheScreen();
-  expect(screen.getAllByText('Start today’s practice')).toHaveLength(1);
-
-  // Order on screen: greeting → daily goal → Today's Practice → recommendation.
-  // Every rendered text, in tree (screen) order.
-  const texts = screen.getAllByText(/.+/).map((el) => [el.props.children].flat(Infinity).join(''));
-  const position = (needle: string) => texts.findIndex((t) => t.includes(needle));
-  const greeting = position('Ramzi');
-  const goal = position("Today's goal");
-  const card = position('Start today’s practice');
-  const recommendation = position('Recommended next');
-  expect(greeting).toBeGreaterThan(-1);
-  expect(goal).toBeGreaterThan(greeting);
-  expect(card).toBeGreaterThan(goal);
-  expect(recommendation).toBeGreaterThan(card);
+beforeEach(() => {
+  mockRouter.push.mockReset();
+  mockSummary = { wordsLearning: 2, wordsMastered: 1, wordsReviewed: 0, totalWordsSeen: 3 };
+  mockDue = 2;
 });
 
-it('starting it opens the guided session', async () => {
-  await render(withTheme(<Home />));
+describe('a returning learner', () => {
+  it('greeting, today’s minutes, and one primary action: Start today’s practice', async () => {
+    await renderHome();
+    expect(await screen.findByText('Start today’s practice')).toBeOnTheScreen();
+    expect(screen.getByText('Ahla, Ramzi!')).toBeOnTheScreen();
+    expect(screen.getByText('4 / 10 min')).toBeOnTheScreen();
+    expect(screen.getAllByRole('button')).toHaveLength(1);
 
-  await fireEvent.press(await screen.findByText('Start today’s practice'));
-
-  expect(mockRouter.push).toHaveBeenCalledWith('/todays-practice');
-});
-
-it('keeps the existing goal card (minutes / goal) intact', async () => {
-  await render(withTheme(<Home />));
-  expect(await screen.findByText('4 / 10 min')).toBeOnTheScreen();
-});
-
-describe('Practice tab (unchanged)', () => {
-  it('still lists every individual activity, and no Today’s Practice entry', async () => {
-    await render(withTheme(<PracticeHub />));
-
-    for (const title of [
-      'Phrasebook',
-      'Flashcards',
-      'Grammar Notes',
-      // Repeat After Me is reached through Speaking Practice now (app/speaking.tsx).
-      'Speaking Practice',
-      'Alphabet Practice',
-      'Review',
-      'Culture Corner',
-    ]) {
-      expect(screen.getByText(title)).toBeOnTheScreen();
-    }
-    expect(screen.queryByText(/Today.s Practice/)).toBeNull();
+    await fireEvent.press(screen.getByRole('button', { name: 'Start today’s practice' }));
+    expect(mockRouter.push).toHaveBeenCalledWith('/todays-practice');
   });
 
-  it('activities still launch individually', async () => {
-    await render(withTheme(<PracticeHub />));
-    await fireEvent.press(screen.getByText('Review'));
+  it('a quiet “N words due” link opens Review', async () => {
+    await renderHome();
+    const link = await screen.findByRole('link', { name: /2 words due/ });
+    await fireEvent.press(link);
     expect(mockRouter.push).toHaveBeenCalledWith('/review');
-    await fireEvent.press(screen.getByText('Speaking Practice'));
-    expect(mockRouter.push).toHaveBeenCalledWith('/speaking');
+    expect(screen.queryByText(/behind|overdue|don.t lose/i)).toBeNull();
+  });
+
+  it('one word due reads naturally', async () => {
+    mockDue = 1;
+    await renderHome();
+    expect(await screen.findByRole('link', { name: /1 word due/ })).toBeOnTheScreen();
+  });
+
+  it('nothing due: no review link', async () => {
+    mockDue = 0;
+    await renderHome();
+    await screen.findByText('Start today’s practice');
+    expect(screen.queryByRole('link')).toBeNull();
+    expect(screen.queryByText(/due/)).toBeNull();
+  });
+
+  it('no challenges checklist, quick actions, recommendation card or 🔥 day count', async () => {
+    await renderHome();
+    await screen.findByText('Start today’s practice');
+    expect(screen.queryByText('Today’s challenges')).toBeNull();
+    expect(screen.queryByText(/Today's challenges/)).toBeNull();
+    expect(screen.queryByText(/🔥/)).toBeNull();
+    expect(screen.queryByText('Recommended next')).toBeNull();
+    for (const quick of ['Learn', 'Practice', 'Talk', 'Review']) expect(screen.queryByText(quick)).toBeNull();
+  });
+});
+
+describe('a brand-new learner', () => {
+  it('the same single action — today’s practice starts with their first lesson’s words', async () => {
+    mockSummary = { wordsLearning: 0, wordsMastered: 0, wordsReviewed: 0, totalWordsSeen: 0 };
+    mockDue = 0;
+    await renderHome();
+    expect(await screen.findByText('Start today’s practice')).toBeOnTheScreen();
+    expect(screen.getAllByRole('button')).toHaveLength(1);
+    expect(screen.queryByRole('link')).toBeNull();
+    await fireEvent.press(screen.getByRole('button', { name: 'Start today’s practice' }));
+    expect(mockRouter.push).toHaveBeenCalledWith('/todays-practice');
   });
 });
