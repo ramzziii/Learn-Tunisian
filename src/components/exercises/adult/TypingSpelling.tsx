@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Animated, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { AnswerFeedback } from '@/components/exercises/shared/AnswerFeedback';
+import { ScriptExemptionNote } from '@/components/tunisian/ScriptExemptionNote';
 import { VariantCallout } from '@/components/exercises/shared/VariantCallout';
 import { AudioPlayButton } from '@/components/ui/AudioPlayButton';
 import { PressableScale } from '@/components/ui/PressableScale';
@@ -54,6 +55,7 @@ export function TypingSpelling({ exercise, onComplete }: TypingSpellingProps) {
       />
       <Text style={styles.meaning}>&ldquo;{exercise.targetGroup.englishMeaning}&rdquo;</Text>
       <Text style={styles.instructions}>Type what you hear</Text>
+      <ScriptExemptionNote exempt="latin" />
       <VariantCallout group={exercise.targetGroup} />
 
       <Animated.View style={[{ width: '100%' }, submitted && !isCorrect ? shakeStyle : undefined]}>
@@ -87,6 +89,7 @@ export function TypingSpelling({ exercise, onComplete }: TypingSpellingProps) {
           correctWordArabic={exercise.promptVariant.wordArabic}
           correctTransliteration={exercise.promptVariant.transliteration}
           correctMeaning={exercise.targetGroup.englishMeaning}
+          alwaysShowLatin
           onNext={() => onComplete(isCorrect)}
         />
       )}

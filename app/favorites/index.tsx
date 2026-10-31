@@ -12,10 +12,13 @@ import { useTheme } from '@/lib/theme/ThemeContext';
 import { fetchFavoriteWordGroups } from '@/data/favorites';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
 import { getPromptVariant } from '@/lib/wordVariants';
+import { useDisplayPreferences } from '@/lib/display/useDisplayPreferences';
+import { TunisianText } from '@/components/tunisian/TunisianText';
 import type { WordGroupWithVariants } from '@/types/models';
 
 export default function Favorites() {
   const { colors } = useTheme();
+  const { preferences: display } = useDisplayPreferences();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { activeProfile } = useActiveProfile();
   const [groups, setGroups] = useState<WordGroupWithVariants[] | null>(null);
@@ -45,7 +48,7 @@ export default function Favorites() {
           keyExtractor={(g) => g.id}
           contentContainerStyle={{ gap: spacing.sm, paddingVertical: spacing.lg }}
           renderItem={({ item, index }) => {
-            const display = getPromptVariant(item, 0);
+            const shown = getPromptVariant(item, 0, display.form);
             return (
               <Reveal delay={Math.min(index * 40, 320)}>
                 <PressableScale
@@ -54,7 +57,7 @@ export default function Favorites() {
                   onPress={() => router.push(`/word/${item.id}`)}
                 >
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.arabic}>{display.wordArabic}</Text>
+                    <TunisianText arabic={shown.wordArabic} latin={shown.transliteration} layout="inline" arabicStyle={styles.arabic} latinStyle={styles.meaning} />
                     <Text style={styles.meaning}>{item.englishMeaning}</Text>
                   </View>
                   <Text style={styles.star}>⭐</Text>

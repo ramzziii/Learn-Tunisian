@@ -229,6 +229,12 @@ cycled through, plus Talk to a Tunisian:
 Every onboarding step (and sign-in/sign-up) has a back button that
 auto-hides when there's nowhere meaningful to go back to.
 
+**Display preferences** (Profile → Display, 0023)
+- Script: Arabic / Latin / both; default form for two-form words: masculine
+  / feminine / both (asked once in onboarding, framed as a display choice,
+  never the learner's gender). Both default to "both". Shared rendering via
+  `src/components/tunisian/TunisianText.tsx` and `FormDisplay.tsx`.
+
 **Profiles**
 - One profile per account; there is no switcher and no "add profile".
   The database enforces it (`0019_one_profile_per_account.sql` — a trigger,

@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { AnswerFeedback } from '@/components/exercises/shared/AnswerFeedback';
+import { TunisianText } from '@/components/tunisian/TunisianText';
 import { AudioPlayButton } from '@/components/ui/AudioPlayButton';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Reveal } from '@/components/ui/Reveal';
@@ -67,10 +68,14 @@ export function ListenChooseMeaning({ exercise, onComplete }: ListenChooseMeanin
 
       {/* AnswerFeedback reveals the word after a miss; this shows it after a hit. */}
       {chosenGroupId && isCorrect ? (
-        <View style={styles.reveal}>
-          <Text style={styles.arabic}>{exercise.promptVariant.wordArabic}</Text>
-          <Text style={styles.transliteration}>{exercise.promptVariant.transliteration}</Text>
-        </View>
+        <TunisianText
+          arabic={exercise.promptVariant.wordArabic}
+          latin={exercise.promptVariant.transliteration}
+          size="lg"
+          arabicStyle={styles.arabic}
+          latinStyle={styles.transliteration}
+          style={styles.reveal}
+        />
       ) : null}
 
       <View style={styles.list}>

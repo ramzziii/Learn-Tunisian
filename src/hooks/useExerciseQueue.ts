@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { buildListeningPass, interleaveListening } from '@/lib/listening';
 import { getPromptVariant } from '@/lib/wordVariants';
 import type { ExerciseItem, ExerciseOption, ExerciseType } from '@/types/exercises';
-import type { WordGroupWithVariants } from '@/types/models';
+import type { FormPreference, WordGroupWithVariants } from '@/types/models';
 
 const OPTION_COUNT = 4;
 const TYPE_CYCLE: ExerciseType[] = ['reading_match', 'typing_spelling', 'speaking'];
@@ -22,7 +22,8 @@ export function buildOptions(
   targetGroup: WordGroupWithVariants,
   targetPromptVariant: ExerciseOption,
   allGroups: WordGroupWithVariants[],
-  alternateSeed: number
+  alternateSeed: number,
+  form: FormPreference = 'both'
 ): ExerciseOption[] {
   const distractorGroups = shuffled(allGroups.filter((g) => g.id !== targetGroup.id)).slice(
     0,
@@ -30,24 +31,25 @@ export function buildOptions(
   );
   const distractorOptions: ExerciseOption[] = distractorGroups.map((group) => ({
     group,
-    variant: getPromptVariant(group, alternateSeed),
+    variant: getPromptVariant(group, alternateSeed, form),
   }));
   return shuffled([targetPromptVariant, ...distractorOptions]);
 }
 
 /** One shuffled pass over every word_group, each paired with an exercise type. */
-function buildPass(groups: WordGroupWithVariants[], passIndex: number): ExerciseItem[] {
+function buildPass(groups: WordGroupWithVariants[], passIndex: number, form: FormPreference): ExerciseItem[] {
   const order = shuffled(groups);
   return order.map((group, i) => {
     const type = TYPE_CYCLE[(passIndex + i) % TYPE_CYCLE.length];
     const alternateSeed = passIndex + i;
-    const promptVariant = getPromptVariant(group, alternateSeed);
+    // Two-form words lead with the learner's preferred form (display only).
+    const promptVariant = getPromptVariant(group, alternateSeed, form);
     return {
       key: `${group.id}-${passIndex}-${i}`,
       type,
       targetGroup: group,
       promptVariant,
-      options: buildOptions(group, { group, variant: promptVariant }, groups, alternateSeed),
+      options: buildOptions(group, { group, variant: promptVariant }, groups, alternateSeed, form),
     };
   });
 }
@@ -73,7 +75,15 @@ export interface ExerciseQueue {
  * session screen keeps pulling from this until its time goal elapses, so
  * there is no fixed "N exercises per lesson" concept here by design.
  */
-export function useExerciseQueue(groups: WordGroupWithVariants[], mode: ExerciseMode = 'mixed'): ExerciseQueue {
+export function useExerciseQueue(
+  groups: WordGroupWithVariants[],
+  mode: ExerciseMode = 'mixed',
+  form: FormPreference = 'both'
+): ExerciseQueue {
+  // Read through a ref: changing the preference mid-session affects the
+  // next passes without restarting the session.
+  const formRef = useRef(form);
+  formRef.current = form;
   // Running counts, so the "1 listening after every 3 regular" rhythm and
   // the format alternation carry across pass boundaries.
   const countsRef = useRef({ regularCount: 0, listeningCount: 0 });
@@ -82,7 +92,7 @@ export function useExerciseQueue(groups: WordGroupWithVariants[], mode: Exercise
     (passIndex: number): ExerciseItem[] => {
       if (groups.length === 0) return [];
       if (mode === 'listening') return buildListeningPass(groups, passIndex);
-      const pass = interleaveListening(buildPass(groups, passIndex), groups, passIndex, countsRef.current);
+      const pass = interleaveListening(buildPass(groups, passIndex, formRef.current), groups, passIndex, countsRef.current);
       const listening = pass.filter(isListening).length;
       countsRef.current = {
         regularCount: countsRef.current.regularCount + pass.length - listening,

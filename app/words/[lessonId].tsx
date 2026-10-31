@@ -15,11 +15,14 @@ import { fetchFavoriteWordGroupIds } from '@/data/favorites';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
 import { usePremium } from '@/lib/premium/PremiumContext';
 import { PremiumRequiredError } from '@/lib/premium/access';
-import { getPrimaryVariant, getMasculineVariant } from '@/lib/wordVariants';
+import { preferredVariant } from '@/lib/display/displayRules';
+import { useDisplayPreferences } from '@/lib/display/useDisplayPreferences';
+import { TunisianText } from '@/components/tunisian/TunisianText';
 import type { WordGroupWithVariants } from '@/types/models';
 
 export default function LessonWordList() {
   const { colors } = useTheme();
+  const { preferences: display } = useDisplayPreferences();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { lessonId } = useLocalSearchParams<{ lessonId: string }>();
   const { activeProfile } = useActiveProfile();
@@ -67,12 +70,12 @@ export default function LessonWordList() {
         keyExtractor={(g) => g.id}
         contentContainerStyle={{ gap: spacing.sm, paddingVertical: spacing.lg }}
         renderItem={({ item, index }) => {
-          const display = getPrimaryVariant(item) ?? getMasculineVariant(item) ?? item.variants[0];
+          const shown = preferredVariant(item, display.form);
           return (
             <Reveal delay={Math.min(index * 40, 320)}>
               <PressableScale haptic style={[styles.row, shadows.card]} onPress={() => router.push(`/word/${item.id}`)}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.arabic}>{display?.wordArabic}</Text>
+                  <TunisianText arabic={shown?.wordArabic} latin={shown?.transliteration} layout="inline" arabicStyle={styles.arabic} latinStyle={styles.meaning} />
                   <Text style={styles.meaning}>{item.englishMeaning}</Text>
                 </View>
                 {favoriteIds.has(item.id) ? <Text style={styles.star}>⭐</Text> : null}

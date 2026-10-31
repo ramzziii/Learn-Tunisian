@@ -1,10 +1,11 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
 
 import { recordConsent } from '@/data/consent';
+import { saveDisplayPreferences } from '@/data/displayPreferences';
 import { createDailyGoalSettings, createProfile } from '@/data/profiles';
 import { isAdult } from '@/lib/age';
 import { requestNotificationPermission, scheduleDailyReminder } from '@/lib/notifications/reminders';
-import type { DailyGoalMinutes, LearningGoal, Profile, StartingProficiency } from '@/types/models';
+import type { DailyGoalMinutes, FormPreference, LearningGoal, Profile, StartingProficiency } from '@/types/models';
 
 /**
  * Draft onboarding answers, held in memory only (never AsyncStorage, never
@@ -21,6 +22,8 @@ export interface OnboardingState {
   country: string;
   startingProficiency: StartingProficiency | null;
   learningGoal: LearningGoal | null;
+  /** Which form of two-form words to show first — a display preference, not the learner's gender. */
+  formPreference: FormPreference;
   dailyGoalMinutes: DailyGoalMinutes | null;
   reminderHour: number | null;
   reminderMinute: number | null;
@@ -37,6 +40,7 @@ const initialState: OnboardingState = {
   // editable, and editable again later in Settings.
   startingProficiency: 'none',
   learningGoal: null,
+  formPreference: 'both',
   dailyGoalMinutes: 10,
   // Pre-selected to match the 6:00 PM default the reminder-time picker
   // already *displays* (see app/onboarding/goal.tsx) — previously these
@@ -73,6 +77,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
           country,
           startingProficiency,
           learningGoal,
+          formPreference,
           dailyGoalMinutes,
           reminderHour,
           reminderMinute,
@@ -107,6 +112,13 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
 
         const reminderTime = `${String(reminderHour).padStart(2, '0')}:${String(reminderMinute).padStart(2, '0')}:00`;
         await createDailyGoalSettings(profile.id, dailyGoalMinutes, reminderTime);
+
+        // Display preference only. "Show both" is the default with no row,
+        // so there's nothing to save for it. A failed save doesn't fail
+        // onboarding: the profile is set up, and Settings can change it.
+        if (formPreference !== 'both') {
+          await saveDisplayPreferences(profile.id, { script: 'both', form: formPreference }).catch(() => undefined);
+        }
 
         // Notifications are requested here, at the point the reminder time is
         // set — not bundled into earlier onboarding steps.

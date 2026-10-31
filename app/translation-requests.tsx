@@ -21,6 +21,7 @@ import {
 import { computeResponseDeadline, describeDeadline, formatTunisDay } from '@/lib/translationRequests/deadline';
 import { createClientRequestId, MAX_REQUEST_LENGTH, validateRequestText } from '@/lib/translationRequests/validation';
 import { useTheme } from '@/lib/theme/ThemeContext';
+import { TunisianText } from '@/components/tunisian/TunisianText';
 
 /**
  * Request a Translation: a signed-in learner asks for an English phrase or
@@ -216,8 +217,7 @@ export default function TranslationRequestsScreen() {
 
                   {request.status === 'answered' && request.answer ? (
                     <View style={styles.answer}>
-                      <Text style={styles.arabic}>{request.answer.arabic}</Text>
-                      <Text style={styles.transliteration}>{request.answer.transliteration}</Text>
+                      <TunisianText arabic={request.answer.arabic} latin={request.answer.transliteration} arabicStyle={styles.arabic} latinStyle={styles.transliteration} />
                       <Text style={styles.note}>Meaning: {request.answer.english}</Text>
                       <Button themed label="▶ Play native recording" variant="secondary" onPress={() => playAnswer(request)} />
                       {request.answer.explanationAudioPath ? (

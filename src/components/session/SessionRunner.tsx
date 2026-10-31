@@ -15,6 +15,7 @@ import { fetchLessonMap } from '@/data/content';
 import { recordWordGroupResult } from '@/data/progress';
 import { recordSessionLog } from '@/data/sessionLogs';
 import { useExerciseQueue, type ExerciseMode } from '@/hooks/useExerciseQueue';
+import { useDisplayPreferences } from '@/lib/display/useDisplayPreferences';
 import { useSlideInOnChange } from '@/hooks/useSlideInOnChange';
 import { useSessionTimer } from '@/hooks/useSessionTimer';
 import { masteryLabel, type MasteryLabel } from '@/lib/masteryStatus';
@@ -72,7 +73,8 @@ export function SessionRunner({
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const timer = useSessionTimer(goalMinutes);
-  const { currentExercise: queuedExercise, next } = useExerciseQueue(groups, exerciseMode);
+  const { preferences } = useDisplayPreferences();
+  const { currentExercise: queuedExercise, next } = useExerciseQueue(groups, exerciseMode, preferences.form);
 
   // Words left mispronounced in speaking exercises are replayed once the time
   // goal is reached, before the summary — see src/lib/speakingRevisit.ts.

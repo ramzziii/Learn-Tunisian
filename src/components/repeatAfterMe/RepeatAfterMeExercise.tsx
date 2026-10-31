@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { PronunciationPractice, type PronunciationResult } from '@/components/pronunciation/PronunciationPractice';
+import { TunisianText } from '@/components/tunisian/TunisianText';
 import { spacing, type ThemeColors } from '@/constants/theme';
 import type { RepeatAfterMeItem } from '@/data/repeatAfterMe';
 import { useTheme } from '@/lib/theme/ThemeContext';
@@ -36,7 +37,7 @@ export function RepeatAfterMeExercise({ item, maxAttempts, isReview, onFinish }:
         onFinish={onFinish}
       >
         <Text style={styles.meaning}>{item.englishMeaning}</Text>
-        <Text style={styles.transliteration}>{item.variant.transliteration}</Text>
+        <TunisianText arabic={item.variant.wordArabic} latin={item.variant.transliteration} latinStyle={styles.transliteration} />
       </PronunciationPractice>
     </View>
   );

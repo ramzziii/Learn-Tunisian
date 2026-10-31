@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { AnswerFeedback } from '@/components/exercises/shared/AnswerFeedback';
+import { TunisianText } from '@/components/tunisian/TunisianText';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Reveal } from '@/components/ui/Reveal';
 import { exerciseSizing, radii, spacing, type ThemeColors } from '@/constants/theme';
@@ -118,10 +119,14 @@ export function ListenChooseRecording({ exercise, onComplete }: ListenChooseReco
 
                 {answered ? (
                   <View style={styles.reveal}>
-                    <Text style={styles.arabic}>{option.variant.wordArabic}</Text>
-                    <Text style={styles.transliteration}>
-                      {option.variant.transliteration} · {option.group.englishMeaning}
-                    </Text>
+                    <TunisianText
+                      arabic={option.variant.wordArabic}
+                      latin={option.variant.transliteration}
+                      layout="inline"
+                      arabicStyle={styles.arabic}
+                      latinStyle={styles.transliteration}
+                    />
+                    <Text style={styles.transliteration}>{option.group.englishMeaning}</Text>
                     {isTheAnswer ? <Text style={styles.statusCorrect}>✓ Right answer</Text> : null}
                     {isChosenWrong ? <Text style={styles.statusIncorrect}>✗ Your choice</Text> : null}
                   </View>
