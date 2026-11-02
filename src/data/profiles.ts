@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase/client';
+import { isGuestSessionActive } from '@/lib/guest/guestSession';
 import { mapDailyGoalSettings, mapProfile } from '@/data/mappers';
 import { isProfileAlreadyExistsDbError, ProfileAlreadyExistsError } from '@/lib/account/profileLimit';
 import type { DailyGoalSettingsRow, ProfileRow } from '@/types/database';
@@ -82,6 +83,7 @@ export async function createDailyGoalSettings(
 }
 
 export async function fetchDailyGoalSettings(profileId: string): Promise<DailyGoalSettings | null> {
+  if (isGuestSessionActive()) return null;
   const { data, error } = await supabase
     .from('daily_goal_settings')
     .select('*')

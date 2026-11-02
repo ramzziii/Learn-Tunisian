@@ -6,6 +6,11 @@ import { createFakeSupabase } from '@/test-utils/fakeSupabase';
 const mockDb = createFakeSupabase();
 jest.mock('@/lib/supabase/client', () => ({ supabase: mockDb.client }));
 
+let mockGuest = false;
+jest.mock('@/lib/guest/guestSession', () => ({ isGuestSessionActive: () => mockGuest }));
+const mockGuestWords = jest.fn();
+jest.mock('@/data/guest/guestContent', () => ({ fetchGuestWordGroups: (...a: unknown[]) => mockGuestWords(...a) }));
+
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { loadRepeatAfterMeSession, setRepeatAfterMeInclusion } = require('@/data/repeatAfterMe');
 
@@ -55,12 +60,15 @@ function seed(count: number) {
   mockDb.respond('word_groups.select', { data: groups, error: null });
 }
 
-beforeEach(() => mockDb.reset());
+beforeEach(() => {
+  mockDb.reset();
+  mockGuest = false;
+});
 
 describe('loadRepeatAfterMeSession', () => {
   it('asks only for opted-in, approved variants that have a recording', async () => {
     seed(2);
-    await loadRepeatAfterMeSession({ isPremium: true, progress: {} });
+    await loadRepeatAfterMeSession({ unlimited: true, openIds: new Set(), remaining: 0, progress: {} });
 
     const variantQuery = mockDb.queries.find((q) => q.table === 'word_variants')!;
     expect(variantQuery.calls).toContainEqual(['eq', 'in_repeat_after_me', true]);
@@ -74,7 +82,7 @@ describe('loadRepeatAfterMeSession', () => {
     mockDb.respond('word_variants.select', { data: [variantRow('v1', 'g1'), variantRow('v2', 'g2')], error: null });
     mockDb.respond('word_groups.select', { data: [groupRow('g1', 1)], error: null }); // g2 filtered out by the query
 
-    const { items } = await loadRepeatAfterMeSession({ isPremium: true, progress: {} });
+    const { items } = await loadRepeatAfterMeSession({ unlimited: true, openIds: new Set(), remaining: 0, progress: {} });
     expect(items.map((i: { id: string }) => i.id)).toEqual(['v1']);
     expect(items[0]).toMatchObject({ englishMeaning: 'meaning of g1', variant: { audioPath: 'g1/v1-1000.m4a' } });
   });
@@ -86,7 +94,7 @@ describe('loadRepeatAfterMeSession', () => {
     });
     mockDb.respond('word_groups.select', { data: [groupRow('g1', 1)], error: null });
 
-    const { items } = await loadRepeatAfterMeSession({ isPremium: true, progress: {} });
+    const { items } = await loadRepeatAfterMeSession({ unlimited: true, openIds: new Set(), remaining: 0, progress: {} });
 
     expect(items[0].variant.audioPath).toBe('g1/v1-1000.m4a');
     expect(items[0].variant.explanationAudioPath).toBeNull();
@@ -99,29 +107,56 @@ describe('loadRepeatAfterMeSession', () => {
     });
     mockDb.respond('word_groups.select', { data: [groupRow('g1', 1)], error: null });
 
-    const { items } = await loadRepeatAfterMeSession({ isPremium: true, progress: {} });
+    const { items } = await loadRepeatAfterMeSession({ unlimited: true, openIds: new Set(), remaining: 0, progress: {} });
     expect(items).toEqual([]);
   });
 
   it('Premium: every item, in stable content order', async () => {
     seed(8);
-    const { items, lockedCount } = await loadRepeatAfterMeSession({ isPremium: true, progress: {} });
+    const { items, lockedCount } = await loadRepeatAfterMeSession({ unlimited: true, openIds: new Set(), remaining: 0, progress: {} });
     expect(items.map((i: { id: string }) => i.id)).toEqual(['v-g1', 'v-g2', 'v-g3', 'v-g4', 'v-g5', 'v-g6', 'v-g7', 'v-g8']);
     expect(lockedCount).toBe(0);
   });
 
-  it('free: at most five items are handed to the session; the rest are only counted', async () => {
+  it('not unlimited: the opened items plus new ones up to what’s left; the rest are only counted', async () => {
     seed(8);
-    const { items, lockedCount } = await loadRepeatAfterMeSession({ isPremium: false, progress: {} });
-    expect(items).toHaveLength(5);
-    expect(lockedCount).toBe(3);
+    const { items, lockedCount } = await loadRepeatAfterMeSession({
+      unlimited: false,
+      openIds: new Set(['v-g7', 'v-g8']),
+      remaining: 2,
+      progress: {},
+    });
+    expect(items.map((i: { id: string }) => i.id)).toEqual(['v-g1', 'v-g2', 'v-g7', 'v-g8']);
+    expect(lockedCount).toBe(4);
+  });
+
+  it('guest: preview recordings from the guest views only — never the full tables', async () => {
+    mockGuest = true;
+    mockGuestWords.mockResolvedValue([
+      {
+        id: 'g1',
+        englishMeaning: 'hello',
+        sortOrder: 1,
+        contentStatus: 'approved',
+        variants: [
+          { id: 'gv1', wordGroupId: 'g1', audioPath: 'a.m4a', inRepeatAfterMe: true, contentStatus: 'approved', sortOrder: 0 },
+          { id: 'gv2', wordGroupId: 'g1', audioPath: null, inRepeatAfterMe: true, contentStatus: 'approved', sortOrder: 1 },
+          { id: 'gv3', wordGroupId: 'g1', audioPath: 'b.m4a', inRepeatAfterMe: false, contentStatus: 'approved', sortOrder: 2 },
+        ],
+      },
+    ]);
+    const { items } = await loadRepeatAfterMeSession({ unlimited: false, openIds: new Set(), remaining: 2, progress: {} });
+    expect(items.map((i: { id: string }) => i.id)).toEqual(['gv1']);
+    expect(mockDb.queries).toEqual([]);
   });
 
   it('free: items not yet marked correct come first, so later sessions move through the content', async () => {
     seed(7);
     const done = { attempts: 1, lastResult: 'correct', lastPracticedAt: '2026-10-01T00:00:00Z' };
     const { items } = await loadRepeatAfterMeSession({
-      isPremium: false,
+      unlimited: false,
+      openIds: new Set(),
+      remaining: 5,
       progress: { 'v-g1': done, 'v-g2': done, 'v-g3': done },
     });
     expect(items.map((i: { id: string }) => i.id)).toEqual(['v-g4', 'v-g5', 'v-g6', 'v-g7', 'v-g1']);
@@ -129,13 +164,13 @@ describe('loadRepeatAfterMeSession', () => {
 
   it('nothing opted in → empty session, no group lookup', async () => {
     mockDb.respond('word_variants.select', { data: [], error: null });
-    await expect(loadRepeatAfterMeSession({ isPremium: true, progress: {} })).resolves.toEqual({ items: [], lockedCount: 0 });
+    await expect(loadRepeatAfterMeSession({ unlimited: true, openIds: new Set(), remaining: 0, progress: {} })).resolves.toEqual({ items: [], lockedCount: 0 });
     expect(mockDb.queries.some((q) => q.table === 'word_groups')).toBe(false);
   });
 
   it('surfaces a load failure instead of showing an empty section', async () => {
     mockDb.respond('word_variants.select', { data: null, error: { message: 'column "in_repeat_after_me" does not exist', code: '42703' } });
-    await expect(loadRepeatAfterMeSession({ isPremium: true, progress: {} })).rejects.toMatchObject({ code: '42703' });
+    await expect(loadRepeatAfterMeSession({ unlimited: true, openIds: new Set(), remaining: 0, progress: {} })).rejects.toMatchObject({ code: '42703' });
   });
 });
 

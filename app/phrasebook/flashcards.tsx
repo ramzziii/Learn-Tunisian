@@ -3,17 +3,16 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { openUpgradeFlow, PremiumBadge } from '@/components/premium/Premium';
+import { PremiumBadge } from '@/components/premium/Premium';
+import { ComputerVoiceNote } from '@/components/ui/ComputerVoiceNote';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { radii, spacing, type ThemeColors } from '@/constants/theme';
-import { fetchPhrasebookCategories } from '@/data/content';
-import { canAccessPhrasebookCategory, fetchAccessibleLessonWordGroups } from '@/data/premiumAccess';
-import { usePremium } from '@/lib/premium/PremiumContext';
+import { fetchPhrasebookCategories, fetchWordGroupsForLesson } from '@/data/content';
+import { useAccess } from '@/lib/access/AccessContext';
 import { useFadeInOnChange } from '@/hooks/useFadeInOnChange';
-import { useLetterSpeech } from '@/hooks/useLetterSpeech';
 import { useWordAudioPlayer } from '@/hooks/useWordAudioPlayer';
 import { useTheme } from '@/lib/theme/ThemeContext';
 import { hasTwoForms, preferredVariant } from '@/lib/display/displayRules';
@@ -32,13 +31,13 @@ export default function PhrasebookFlashcardsScreen() {
   const { colors } = useTheme();
   const { preferences: display } = useDisplayPreferences();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const { isPremium } = usePremium();
+  const { decide } = useAccess();
   const [cards, setCards] = useState<WordGroupWithVariants[] | null>(null);
-  // Phrases in Premium categories — counted (from the category list) so the
-  // deck can say what's locked, but never fetched for a free profile.
+  // Practice isn't counted: the deck uses only categories already opened (all
+  // with Premium). The rest are counted from the category list so the deck can
+  // say what's left, but never fetched.
   const [lockedPhraseCount, setLockedPhraseCount] = useState(0);
   const [index, setIndex] = useState(0);
-  const { speak, isSpeaking } = useLetterSpeech();
   const fadeAnim = useFadeInOnChange(String(index));
   // Computed here (not after the early returns below) so useWordAudioPlayer
   // can be called unconditionally every render, same requirement as every
@@ -49,13 +48,11 @@ export default function PhrasebookFlashcardsScreen() {
 
   const load = useCallback(async () => {
     const categories = await fetchPhrasebookCategories().catch(() => []);
-    const accessible = categories.filter((c) => canAccessPhrasebookCategory(isPremium, c.unitId, categories));
+    const accessible = categories.filter((c) => decide('phrasebook_category', c.unitId) === 'open');
     const locked = categories.filter((c) => !accessible.includes(c));
-    const perCategory = await Promise.all(
-      accessible.map((c) => fetchAccessibleLessonWordGroups(c.lessonId, isPremium).catch(() => []))
-    );
+    const perCategory = await Promise.all(accessible.map((c) => fetchWordGroupsForLesson(c.lessonId).catch(() => [])));
     return { cards: perCategory.flat(), lockedPhraseCount: locked.reduce((sum, c) => sum + c.phraseCount, 0) };
-  }, [isPremium]);
+  }, [decide]);
 
   // Refetches on every focus (not just mount) so audio re-recorded in the
   // admin tool is picked up on returning to this screen, not just on a cold
@@ -102,16 +99,12 @@ export default function PhrasebookFlashcardsScreen() {
     Haptics.selectionAsync();
     setIndex((prev) => (prev - 1 + cards.length) % cards.length);
   };
+  // Plays the card's recording when tapped; a computer voice is labelled,
+  // and the phone's own voice is never used for a card without one.
   const playCard = () => {
-    if (!variant) return;
+    if (!variant || !wordPlayer.hasAudio) return;
     Haptics.selectionAsync();
-    if (wordPlayer.hasAudio) {
-      wordPlayer.play();
-    } else {
-      // No audio_path recorded for this variant yet — on-device TTS as a
-      // placeholder so the card is still audible.
-      speak(variant.wordArabic);
-    }
+    wordPlayer.play();
   };
 
   return (
@@ -141,11 +134,18 @@ export default function PhrasebookFlashcardsScreen() {
               )}
             </>
           ) : null}
-          <View style={[styles.playBadge, (wordPlayer.isPlaying || isSpeaking) && styles.playBadgeActive]}>
+          <View style={[styles.playBadge, wordPlayer.isPlaying && styles.playBadgeActive]}>
             <Text style={styles.playIcon}>
-              {wordPlayer.isResolving ? 'Loading…' : wordPlayer.isPlaying || isSpeaking ? '🔊 Playing…' : '▶ Tap to hear it'}
+              {wordPlayer.isResolving
+                ? 'Loading…'
+                : wordPlayer.isPlaying
+                  ? '🔊 Playing…'
+                  : wordPlayer.hasAudio
+                    ? '▶ Tap to hear it'
+                    : 'No recording yet'}
             </Text>
           </View>
+          {wordPlayer.source === 'computer' ? <ComputerVoiceNote style={{ marginTop: spacing.sm }} /> : null}
         </PressableScale>
       </Animated.View>
 
@@ -163,10 +163,10 @@ export default function PhrasebookFlashcardsScreen() {
       </View>
 
       {lockedPhraseCount > 0 ? (
-        <PressableScale haptic onPress={openUpgradeFlow} style={[styles.lockedRow, styles.shadowCard]}>
+        <PressableScale haptic onPress={() => router.push('/phrasebook')} style={[styles.lockedRow, styles.shadowCard]}>
           <PremiumBadge />
           <Text style={styles.lockedText}>
-            {lockedPhraseCount} more {lockedPhraseCount === 1 ? 'phrase' : 'phrases'} in the other categories
+            {lockedPhraseCount} more {lockedPhraseCount === 1 ? 'phrase' : 'phrases'} in categories you haven’t opened
           </Text>
           <Text style={styles.lockedChevron}>›</Text>
         </PressableScale>

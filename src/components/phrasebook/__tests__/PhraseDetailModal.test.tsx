@@ -9,9 +9,10 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,
   default: { getItem: jest.fn(async () => null), setItem: jest.fn(async () => undefined) },
 }));
-jest.mock('@/hooks/useWordAudioPlayer', () => ({
-  useWordAudioPlayer: () => ({ play: jest.fn(), hasAudio: true, isResolving: false, hasError: false, isFallbackVoice: false, isPlaying: false, retry: jest.fn() }),
-}));
+let mockAudio = { play: jest.fn(), hasAudio: true, isResolving: false, hasError: false, source: 'native' as string | null, isPlaying: false, retry: jest.fn() };
+const mockSpeak = jest.fn();
+jest.mock('@/hooks/useWordAudioPlayer', () => ({ useWordAudioPlayer: () => mockAudio }));
+jest.mock('expo-speech', () => ({ speak: (...a: unknown[]) => mockSpeak(...a), stop: jest.fn() }));
 jest.mock('@/components/ui/ExplanationPlayButton', () => ({
   ExplanationPlayButton: ({ variant }: { variant: { explanationAudioPath?: string | null } }) => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -61,6 +62,33 @@ async function renderModal() {
 beforeEach(() => {
   mockPracticeProps.mockClear();
   mockPracticeMounts = 0;
+  mockSpeak.mockClear();
+  mockAudio = { play: jest.fn(), hasAudio: true, isResolving: false, hasError: false, source: 'native', isPlaying: false, retry: jest.fn() };
+});
+
+describe('playing the phrase', () => {
+  it('a native recording says so', async () => {
+    await renderModal();
+    expect(screen.getByText('🎙️ Native recording')).toBeOnTheScreen();
+    expect(screen.queryByText('Computer voice — not a Tunisian speaker')).toBeNull();
+  });
+
+  it('the computer voice is labelled as not Tunisian and plays only when tapped', async () => {
+    mockAudio = { ...mockAudio, source: 'computer' };
+    await renderModal();
+    expect(screen.getByText('Computer voice — not a Tunisian speaker')).toBeOnTheScreen();
+    expect(mockAudio.play).not.toHaveBeenCalled();
+    await fireEvent.press(screen.getByRole('button', { name: 'Play hello' }));
+    expect(mockAudio.play).toHaveBeenCalled();
+  });
+
+  it('no recording: says so, and never uses the phone’s voice', async () => {
+    mockAudio = { ...mockAudio, hasAudio: false, source: null };
+    await renderModal();
+    expect(screen.getByText('No recording yet')).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole('button', { name: 'Play hello' }));
+    expect(mockSpeak).not.toHaveBeenCalled();
+  });
 });
 
 it('practice uses the shared flow against this phrase, three tries, without a second play button', async () => {

@@ -1,7 +1,7 @@
 // Entry points that must keep working after the navigation reorganisation:
 // - Phrasebook links to its browse-and-listen phrase cards;
-// - Review keeps its free daily allowance (unchanged by the removal of the
-//   flashcards "Due today" deck);
+// - Review loads the due words (practice isn't counted — no daily allowance;
+//   which words it may use is tested in practiceAccess.test.tsx);
 // - the five tabs are unchanged.
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
@@ -9,8 +9,13 @@ declare const __dirname: string;
 
 const mockPush = jest.fn();
 const mockFetchReviewQueue = jest.fn();
-let mockUsedFreeReview = false;
 
+// Signed-in Premium account with every lesson open (access rules are tested elsewhere).
+jest.mock('@/lib/access/AccessContext', () => ({ useAccess: () => ({ tier: 'premium', isResolved: true, decide: () => 'open', claimed: () => new Set() }) }));
+jest.mock('@/lib/access/usePracticeScope', () => ({
+  usePracticeScope: () => mockAllScope,
+}));
+const mockAllScope = { scope: { all: true, lessonKeys: new Set(), unitIds: new Set() }, error: false, reload: () => undefined };
 jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,
   default: { getItem: jest.fn(async () => null), setItem: jest.fn(async () => undefined) },
@@ -28,10 +33,6 @@ jest.mock('@/data/content', () => ({
 }));
 jest.mock('@/data/progress', () => ({ fetchReviewQueue: (...a: unknown[]) => mockFetchReviewQueue(...a) }));
 jest.mock('@/data/profiles', () => ({ fetchDailyGoalSettings: jest.fn(async () => ({ dailyGoalMinutes: 5 })) }));
-jest.mock('@/lib/premium/freeAllowance', () => ({
-  hasUsedFreeReviewToday: jest.fn(async () => mockUsedFreeReview),
-  markFreeReviewStarted: jest.fn(async () => undefined),
-}));
 jest.mock('@/lib/offline/audioCache', () => ({ prefetchLessonAudio: jest.fn() }));
 jest.mock('@/lib/supabase/client', () => ({ supabase: {} }));
 jest.mock('@/components/session/SessionRunner', () => ({ SessionRunner: () => null }));
@@ -49,7 +50,6 @@ beforeEach(() => {
   mockPush.mockReset();
   mockFetchReviewQueue.mockReset();
   mockFetchReviewQueue.mockResolvedValue([]);
-  mockUsedFreeReview = false;
 });
 
 it('Phrasebook links to its browse-and-listen phrase cards', async () => {
@@ -58,15 +58,8 @@ it('Phrasebook links to its browse-and-listen phrase cards', async () => {
   expect(mockPush).toHaveBeenCalledWith('/phrasebook/flashcards');
 });
 
-describe('Review keeps its free daily allowance', () => {
-  it('once today’s free review is used, Review says so and loads nothing', async () => {
-    mockUsedFreeReview = true;
-    await themed(<Review />);
-    expect(await screen.findByText(/used today's free review/i)).toBeOnTheScreen();
-    expect(mockFetchReviewQueue).not.toHaveBeenCalled();
-  });
-
-  it('otherwise it loads the due words as before', async () => {
+describe('Review', () => {
+  it('loads the due words — no daily allowance any more', async () => {
     await themed(<Review />);
     expect(await screen.findByText('All caught up')).toBeOnTheScreen();
     expect(mockFetchReviewQueue).toHaveBeenCalledWith('p1');

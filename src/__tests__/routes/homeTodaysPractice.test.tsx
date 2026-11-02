@@ -14,6 +14,8 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   default: { getItem: jest.fn(async () => null), setItem: jest.fn(async () => undefined) },
 }));
 jest.mock('expo-router', () => ({ router: mockRouter }));
+let mockTier: 'guest' | 'free' = 'free';
+jest.mock('@/lib/access/AccessContext', () => ({ useAccess: () => ({ tier: mockTier, isResolved: true }) }));
 jest.mock('@/lib/account/ActiveProfileContext', () => ({ useActiveProfile: () => ({ activeProfile: mockProfile }) }));
 jest.mock('@/data/content', () => ({
   fetchLessonMap: jest.fn(async () => [
@@ -105,5 +107,27 @@ describe('a brand-new learner', () => {
     expect(screen.queryByRole('link')).toBeNull();
     await fireEvent.press(screen.getByRole('button', { name: 'Start today’s practice' }));
     expect(mockRouter.push).toHaveBeenCalledWith('/todays-practice');
+  });
+});
+
+describe('a guest (device-only preview)', () => {
+  afterEach(() => {
+    mockTier = 'free';
+  });
+
+  it('no goal card; the one action is “Try lesson 1”, which opens the first preview lesson', async () => {
+    mockTier = 'guest';
+    await renderHome();
+    await fireEvent.press(await screen.findByRole('button', { name: 'Try lesson 1' }));
+    expect(mockRouter.push).toHaveBeenCalledWith('/lesson/l1');
+    expect(screen.queryByText(/Today.s goal/)).toBeNull();
+    expect(screen.queryByText('Start today’s practice')).toBeNull();
+  });
+
+  it('offers a free account without pressure', async () => {
+    mockTier = 'guest';
+    await renderHome();
+    await fireEvent.press(await screen.findByRole('button', { name: 'Create a free account' }));
+    expect(mockRouter.push).toHaveBeenCalledWith('/onboarding/age');
   });
 });

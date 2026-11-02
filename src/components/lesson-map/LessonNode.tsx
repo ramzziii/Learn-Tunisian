@@ -19,6 +19,8 @@ interface LessonNodeProps {
   /** Beyond the free plan — stays tappable (onPress opens the upgrade flow),
    * marked Premium instead of progress-locked. */
   premiumLocked?: boolean;
+  /** 1-based position within the unit — what "Lesson N" means on screen. */
+  position: number;
   /** Position on the unit's path, for the connecting line. */
   isFirst?: boolean;
   isLast?: boolean;
@@ -32,14 +34,14 @@ type Kind = 'completed' | 'current' | 'locked' | 'premium';
  * that's up next gets a gradient node with a soft ripple. The whole row is
  * the button; a progress-locked lesson is disabled.
  */
-export function LessonNode({ lesson, onPress, premiumLocked = false, isFirst = false, isLast = false }: LessonNodeProps) {
+export function LessonNode({ lesson, position, onPress, premiumLocked = false, isFirst = false, isLast = false }: LessonNodeProps) {
   const { colors, gradients } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const kind: Kind = premiumLocked ? 'premium' : lesson.state === 'completed' ? 'completed' : lesson.state === 'unlocked' ? 'current' : 'locked';
   // "Lesson N" when the lesson's title would just repeat the unit name above it.
-  const title = lessonDisplayTitle(lesson);
-  const spokenName = hasOwnLessonTitle(lesson) ? `Lesson ${lesson.lessonNumber}, ${title}` : title;
+  const title = lessonDisplayTitle(lesson, position);
+  const spokenName = hasOwnLessonTitle(lesson) ? `Lesson ${position}, ${title}` : title;
   const words = `${lesson.masteredCount} of ${lesson.wordCount} words`;
   const stateText = {
     completed: `Completed, ${words}`,

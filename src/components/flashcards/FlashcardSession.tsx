@@ -100,7 +100,7 @@ export function FlashcardSession({
   // device voice standing in for a missing one.
   const cardVariant = card ? preferredVariant(card, preferences.form) : null;
   const autoPlayVariant = cardVariant?.audioPath && (direction === 'tunisian-first' || answered) ? cardVariant : null;
-  useWordAudioPlayer(autoPlayVariant, { autoPlay: true, fallbackVoice: false });
+  useWordAudioPlayer(autoPlayVariant, { autoPlay: true, nativeOnly: true });
 
   const choose = (index: number, choice: FlashcardChoice) => {
     // One result per card shown, whatever is tapped or tapped twice.

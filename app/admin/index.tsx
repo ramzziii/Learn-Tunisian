@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { AnalyticsOverview } from '@/components/admin/AnalyticsOverview';
+import { ContentProgressSection } from '@/components/admin/ContentProgressSection';
 import { SelectableCard } from '@/components/ui/SelectableCard';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { colors, radii, shadows, spacing } from '@/constants/theme';
@@ -52,6 +53,9 @@ export default function AdminDashboard() {
         ) : (
           <ActivityIndicator style={styles.metricsLoading} color={colors.primary} />
         )}
+
+        <Text style={styles.sectionHeading}>Content progress</Text>
+        <ContentProgressSection />
 
         <SelectableCard title="Content" subtitle="Units, lessons, and word groups" onPress={() => router.push('/admin/units')} />
         <SelectableCard

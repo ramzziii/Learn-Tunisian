@@ -10,6 +10,7 @@ import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { spacing, type ThemeColors } from '@/constants/theme';
 import { fetchFlashcardDecks, fetchFlashcards } from '@/data/flashcards';
 import { fetchDailyGoalSettings } from '@/data/profiles';
+import { usePracticeScope } from '@/lib/access/usePracticeScope';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
 import type { FlashcardDeck } from '@/lib/flashcards';
 import { prefetchLessonAudio } from '@/lib/offline/audioCache';
@@ -40,12 +41,13 @@ export default function FlashcardDeckScreen() {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { activeProfile } = useActiveProfile();
   const [state, setState] = useState<State>({ kind: 'loading' });
+  const { scope } = usePracticeScope();
 
   useEffect(() => {
-    if (!activeProfile) return;
+    if (!activeProfile || !scope) return;
     let cancelled = false;
     (async () => {
-      const decks = await fetchFlashcardDecks(activeProfile.id);
+      const decks = await fetchFlashcardDecks(activeProfile.id, scope);
       const deck = decks.find((d) => d.id === deckId);
       if (cancelled) return;
       if (!deck) return setState({ kind: 'missing' });
@@ -64,7 +66,7 @@ export default function FlashcardDeckScreen() {
     return () => {
       cancelled = true;
     };
-  }, [activeProfile, deckId]);
+  }, [activeProfile, deckId, scope]);
 
   if (state.kind === 'ready' && activeProfile) {
     if (state.cards.length > 0) {

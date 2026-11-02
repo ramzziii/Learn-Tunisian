@@ -6,17 +6,17 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { GrowingBar } from '@/components/lesson-map/GrowingBar';
 import { PulseRing } from '@/components/lesson-map/PulseRing';
 import { UnitSection } from '@/components/lesson-map/UnitSection';
-import { openUpgradeFlow, PremiumBadge } from '@/components/premium/Premium';
+import { PremiumBadge } from '@/components/premium/Premium';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Reveal } from '@/components/ui/Reveal';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { radii, shadows, spacing, type ThemeColors } from '@/constants/theme';
 import type { UnitWithLessons } from '@/data/content';
 import type { ProfileProgressSummary } from '@/data/progress';
-import { hasOwnLessonTitle, lessonDisplayTitle } from '@/lib/lessonTitle';
-import { canAccessLesson } from '@/lib/premium/access';
+import { hasOwnLessonTitle, lessonDisplayTitle, lessonPositions } from '@/lib/lessonTitle';
 import type { ProgressInsights } from '@/lib/progressInsights';
 import { useTheme } from '@/lib/theme/ThemeContext';
+import type { LessonWithState } from '@/types/models';
 
 /** Reference features to explore alongside the curriculum. Same routes and
  * behaviour as before — only the entry points moved here (from Practice and
@@ -44,8 +44,10 @@ export interface LearnViewData {
 
 interface LearnViewProps {
   data: LearnViewData;
-  isPremium: boolean;
-  freeLessonIds: Set<string>;
+  /** True once the lesson is past the learner's allowance (guest / free). */
+  isLessonLocked: (lesson: LessonWithState) => boolean;
+  /** Tapping a locked lesson: create-account prompt (guest) or upgrade flow (free). */
+  onLockedPress: () => void;
   /** "🔔 Your translation is ready", or null. */
   translationNotice: string | null;
 }
@@ -55,20 +57,23 @@ interface LearnViewProps {
  * it): a clean header with overall progress, one bold gradient "Continue"
  * card for the lesson that's up next (the page's focal point), the units as
  * cards with each lesson on a path (UnitSection), and Explore Tunisian.
- * Lesson order, unlock rules and Premium gates come from the data and
- * src/lib/premium/access.ts. Entrances are staggered, bars fill in and the
+ * Lesson order and unlock rules come from the data; the allowance lock from
+ * the caller (src/lib/access). Entrances are staggered, bars fill in and the
  * next lesson ripples; loops stop when the OS asks to reduce motion.
  */
-export function LearnView({ data, isPremium, freeLessonIds, translationNotice }: LearnViewProps) {
+export function LearnView({ data, isLessonLocked, onLockedPress, translationNotice }: LearnViewProps) {
   const { colors, gradients } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const allLessons = data.unitsWithLessons.flatMap(({ lessons }) => lessons);
+  const lessonById = new Map(allLessons.map((l) => [l.id, l]));
   const completedCount = allLessons.filter((l) => l.state === 'completed').length;
   const hasCompletedALesson = completedCount > 0;
   // Lessons unlock in order, so at most one is "up next".
   const nextLesson = allLessons.find((l) => l.state === 'unlocked') ?? null;
   const allDone = allLessons.length > 0 && completedCount === allLessons.length;
+  // "Lesson N" = position within the unit, not the course-wide lesson_number.
+  const nextPosition = nextLesson ? lessonPositions(data.unitsWithLessons).get(nextLesson.id) ?? 1 : 1;
   const percent = allLessons.length > 0 ? Math.round((completedCount / allLessons.length) * 100) : 0;
   const { wordsLearning, wordsMastered } = data.progressSummary;
 
@@ -90,6 +95,16 @@ export function LearnView({ data, isPremium, freeLessonIds, translationNotice }:
                 <Text style={styles.percentLabel}>done</Text>
               </LinearGradient>
             </View>
+            {/* Dictionary / Search: words the learner can open (app/search.tsx). */}
+            <PressableScale
+              accessibilityRole="button"
+              accessibilityLabel="Search words"
+              onPress={() => router.push('/search')}
+              style={styles.searchBar}
+            >
+              <Text style={styles.searchIcon}>🔍</Text>
+              <Text style={styles.searchPlaceholder}>Search words — English, عربي or 3/7/9</Text>
+            </PressableScale>
             <Text style={styles.progressText}>
               {completedCount} of {allLessons.length} {allLessons.length === 1 ? 'lesson' : 'lessons'} complete
             </Text>
@@ -136,20 +151,16 @@ export function LearnView({ data, isPremium, freeLessonIds, translationNotice }:
               <ContinueCard
                 heading={hasCompletedALesson ? 'Continue' : 'Start your first lesson'}
                 // A lesson titled after its unit shows the unit name once.
-                lessonTitle={hasOwnLessonTitle(nextLesson) ? lessonDisplayTitle(nextLesson) : nextLesson.unitName}
+                lessonTitle={hasOwnLessonTitle(nextLesson) ? lessonDisplayTitle(nextLesson, nextPosition) : nextLesson.unitName}
                 meta={
                   hasOwnLessonTitle(nextLesson)
-                    ? `${nextLesson.unitName} · Lesson ${nextLesson.lessonNumber}`
-                    : `Lesson ${nextLesson.lessonNumber}`
+                    ? `${nextLesson.unitName} · Lesson ${nextPosition}`
+                    : `Lesson ${nextPosition}`
                 }
                 masteredCount={nextLesson.masteredCount}
                 wordCount={nextLesson.wordCount}
-                premiumLocked={!canAccessLesson(isPremium, nextLesson.id, freeLessonIds)}
-                onPress={() =>
-                  canAccessLesson(isPremium, nextLesson.id, freeLessonIds)
-                    ? router.push(`/lesson/${nextLesson.id}`)
-                    : openUpgradeFlow()
-                }
+                premiumLocked={isLessonLocked(nextLesson)}
+                onPress={() => (isLessonLocked(nextLesson) ? onLockedPress() : router.push(`/lesson/${nextLesson.id}`))}
               />
             </Reveal>
           ) : allDone ? (
@@ -202,8 +213,11 @@ export function LearnView({ data, isPremium, freeLessonIds, translationNotice }:
                   unitNumber={index + 1}
                   onSelectLesson={(lessonId) => router.push(`/lesson/${lessonId}`)}
                   onBrowseWords={(lessonId) => router.push(`/words/${lessonId}`)}
-                  isPremiumLocked={(lessonId) => !canAccessLesson(isPremium, lessonId, freeLessonIds)}
-                  onPremiumLockedPress={openUpgradeFlow}
+                  isPremiumLocked={(lessonId) => {
+                    const lesson = lessonById.get(lessonId);
+                    return lesson ? isLessonLocked(lesson) : false;
+                  }}
+                  onPremiumLockedPress={onLockedPress}
                 />
               </Reveal>
             ))
@@ -337,6 +351,20 @@ const makeStyles = (colors: ThemeColors) =>
     percentValue: { fontSize: 18, fontWeight: '900', color: '#3A2A10' },
     percentLabel: { fontSize: 10, fontWeight: '700', color: '#3A2A10', opacity: 0.75, marginTop: -2 },
     progressText: { fontSize: 14, fontWeight: '600', color: colors.textSecondary, marginTop: spacing.md },
+    searchBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      marginTop: spacing.md,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      borderRadius: radii.md,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+    },
+    searchIcon: { fontSize: 16 },
+    searchPlaceholder: { fontSize: 15, color: colors.textSecondary },
     statRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.md },
     statPill: { borderRadius: radii.pill, paddingVertical: 6, paddingHorizontal: spacing.sm, maxWidth: '100%' },
     statText: { fontSize: 13, color: colors.textPrimary },

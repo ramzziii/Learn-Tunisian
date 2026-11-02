@@ -167,8 +167,11 @@ The app is for adults (18+). The age gate asks for a date of birth once,
 before sign-up; under 18 shows a friendly "adults only" message and nothing
 is created, stored, logged or sent. The check is self-declared
 (`isAdult` in `src/lib/age.ts` — exactly 18 passes, one day short fails).
+After an under-18 answer the device blocks retrying for 24 hours, storing
+only a yes/no flag and its expiry. Signed-out adults can also try a **guest
+preview** (a yes/no "Are you 18 or older?", no date of birth, device only).
 There is no kid track: every learner gets the same three exercise types,
-cycled through, plus Talk to a Tunisian:
+cycled through (Talk to a Tunisian is Premium):
 
 - **Reading match** — hear a word, tap the matching written Arabic
   script.
@@ -419,8 +422,10 @@ draft, not launch content**:
   single biggest gap between the current app and something launchable.
 - **Social sign-in** (Google/Apple) — the auth layer is structured for it,
   not implemented.
-- **Monetization** — out of scope by design; `is_premium` exists on
-  `profiles` but is inert.
+- **Payments** — out of scope by design. `is_premium` on `profiles` now
+  drives the Guest / Free / Premium access rules
+  ([docs/access-and-guest-preview.md](docs/access-and-guest-preview.md)), but
+  nothing in the app can buy it; it's set by hand.
 - **Test coverage beyond spaced repetition.** `src/lib/spacedRepetition.ts`
   has real unit tests; nothing else does yet (exercise selection, answer
   matching, the age check, review-queue priority, and all

@@ -1,5 +1,8 @@
-// The Repeat After Me screen end to end: free limit + upgrade gate, review
-// pass after the gate, Premium access, and what progress gets persisted.
+// The Repeat After Me screen end to end: a recording counts as one item when
+// first started (guest 2 / free 5 in total / Premium all) — the screen loads
+// the opened ones plus new ones up to what's left, counts each new one as it
+// starts, and shows the limit screen after; review pass after it, Premium
+// access, and what progress gets persisted.
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
 type Item = { id: string; englishMeaning: string };
@@ -9,7 +12,17 @@ const mockGetProgress = jest.fn();
 const mockRecordItem = jest.fn();
 const mockMarkCompleted = jest.fn();
 const mockOpenUpgrade = jest.fn();
-let mockPremium = { isPremium: false, isResolved: true };
+let mockTier: 'guest' | 'free' | 'premium' = 'free';
+let mockResolved = true;
+let mockClaimed: string[] = [];
+const mockOpen = jest.fn(async (_f: string, key: string) => {
+  mockClaimed = [...mockClaimed, key];
+  return true;
+});
+const mockDecide = (_f: string, key: string) =>
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  require('@/lib/access/accessRules').decideItemAccess({ tier: mockTier, claimed: new Set(mockClaimed), itemKey: key });
+const mockClaimedSet = () => new Set(mockClaimed);
 const mockProfile = { id: 'p1' };
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
@@ -18,7 +31,9 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 jest.mock('expo-router', () => ({ router: { back: jest.fn(), replace: jest.fn(), push: jest.fn(), canGoBack: () => true } }));
 jest.mock('@/lib/account/ActiveProfileContext', () => ({ useActiveProfile: () => ({ activeProfile: mockProfile }) }));
-jest.mock('@/lib/premium/PremiumContext', () => ({ usePremium: () => mockPremium }));
+jest.mock('@/lib/access/AccessContext', () => ({
+  useAccess: () => ({ tier: mockTier, isResolved: mockResolved, open: mockOpen, decide: mockDecide, claimed: mockClaimedSet }),
+}));
 jest.mock('@/data/repeatAfterMe', () => ({ loadRepeatAfterMeSession: (...a: unknown[]) => mockLoad(...a) }));
 jest.mock('@/lib/repeatAfterMe/progress', () => ({
   getRepeatAfterMeProgress: (...a: unknown[]) => mockGetProgress(...a),
@@ -75,7 +90,10 @@ const gotIt = async () => fireEvent.press(await screen.findByText('Got it'));
 const missed = async () => fireEvent.press(await screen.findByText('Missed'));
 
 beforeEach(() => {
-  mockPremium = { isPremium: false, isResolved: true };
+  mockTier = 'free';
+  mockResolved = true;
+  mockClaimed = [];
+  mockOpen.mockClear();
   mockLoad.mockReset();
   mockGetProgress.mockReset().mockResolvedValue({ items: {}, sessionsCompleted: 0, lastCompletedAt: null });
   mockRecordItem.mockReset().mockResolvedValue(undefined);
@@ -83,18 +101,20 @@ beforeEach(() => {
   mockOpenUpgrade.mockReset();
 });
 
-it('loads with the learner’s saved progress and their entitlement', async () => {
+it('loads with the learner’s saved progress, what they’ve opened and what’s left', async () => {
   const saved = { items: { v1: { attempts: 1, lastResult: 'correct', lastPracticedAt: 'x' } }, sessionsCompleted: 1, lastCompletedAt: 'x' };
   mockGetProgress.mockResolvedValue(saved);
   mockLoad.mockResolvedValue({ items: items(1), lockedCount: 0 });
 
   await renderScreen();
 
-  await waitFor(() => expect(mockLoad).toHaveBeenCalledWith({ isPremium: false, progress: saved.items }));
+  await waitFor(() =>
+    expect(mockLoad).toHaveBeenCalledWith({ unlimited: false, openIds: new Set(), remaining: 5, progress: saved.items })
+  );
 });
 
-it('waits for the entitlement to resolve before loading (no free-limit flash for Premium/admins)', async () => {
-  mockPremium = { isPremium: false, isResolved: false };
+it('waits for access to resolve before loading (no limit flash for Premium/admins)', async () => {
+  mockResolved = false;
   mockLoad.mockResolvedValue({ items: items(1), lockedCount: 0 });
 
   await renderScreen();
@@ -102,16 +122,17 @@ it('waits for the entitlement to resolve before loading (no free-limit flash for
   expect(mockLoad).not.toHaveBeenCalled();
 });
 
-it('free: five items, then the upgrade screen instead of a sixth', async () => {
+it('free: each new recording is counted as it starts; then the limit screen instead of a sixth', async () => {
   mockLoad.mockResolvedValue({ items: items(5), lockedCount: 3 });
   await renderScreen();
 
   for (let i = 1; i <= 5; i++) {
     expect(await screen.findByText(new RegExp(`^Item: v${i} `))).toBeOnTheScreen();
+    await waitFor(() => expect(mockOpen).toHaveBeenCalledWith('repeat_after_me', `v${i}`));
     await gotIt();
   }
 
-  expect(await screen.findByText(/3 more with Premium/)).toBeOnTheScreen();
+  expect(await screen.findByText(/used your 5 free Repeat After Me recordings/i)).toBeOnTheScreen();
   expect(screen.queryByText(/^Item: v6/)).toBeNull();
   await fireEvent.press(screen.getByText('See Premium plans'));
   expect(mockOpenUpgrade).toHaveBeenCalled();
@@ -131,8 +152,27 @@ it('free: after the upgrade screen, items missed this session still get their re
   expect(await screen.findByText(/Session complete/)).toBeOnTheScreen();
 });
 
+it('a recording already opened isn’t counted again', async () => {
+  mockClaimed = ['v1'];
+  mockLoad.mockResolvedValue({ items: items(1), lockedCount: 0 });
+  await renderScreen();
+  expect(await screen.findByText(/^Item: v1 /)).toBeOnTheScreen();
+  expect(mockOpen).not.toHaveBeenCalled();
+});
+
+it('guest: the limit screen explains a free account', async () => {
+  mockTier = 'guest';
+  mockLoad.mockResolvedValue({ items: items(2), lockedCount: 4 });
+  await renderScreen();
+  await gotIt();
+  await gotIt();
+  expect(await screen.findByText('Create a free account to keep learning')).toBeOnTheScreen();
+  expect(screen.getByText('Create a free account')).toBeOnTheScreen();
+  expect(mockLoad).toHaveBeenCalledWith(expect.objectContaining({ unlimited: false, remaining: 2 }));
+});
+
 it('each item gets three tries; the review pass gets one', async () => {
-  mockPremium = { isPremium: true, isResolved: true };
+  mockTier = 'premium';
   mockLoad.mockResolvedValue({ items: items(1), lockedCount: 0 });
   await renderScreen();
 
@@ -141,8 +181,8 @@ it('each item gets three tries; the review pass gets one', async () => {
   expect(await screen.findByText('Item: v1 (review) max=1')).toBeOnTheScreen();
 });
 
-it('Premium: every item, no upgrade screen', async () => {
-  mockPremium = { isPremium: true, isResolved: true };
+it('Premium: every item, no upgrade screen, nothing counted', async () => {
+  mockTier = 'premium';
   mockLoad.mockResolvedValue({ items: items(7), lockedCount: 0 });
   await renderScreen();
 
@@ -150,11 +190,12 @@ it('Premium: every item, no upgrade screen', async () => {
 
   expect(await screen.findByText(/Session complete/)).toBeOnTheScreen();
   expect(screen.queryByText('See Premium plans')).toBeNull();
-  expect(mockLoad).toHaveBeenCalledWith(expect.objectContaining({ isPremium: true }));
+  expect(mockLoad).toHaveBeenCalledWith(expect.objectContaining({ unlimited: true }));
+  expect(mockOpen).not.toHaveBeenCalled();
 });
 
 it('persists each item’s attempts and self-reported result, and the session completion', async () => {
-  mockPremium = { isPremium: true, isResolved: true };
+  mockTier = 'premium';
   mockLoad.mockResolvedValue({ items: items(2), lockedCount: 0 });
   await renderScreen();
 

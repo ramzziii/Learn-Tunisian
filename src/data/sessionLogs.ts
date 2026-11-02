@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase/client';
+import { isGuestSessionActive } from '@/lib/guest/guestSession';
 import type { SessionType } from '@/types/models';
 
 export async function recordSessionLog(
@@ -6,6 +7,8 @@ export async function recordSessionLog(
   sessionType: SessionType,
   durationSeconds: number
 ): Promise<void> {
+  // Guest preview: nothing is logged on the server.
+  if (isGuestSessionActive()) return;
   const { error } = await supabase.from('session_logs').insert({
     profile_id: profileId,
     session_type: sessionType,
@@ -24,6 +27,7 @@ export function startOfLocalDayIso(): string {
 
 /** Total minutes logged today, in the device's local calendar day (not UTC). */
 export async function fetchMinutesLearnedToday(profileId: string): Promise<number> {
+  if (isGuestSessionActive()) return 0;
   const { data, error } = await supabase
     .from('session_logs')
     .select('duration_seconds')
@@ -50,6 +54,7 @@ function toLocalDateKey(isoTimestamp: string): string {
  * session_logs the same way fetchMinutesLearnedToday derives "today".
  */
 export async function fetchRecentActivityDates(profileId: string, daysBack = 60): Promise<string[]> {
+  if (isGuestSessionActive()) return [];
   const since = new Date();
   since.setDate(since.getDate() - daysBack);
 

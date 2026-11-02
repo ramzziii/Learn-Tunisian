@@ -8,6 +8,8 @@ const mockPermission = jest.fn();
 const mockSchedule = jest.fn();
 const mockUpdateSettings = jest.fn();
 let mockSettings: Record<string, unknown> = { dailyGoalMinutes: 10, reminderEnabled: false, reminderTime: '18:00:00' };
+// Signed-in account (the guest guard and Talk lock read the access tier).
+jest.mock('@/lib/access/AccessContext', () => ({ useAccess: () => ({ tier: 'free', isResolved: true }) }));
 jest.mock('@/components/onboarding/TimeWheelPicker', () => ({
   TimeWheelPicker: () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires

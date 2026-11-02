@@ -20,11 +20,19 @@ interface TypingSpellingProps {
   onComplete: (wasCorrect: boolean) => void;
 }
 
-/** hear a word and its meaning, type its transliteration. Any variant of the concept counts as correct. */
+/**
+ * Hear a word and its meaning, type its transliteration. Any variant of the
+ * concept counts as correct. Only a native recording is ever played (never
+ * the computer voice); without one, the meaning alone is the prompt.
+ */
 export function TypingSpelling({ exercise, onComplete }: TypingSpellingProps) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const { play, hasAudio, isResolving, hasError, retry } = useWordAudioPlayer(exercise.promptVariant, { autoPlay: true });
+  const hasNativeRecording = !!(exercise.promptVariant.isNativeVoice && exercise.promptVariant.audioPath);
+  const { play, hasAudio, isResolving, hasError, retry } = useWordAudioPlayer(hasNativeRecording ? exercise.promptVariant : null, {
+    autoPlay: true,
+    nativeOnly: true,
+  });
   const { playCorrect, playIncorrect } = useAnswerFeedback();
   const { shake, shakeStyle } = useShake();
   const [input, setInput] = useState('');
@@ -45,16 +53,18 @@ export function TypingSpelling({ exercise, onComplete }: TypingSpellingProps) {
 
   return (
     <View style={styles.container}>
-      <AudioPlayButton
-        onPress={play}
-        hasAudio={hasAudio}
-        isResolving={isResolving}
-        hasError={hasError}
-        onRetry={retry}
-        style={{ marginTop: spacing.lg }}
-      />
+      {hasNativeRecording ? (
+        <AudioPlayButton
+          onPress={play}
+          hasAudio={hasAudio}
+          isResolving={isResolving}
+          hasError={hasError}
+          onRetry={retry}
+          style={{ marginTop: spacing.lg }}
+        />
+      ) : null}
       <Text style={styles.meaning}>&ldquo;{exercise.targetGroup.englishMeaning}&rdquo;</Text>
-      <Text style={styles.instructions}>Type what you hear</Text>
+      <Text style={styles.instructions}>{hasNativeRecording ? 'Type what you hear' : 'Type the Tunisian for this'}</Text>
       <ScriptExemptionNote exempt="latin" />
       <VariantCallout group={exercise.targetGroup} />
 

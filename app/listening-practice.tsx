@@ -13,6 +13,10 @@ import { fetchLessonMap, fetchWordGroupsForLesson } from '@/data/content';
 import { fetchFavoriteWordGroups } from '@/data/favorites';
 import { fetchDailyGoalSettings } from '@/data/profiles';
 import { fetchWeakestWordGroups } from '@/data/progress';
+import { CreateAccountPrompt } from '@/components/guest/CreateAccountPrompt';
+import { useAccess } from '@/lib/access/AccessContext';
+import { filterToPracticeScope, inPracticeScope } from '@/lib/access/practiceScope';
+import { usePracticeScope } from '@/lib/access/usePracticeScope';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
 import { hasEnoughListeningContent, listeningVariant } from '@/lib/listening';
 import { prefetchLessonAudio } from '@/lib/offline/audioCache';
@@ -33,26 +37,42 @@ const DEFAULT_GOAL_MINUTES: DailyGoalMinutes = 5;
  * asked; with fewer than 3 of those there's an honest empty state instead
  * of a lopsided or silent quiz.
  */
+/** Listening isn't part of the guest preview. */
 export default function ListeningPractice() {
+  const { tier } = useAccess();
+  if (tier === 'guest') return <CreateAccountPrompt reason="keep-learning" />;
+  return <ListeningSession />;
+}
+
+function ListeningSession() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { activeProfile } = useActiveProfile();
   const [groups, setGroups] = useState<WordGroupWithVariants[] | null>(null);
   const [goalMinutes, setGoalMinutes] = useState<DailyGoalMinutes>(DEFAULT_GOAL_MINUTES);
 
+  // Practice isn't counted: only approved words from open lessons /
+  // categories (all with Premium).
+  const { scope } = usePracticeScope();
+
   useEffect(() => {
-    if (!activeProfile) return;
+    if (!activeProfile || !scope) return;
     let cancelled = false;
     (async () => {
       const pool = new Map<string, WordGroupWithVariants>();
-      const add = (list: WordGroupWithVariants[]) => list.forEach((g) => pool.has(g.id) || pool.set(g.id, g));
+      const add = (list: WordGroupWithVariants[]) =>
+        filterToPracticeScope(scope, list).forEach((g) => pool.has(g.id) || pool.set(g.id, g));
 
       add(await fetchWeakestWordGroups(activeProfile.id, POOL_SIZE).catch(() => [] as WordGroupWithVariants[]));
       add(await fetchFavoriteWordGroups(activeProfile.id).catch(() => [] as WordGroupWithVariants[]));
       if (!hasEnoughListeningContent([...pool.values()])) {
         const units = await fetchLessonMap(activeProfile.id).catch(() => []);
         const lessons = units.flatMap((u) => u.lessons);
-        const current = lessons.find((l) => l.state === 'unlocked') ?? lessons[0] ?? null;
+        // Only a lesson that's open — practice never opens one.
+        const open = lessons.filter((l) =>
+          inPracticeScope(scope, { unitId: l.unitId, lessonNumber: l.lessonNumber, contentStatus: 'approved' })
+        );
+        const current = open.find((l) => l.state === 'unlocked') ?? open[0] ?? null;
         if (current) add(await fetchWordGroupsForLesson(current.id).catch(() => [] as WordGroupWithVariants[]));
       }
       const settings = await fetchDailyGoalSettings(activeProfile.id).catch(() => null);
@@ -68,7 +88,7 @@ export default function ListeningPractice() {
     return () => {
       cancelled = true;
     };
-  }, [activeProfile]);
+  }, [activeProfile, scope]);
 
   if (!activeProfile || groups === null) return <LoadingScreen themed />;
 

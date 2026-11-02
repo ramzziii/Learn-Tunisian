@@ -130,3 +130,29 @@ it('a lesson titled the same as its unit is shown as “Lesson N” — the name
   expect(screen.getByText('Lesson 1')).toBeOnTheScreen();
   expect(screen.getByRole('button', { name: 'Lesson 1. Completed, 4 of 4 words' })).toBeOnTheScreen();
 });
+
+it('“Lesson N” is the position in the unit, not the course-wide lesson_number', async () => {
+  // Real data: Colors' only lesson has lesson_number 4; Animals' has 5.
+  await render(
+    <ThemeProvider>
+      <UnitSection
+        unitWithLessons={{
+          ...UNIT,
+          unit: { ...UNIT.unit, name: 'Colors' },
+          lessons: [
+            { ...lesson('c1', 4, 'Colors', 'completed', 4), unitName: 'Colors' },
+            { ...lesson('c2', 9, 'Colors', 'unlocked', 1), unitName: 'Colors' },
+          ],
+        }}
+        unitNumber={2}
+        onSelectLesson={onSelectLesson}
+        onBrowseWords={onBrowseWords}
+      />
+    </ThemeProvider>
+  );
+  expect(screen.getByText('Lesson 1')).toBeOnTheScreen();
+  expect(screen.getByText('Lesson 2')).toBeOnTheScreen();
+  expect(screen.queryByText(/Lesson [49]/)).toBeNull();
+  const labels = screen.getAllByRole('button', { name: /^Lesson \d/ }).map((b) => b.props.accessibilityLabel);
+  expect(labels).toEqual(['Lesson 1. Completed, 4 of 4 words', 'Lesson 2. Up next, 1 of 4 words']);
+});

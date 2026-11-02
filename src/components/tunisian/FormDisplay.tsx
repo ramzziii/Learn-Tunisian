@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View, type StyleProp, type TextStyle } from 'react-native';
 
 import { TunisianText } from '@/components/tunisian/TunisianText';
+import { ComputerVoiceNote } from '@/components/ui/ComputerVoiceNote';
 import { radii, spacing, type ThemeColors } from '@/constants/theme';
 import { useWordAudioPlayer } from '@/hooks/useWordAudioPlayer';
 import { formLabel, formsToShow, hasTwoForms } from '@/lib/display/displayRules';
@@ -88,8 +89,8 @@ function FormAudio({ variant, name, autoPlay, colors }: { variant: WordVariant; 
 
 function FormAudioButton({ variant, name, autoPlay, colors }: { variant: WordVariant; name: string; autoPlay: boolean; colors: ThemeColors }) {
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  // fallbackVoice: false — a form plays its own recording or nothing.
-  const audio = useWordAudioPlayer(variant, { autoPlay, fallbackVoice: false });
+  // A form plays its own recording or nothing; only a native one autoplays.
+  const audio = useWordAudioPlayer(variant, { autoPlay });
   const lower = name.charAt(0).toLowerCase() + name.slice(1);
 
   if (audio.hasError) {
@@ -100,17 +101,20 @@ function FormAudioButton({ variant, name, autoPlay, colors }: { variant: WordVar
     );
   }
   return (
-    <Pressable
-      onPress={audio.play}
-      disabled={audio.isResolving}
-      accessibilityRole="button"
-      accessibilityLabel={`Play ${lower}`}
-      accessibilityState={{ busy: audio.isResolving }}
-      style={styles.play}
-      hitSlop={8}
-    >
-      {audio.isResolving ? <ActivityIndicator color={colors.textOnPrimary} /> : <Text style={styles.playIcon}>🔊</Text>}
-    </Pressable>
+    <>
+      <Pressable
+        onPress={audio.play}
+        disabled={audio.isResolving}
+        accessibilityRole="button"
+        accessibilityLabel={`Play ${lower}`}
+        accessibilityState={{ busy: audio.isResolving }}
+        style={styles.play}
+        hitSlop={8}
+      >
+        {audio.isResolving ? <ActivityIndicator color={colors.textOnPrimary} /> : <Text style={styles.playIcon}>🔊</Text>}
+      </Pressable>
+      {audio.source === 'computer' ? <ComputerVoiceNote style={styles.computerNote} /> : null}
+    </>
   );
 }
 
@@ -131,6 +135,7 @@ const makeStyles = (colors: ThemeColors) =>
     },
     playIcon: { fontSize: 18, color: colors.textOnPrimary },
     noAudio: { fontSize: 12, color: colors.textSecondary, fontStyle: 'italic' },
+    computerNote: { flexShrink: 1, textAlign: 'left' },
     toggle: {
       alignSelf: 'flex-start',
       minHeight: 44,

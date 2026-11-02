@@ -21,13 +21,13 @@ interface ListenChooseMeaningProps {
 /**
  * Listening quiz: hear a native recording, choose what it means. The
  * recording plays by itself and can be replayed; it is never swapped for
- * the device voice (fallbackVoice: false) — if it can't load, the learner
+ * a computer or device voice (nativeOnly) — if it can't load, the learner
  * gets a retry. A wrong choice replays the recording and reveals the word.
  */
 export function ListenChooseMeaning({ exercise, onComplete }: ListenChooseMeaningProps) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const audio = useWordAudioPlayer(exercise.promptVariant, { autoPlay: true, fallbackVoice: false });
+  const audio = useWordAudioPlayer(exercise.promptVariant, { autoPlay: true, nativeOnly: true });
   const { playCorrect, playIncorrect } = useAnswerFeedback();
   const [chosenGroupId, setChosenGroupId] = useState<string | null>(null);
   const reported = useRef(false);

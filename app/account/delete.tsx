@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { RequireAccount } from '@/components/guest/RequireAccount';
 
 import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
@@ -29,7 +30,7 @@ const DELETED = [
  * explains it, requires typing DELETE, and only reports success when the
  * server says the account is gone. See docs/account-deletion.md.
  */
-export default function DeleteAccount() {
+function DeleteAccount() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { profiles } = useActiveProfile();
@@ -202,3 +203,12 @@ const makeStyles = (colors: ThemeColors) =>
     deleteButtonDisabled: { opacity: 0.45 },
     deleteLabel: { fontSize: 16, fontWeight: '700', color: colors.textOnPrimary },
   });
+
+/** Account only: a guest gets the create-account explanation (src/components/guest/RequireAccount.tsx). */
+export default function DeleteAccountScreen() {
+  return (
+    <RequireAccount>
+      <DeleteAccount />
+    </RequireAccount>
+  );
+}

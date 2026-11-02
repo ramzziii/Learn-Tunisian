@@ -6,6 +6,8 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 
 const mockFetchDisplay = jest.fn();
 const mockSaveDisplay = jest.fn();
+// Signed-in account (the guest guard and Talk lock read the access tier).
+jest.mock('@/lib/access/AccessContext', () => ({ useAccess: () => ({ tier: 'free', isResolved: true }) }));
 jest.mock('@/data/displayPreferences', () => ({
   fetchDisplayPreferences: (...a: unknown[]) => mockFetchDisplay(...a),
   saveDisplayPreferences: (...a: unknown[]) => mockSaveDisplay(...a),

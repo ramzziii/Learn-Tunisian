@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { RequireAccount } from '@/components/guest/RequireAccount';
 
 import { TimeWheelPicker } from '@/components/onboarding/TimeWheelPicker';
 import { DisplaySettings } from '@/components/settings/DisplaySettings';
@@ -20,7 +21,7 @@ import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
 import { useIsAdmin } from '@/lib/admin/AdminContext';
 import { useAuth } from '@/lib/auth/AuthContext';
 import { requestPasswordReset } from '@/lib/auth/passwordResetRequest';
-import { resetFreeAllowances } from '@/lib/premium/freeAllowance';
+import { useAccess } from '@/lib/access/AccessContext';
 import { usePremium } from '@/lib/premium/PremiumContext';
 import { cancelDailyReminder, requestNotificationPermission, scheduleDailyReminder } from '@/lib/notifications/reminders';
 import { useTheme, type ThemePreference } from '@/lib/theme/ThemeContext';
@@ -45,7 +46,7 @@ interface ProgressStats extends ProfileProgressSummary {
  *
  * Fully converted to the live theme system.
  */
-export default function ProfileScreen() {
+function ProfileScreen() {
   const { activeProfile } = useActiveProfile();
   const { signOut, session, sendPasswordReset } = useAuth();
   // Change password reuses the existing reset flow: email the signed-in
@@ -56,6 +57,7 @@ export default function ProfileScreen() {
   const resetInFlightRef = useRef(false);
   const { isAdmin } = useIsAdmin();
   const { isPremium, adminPreview, setAdminPreview } = usePremium();
+  const { resetPreview } = useAccess();
   const { colors, preference, setPreference } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [goalSettings, setGoalSettings] = useState<DailyGoalSettings | null>(null);
@@ -322,7 +324,7 @@ export default function ProfileScreen() {
               <Text style={styles.previewBody}>
                 {adminPreview === 'premium'
                   ? 'Showing the full Premium app. Switch off to see exactly what free learners see.'
-                  : 'Previewing the free plan — locked items, gates, and daily limits apply to you now.'}
+                  : 'Previewing the free plan — its item limits apply to you now, counted only on this device.'}
               </Text>
               {adminPreview === 'free' ? (
                 <Button
@@ -330,8 +332,8 @@ export default function ProfileScreen() {
                   label="Reset free-plan limits"
                   variant="ghost"
                   onPress={async () => {
-                    await resetFreeAllowances(activeProfile.id);
-                    Alert.alert('Free-plan limits reset', 'The Speed Match sample round and today’s free review are available again.');
+                    await resetPreview();
+                    Alert.alert('Free-plan preview reset', 'Your preview counts are cleared. Your real account and its counts are unchanged.');
                   }}
                 />
               ) : null}
@@ -428,3 +430,12 @@ const makeStyles = (colors: ThemeColors) => {
     errorBody: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', marginBottom: spacing.md },
   });
 };
+
+/** Account only: a guest gets the create-account explanation (src/components/guest/RequireAccount.tsx). */
+export default function ProfileTab() {
+  return (
+    <RequireAccount>
+      <ProfileScreen />
+    </RequireAccount>
+  );
+}

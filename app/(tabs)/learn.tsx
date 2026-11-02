@@ -11,9 +11,10 @@ import { spacing, type ThemeColors } from '@/constants/theme';
 import { fetchLessonMap, type UnitWithLessons } from '@/data/content';
 import { fetchProgressSummary, type ProfileProgressSummary } from '@/data/progress';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
-import { usePremium } from '@/lib/premium/PremiumContext';
-import { computeFreeLessonIds } from '@/lib/premium/access';
+import { useLockedItemAction } from '@/components/access/AccessLimit';
+import { useAccess } from '@/lib/access/AccessContext';
 import { buildProgressInsights, type ProgressInsights } from '@/lib/progressInsights';
+import type { LessonWithState } from '@/types/models';
 import { useTheme } from '@/lib/theme/ThemeContext';
 
 interface LearnData {
@@ -26,8 +27,8 @@ interface LearnData {
  * Learn — "what should I learn next?". A gradient hero with overall
  * progress, a Continue card for the one lesson that's up next, the units as
  * cards with each lesson on a path (UnitSection), and Explore Tunisian.
- * Lesson order, unlock rules and Premium gates come from fetchLessonMap and
- * src/lib/premium/access.ts, unchanged. Entrances are staggered (Reveal),
+ * Lesson order and unlock rules come from fetchLessonMap; the allowance
+ * lock from the access layer (src/lib/access/accessRules.ts). Entrances are staggered (Reveal),
  * progress bars fill in, and the next lesson ripples — loops stop when the
  * OS asks to reduce motion.
  */
@@ -36,18 +37,15 @@ export default function LearnScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [data, setData] = useState<LearnData | null>(null);
-  const { isPremium } = usePremium();
   // The "your translation is ready" notice moved here with its entry point.
   const translationNotice = translationReadyText(useNewTranslationAnswers());
-  // Derived from the already-loaded lesson map (real sort_order columns), so
-  // the map marks exactly the lessons /lesson/[lessonId] would gate.
-  const freeLessonIds = useMemo(
-    () =>
-      computeFreeLessonIds(
-        data?.unitsWithLessons.map(({ unit }) => unit) ?? [],
-        data?.unitsWithLessons.flatMap(({ lessons }) => lessons) ?? []
-      ),
-    [data]
+  // Same rule /lesson/[lessonId] applies when it opens: locked only once the
+  // allowance is used up, and never for a lesson already opened or completed.
+  const { decide } = useAccess();
+  const onLockedPress = useLockedItemAction();
+  const isLessonLocked = useCallback(
+    (lesson: LessonWithState) => decide('lesson', lesson.id, { completed: lesson.state === 'completed' }) === 'limit',
+    [decide]
   );
   const [loadError, setLoadError] = useState(false);
 
@@ -95,7 +93,7 @@ export default function LearnScreen() {
   }
 
   return (
-    <LearnView data={data} isPremium={isPremium} freeLessonIds={freeLessonIds} translationNotice={translationNotice} />
+    <LearnView data={data} isLessonLocked={isLessonLocked} onLockedPress={onLockedPress} translationNotice={translationNotice} />
   );
 }
 

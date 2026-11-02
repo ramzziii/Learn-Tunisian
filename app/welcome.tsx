@@ -41,12 +41,13 @@ export default function Welcome() {
         </View>
 
         <View style={styles.footer}>
-          <Button label="Start learning free" onPress={() => router.push('/onboarding/age')} />
+          {/* Guest preview (device only) — asks "18 or older?" first. */}
+          <Button label="Try a free lesson" onPress={() => router.push('/guest/age')} />
           <Button
-            label="I already have an account"
-            variant="ghost"
+            label="Create account / Sign in"
+            variant="secondary"
             onPress={() => router.push('/auth/sign-in')}
-            style={{ marginTop: spacing.xs }}
+            style={{ marginTop: spacing.sm }}
           />
         </View>
       </View>

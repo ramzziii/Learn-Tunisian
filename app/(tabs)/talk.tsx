@@ -1,62 +1,37 @@
 import { router } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { Button } from '@/components/ui/Button';
-import { LoadingScreen } from '@/components/ui/LoadingScreen';
+import { openUpgradeFlow, PremiumBadge } from '@/components/premium/Premium';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Reveal } from '@/components/ui/Reveal';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { sortScenariosByGoal, TALK_SCENARIOS } from '@/constants/talkScenarios';
 import { radii, spacing, type ThemeColors } from '@/constants/theme';
-import { fetchTalkLevel } from '@/data/talkContext';
+import { canUseTalk } from '@/lib/access/accessRules';
+import { useAccess } from '@/lib/access/AccessContext';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
-import { meetsTalkLevel, type TalkLevel } from '@/lib/talkLevel';
 import { useTheme } from '@/lib/theme/ThemeContext';
 
-const LEVEL_LABEL: Record<TalkLevel, string> = { beginner: 'Beginner', intermediate: 'Intermediate', advanced: 'Advanced' };
-const LEVEL_EMOJI: Record<TalkLevel, string> = { beginner: '🌱', intermediate: '🌿', advanced: '🌳' };
-
+/**
+ * Talk to a Tunisian — visible to everyone, usable with Premium only (the
+ * server enforces it too). Premium opens all 5 scenarios. A free account sees
+ * them with a Premium lock and gets the upgrade flow; a guest gets the
+ * create-account explanation. Nothing here calls the AI.
+ */
 export default function TalkScenarioPicker() {
   const { activeProfile } = useActiveProfile();
+  const { tier } = useAccess();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const [level, setLevel] = useState<TalkLevel | null>(null);
-  const [loadError, setLoadError] = useState(false);
+  const unlocked = canUseTalk(tier);
+  const goal = activeProfile?.learningGoal ?? null;
 
-  const load = useCallback(async () => {
-    if (!activeProfile) return;
-    setLoadError(false);
-    try {
-      setLevel(await fetchTalkLevel(activeProfile.id));
-    } catch {
-      setLoadError(true);
-    }
-  }, [activeProfile]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  if (!activeProfile) return <LoadingScreen themed />;
-
-
-  if (loadError || level === null) {
-    return (
-      <ScreenContainer themed>
-        {loadError ? (
-          <View style={styles.unavailableContainer}>
-            <Text style={styles.unavailableEmoji}>😕</Text>
-            <Text style={styles.unavailableTitle}>Couldn&apos;t load this</Text>
-            <Text style={styles.unavailableBody}>Check your connection and try again.</Text>
-            <Button themed label="Try again" variant="secondary" onPress={load} style={{ marginTop: spacing.md }} />
-          </View>
-        ) : (
-          <LoadingScreen themed />
-        )}
-      </ScreenContainer>
-    );
-  }
+  const openScenario = (scenarioId: string) => {
+    if (unlocked) router.push(`/talk/${scenarioId}`);
+    else if (tier === 'guest') router.push({ pathname: '/guest/create-account', params: { reason: 'talk' } });
+    else openUpgradeFlow();
+  };
 
   return (
     <ScreenContainer themed>
@@ -64,25 +39,26 @@ export default function TalkScenarioPicker() {
         <Text style={styles.eyebrow}>Conversation practice</Text>
         <Text style={styles.title}>Talk to a Tunisian 🇹🇳</Text>
         <Text style={styles.subtitle}>Choose a situation to practice a real conversation.</Text>
-
-        <Reveal style={styles.levelBadge}>
-          <Text style={styles.levelBadgeText}>
-            {LEVEL_EMOJI[level]} Your level: {LEVEL_LABEL[level]}
-          </Text>
-        </Reveal>
+        {!unlocked ? (
+          <Reveal style={styles.lockNote}>
+            <Text style={styles.lockNoteText}>
+              🔒 Talk is part of Premium — an AI conversation partner.{' '}
+              {tier === 'guest' ? 'Create a free account to see the plans.' : 'Your lessons and practice stay free.'}
+            </Text>
+          </Reveal>
+        ) : null}
 
         <View style={styles.scenarioList}>
-          {sortScenariosByGoal(TALK_SCENARIOS, activeProfile.learningGoal).map((scenario, index) => {
-            const unlocked = meetsTalkLevel(level, scenario.minLevel);
-            const isRecommended =
-              activeProfile.learningGoal !== null && scenario.relevantGoals.includes(activeProfile.learningGoal);
+          {sortScenariosByGoal(TALK_SCENARIOS, goal).map((scenario, index) => {
+            const isRecommended = goal !== null && scenario.relevantGoals.includes(goal);
             return (
               <Reveal key={scenario.id} delay={60 + Math.min(index * 40, 320)}>
                 <PressableScale
-                  haptic={unlocked}
-                  disabled={!unlocked}
+                  haptic
+                  accessibilityRole="button"
+                  accessibilityLabel={`${scenario.title}. ${unlocked ? scenario.description : 'Premium'}`}
                   style={[styles.scenarioRow, styles.shadowCard, !unlocked && styles.scenarioRowLocked]}
-                  onPress={() => router.push(`/talk/${scenario.id}`)}
+                  onPress={() => openScenario(scenario.id)}
                 >
                   <Text style={styles.scenarioEmoji}>{unlocked ? scenario.emoji : '🔒'}</Text>
                   <View style={styles.scenarioTextColumn}>
@@ -95,9 +71,10 @@ export default function TalkScenarioPicker() {
                           <Text style={styles.recommendedBadgeText}>For you</Text>
                         </View>
                       ) : null}
+                      {!unlocked ? <PremiumBadge compact /> : null}
                     </View>
                     <Text style={styles.scenarioDescription} numberOfLines={2} maxFontSizeMultiplier={1.3}>
-                      {unlocked ? scenario.description : `Unlocks at ${LEVEL_LABEL[scenario.minLevel]} level`}
+                      {scenario.description}
                     </Text>
                   </View>
                 </PressableScale>
@@ -115,6 +92,8 @@ const makeStyles = (colors: ThemeColors) => {
 
   return StyleSheet.create({
     shadowCard,
+    lockNote: { backgroundColor: `${colors.accent}1F`, borderRadius: radii.md, padding: spacing.md, marginTop: spacing.md },
+    lockNoteText: { fontSize: 14, color: colors.textPrimary, lineHeight: 20 },
     eyebrow: {
       fontSize: 12,
       fontWeight: '700',

@@ -33,7 +33,6 @@ export function SpeakingPractice({ exercise, onComplete }: SpeakingPracticeProps
         nativeVariant={exercise.promptVariant}
         matchGroup={exercise.targetGroup}
         maxAttempts={PRONUNCIATION_MAX_ATTEMPTS}
-        allowFallbackVoice
         outOfTriesMessage={exercise.isRevisit ? 'Good effort — it’ll come up again in your reviews.' : undefined}
         onFinish={({ correct }) => (correct ? onComplete(true) : onComplete(true, { mispronounced: true }))}
       >

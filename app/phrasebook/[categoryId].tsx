@@ -3,7 +3,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { PhraseDetailModal } from '@/components/phrasebook/PhraseDetailModal';
-import { PremiumGate } from '@/components/premium/Premium';
+import { AccessLimitScreen } from '@/components/access/AccessLimit';
 import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
@@ -12,10 +12,9 @@ import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Reveal } from '@/components/ui/Reveal';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { radii, spacing, type ThemeColors } from '@/constants/theme';
-import { fetchPhrasebookCategories } from '@/data/content';
-import { canAccessPhrasebookCategory, fetchAccessibleLessonWordGroups } from '@/data/premiumAccess';
+import { fetchPhrasebookCategories, fetchWordGroupsForLesson } from '@/data/content';
+import { useAccess } from '@/lib/access/AccessContext';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
-import { usePremium } from '@/lib/premium/PremiumContext';
 import { getViewedPhraseIds, markPhraseViewed } from '@/lib/phrasebookProgress';
 import { useTheme } from '@/lib/theme/ThemeContext';
 import { preferredVariant } from '@/lib/display/displayRules';
@@ -37,15 +36,15 @@ export default function PhrasebookCategoryScreen() {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [data, setData] = useState<CategoryData | null>(null);
   const [loadError, setLoadError] = useState(false);
-  const [isPremiumLocked, setIsPremiumLocked] = useState(false);
-  const { isPremium, isResolved } = usePremium();
+  const [isLimitReached, setIsLimitReached] = useState(false);
+  const { isResolved, open } = useAccess();
   const [viewedIds, setViewedIds] = useState<string[]>([]);
   const [selectedPhrase, setSelectedPhrase] = useState<WordGroupWithVariants | null>(null);
 
   const load = useCallback(async () => {
     if (!categoryId || !activeProfile || !isResolved) return;
     setLoadError(false);
-    setIsPremiumLocked(false);
+    setIsLimitReached(false);
     try {
       const [categories, viewed] = await Promise.all([
         fetchPhrasebookCategories(),
@@ -63,20 +62,22 @@ export default function PhrasebookCategoryScreen() {
         setLoadError(true);
         return;
       }
-      // Checked before the category's phrases are fetched, so a direct link
-      // to a locked category never loads them.
-      if (!canAccessPhrasebookCategory(isPremium, category.unitId, categories)) {
-        setIsPremiumLocked(true);
+      // Opened (counted on first open) before the category's phrases are
+      // fetched, so a direct link past the allowance never loads them.
+      if (!(await open('phrasebook_category', category.unitId))) {
+        setIsLimitReached(true);
         return;
       }
-      const phrases = await fetchAccessibleLessonWordGroups(category.lessonId, isPremium);
+      const phrases = await fetchWordGroupsForLesson(category.lessonId);
       setData({ name: category.name, lessonId: category.lessonId, phrases });
       setViewedIds(viewed);
     } catch (error) {
       console.error('Failed to load phrasebook category', categoryId, error);
       setLoadError(true);
     }
-  }, [categoryId, activeProfile, isPremium, isResolved]);
+    // `open` changes identity as counts change; reloading then would only re-open the same category.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categoryId, activeProfile, isResolved]);
 
   useFocusEffect(
     useCallback(() => {
@@ -91,14 +92,7 @@ export default function PhrasebookCategoryScreen() {
     markPhraseViewed(activeProfile.id, phrase.id);
   };
 
-  if (isPremiumLocked) {
-    return (
-      <PremiumGate
-        title="This category is part of Premium"
-        message="Your free plan includes the Greetings phrasebook. Upgrade to unlock every category."
-      />
-    );
-  }
+  if (isLimitReached) return <AccessLimitScreen feature="phrasebook_category" />;
 
   if (!activeProfile || (data === null && !loadError)) return <LoadingScreen themed />;
 

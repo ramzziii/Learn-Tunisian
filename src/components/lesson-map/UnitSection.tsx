@@ -125,6 +125,7 @@ export function UnitSection({
             <Reveal key={lesson.id} delay={Math.min(100 + index * 60, 600)}>
               <LessonNode
                 lesson={lesson}
+                position={index + 1}
                 isFirst={index === 0}
                 isLast={index === lessons.length - 1}
                 premiumLocked={isPremiumLocked(lesson.id)}

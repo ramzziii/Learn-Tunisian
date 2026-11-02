@@ -11,9 +11,10 @@ import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { radii, shadows, spacing, type ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/lib/theme/ThemeContext';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
-import { usePremium } from '@/lib/premium/PremiumContext';
-import { ARABIC_LETTERS, buildAlphabetExerciseQueue, type AlphabetExerciseItem } from '@/lib/alphabet';
-import { accessibleLetters } from '@/lib/premium/access';
+import { AccessCheckProblem, AccessLimitScreen } from '@/components/access/AccessLimit';
+import { LoadingScreen } from '@/components/ui/LoadingScreen';
+import { useOpenLetterPool } from '@/lib/access/useOpenLetterPool';
+import { buildAlphabetExerciseQueue, type ArabicLetter, type AlphabetExerciseItem } from '@/lib/alphabet';
 import { markLettersPracticed } from '@/lib/alphabetProgress';
 import { useFadeInOnChange } from '@/hooks/useFadeInOnChange';
 
@@ -23,16 +24,24 @@ interface AlphabetPracticeSessionProps {
   onExit: () => void;
 }
 
+/** A practice round needs at least this many open letters (a guest's whole allowance). */
+const PRACTICE_MIN_LETTERS = 2;
+
 export function AlphabetPracticeSession({ onExit }: AlphabetPracticeSessionProps) {
+  // The round only asks about open letters (all with Premium), topped up in
+  // teaching order when too few are open — decided before the round starts.
+  const pool = useOpenLetterPool(PRACTICE_MIN_LETTERS);
+  if (pool.status === 'checking') return <LoadingScreen themed />;
+  if (pool.status === 'limit') return <AccessLimitScreen feature="alphabet_letter" />;
+  if (pool.status === 'error') return <AccessCheckProblem kind="error" />;
+  return <PracticeRound letters={pool.letters} onExit={onExit} />;
+}
+
+function PracticeRound({ letters, onExit }: AlphabetPracticeSessionProps & { letters: ArabicLetter[] }) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { activeProfile } = useActiveProfile();
-  // A free profile's round only asks about the free letters (see
-  // src/lib/premium/access.ts) — decided when the round is built.
-  const { isPremium } = usePremium();
-  const [queue, setQueue] = useState<AlphabetExerciseItem[]>(() =>
-    buildAlphabetExerciseQueue(QUEUE_SIZE, accessibleLetters(isPremium, ARABIC_LETTERS))
-  );
+  const [queue, setQueue] = useState<AlphabetExerciseItem[]>(() => buildAlphabetExerciseQueue(QUEUE_SIZE, letters));
   const [index, setIndex] = useState(0);
   const [missedLetterIds, setMissedLetterIds] = useState<string[]>([]);
   const [correctLetterIds, setCorrectLetterIds] = useState<string[]>([]);

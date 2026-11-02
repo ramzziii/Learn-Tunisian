@@ -7,6 +7,12 @@ import type { ExerciseItem } from '@/types/exercises';
 const mockMarkSpeakingDone = jest.fn();
 const mockProfile = { id: 'p1' };
 
+// Signed-in Premium account with every lesson open (access rules are tested elsewhere).
+jest.mock('@/lib/access/AccessContext', () => ({ useAccess: () => ({ tier: 'premium', isResolved: true, decide: () => 'open', claimed: () => new Set() }) }));
+jest.mock('@/lib/access/usePracticeScope', () => ({
+  usePracticeScope: () => mockAllScope,
+}));
+const mockAllScope = { scope: { all: true, lessonKeys: new Set(), unitIds: new Set() }, error: false, reload: () => undefined };
 jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,
   default: { getItem: jest.fn(async () => null), setItem: jest.fn(async () => undefined) },
@@ -20,6 +26,9 @@ jest.mock('@/data/progress', () => ({
   fetchWeakestWordGroups: jest.fn(async () =>
     ['salam', 'shukran', 'bislema'].map((id) => ({
       id,
+      unitId: 'u1',
+      lessonNumber: 1,
+      contentStatus: 'approved',
       englishMeaning: id,
       variants: [{ id: `${id}-v`, variantLabel: 'primary', wordArabic: 'كلمة', transliteration: id }],
     }))

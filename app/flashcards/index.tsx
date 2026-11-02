@@ -9,6 +9,7 @@ import { PressableScale } from '@/components/ui/PressableScale';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { radii, spacing, type ThemeColors } from '@/constants/theme';
 import { fetchFlashcardDecks } from '@/data/flashcards';
+import { usePracticeScope } from '@/lib/access/usePracticeScope';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
 import type { FlashcardDeck } from '@/lib/flashcards';
 import { useTheme } from '@/lib/theme/ThemeContext';
@@ -33,22 +34,24 @@ export default function FlashcardDecksScreen() {
   const { activeProfile } = useActiveProfile();
   const [decks, setDecks] = useState<FlashcardDeck[] | null>(null);
   const [loadError, setLoadError] = useState(false);
+  // Practice isn't counted: decks only hold words from open lessons / categories.
+  const { scope, error: scopeError } = usePracticeScope();
 
   const load = useCallback(() => {
-    if (!activeProfile) return () => {};
+    if (!activeProfile || !scope) return () => {};
     let cancelled = false;
     setLoadError(false);
-    fetchFlashcardDecks(activeProfile.id)
+    fetchFlashcardDecks(activeProfile.id, scope)
       .then((result) => !cancelled && setDecks(result))
       .catch(() => !cancelled && setLoadError(true));
     return () => {
       cancelled = true;
     };
-  }, [activeProfile]);
+  }, [activeProfile, scope]);
 
   useFocusEffect(load);
 
-  if (loadError) {
+  if (loadError || scopeError) {
     return (
       <ScreenContainer themed>
         <BackButton themed />

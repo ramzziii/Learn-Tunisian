@@ -5,7 +5,7 @@ navigated, and where it stands. Written so that someone new to the project
 (a person or an AI reviewer) can understand the whole product and give
 informed recommendations without running it.
 
-Last updated: 2026-10-30. Where this guide and the code disagree, the code
+Last updated: 2026-10-31. Where this guide and the code disagree, the code
 wins; the deeper per-topic docs are linked at the end.
 
 ---
@@ -27,9 +27,10 @@ streak-loss warnings.
 | Area | State |
 |---|---|
 | App features | Broad and working: curriculum, exercises, review, flashcard quiz, phrasebook, alphabet, grammar, culture, listening/speaking practice, AI conversation, translation requests, admin tools |
-| Learning content | **Draft.** ~5 curriculum units / ~50 words plus 10 phrasebook categories, AI-drafted and **not native-speaker verified**. Seeded audio is placeholder text-to-speech in Modern Standard Arabic, not Tunisian. Real recordings are uploaded through the admin tools |
+| Learning content | **Draft.** ~5 curriculum units / ~50 words plus 10 phrasebook categories, AI-drafted and **not native-speaker verified**. Seeded audio is placeholder text-to-speech in Modern Standard Arabic, not Tunisian — labelled "Computer voice", played only on tap, never in listening or pronunciation exercises. A bulk pipeline (import → native review → recording sheet → audio upload) grows it toward 300–500 verified words: [content-pipeline.md](content-pipeline.md), [content-plan.md](content-plan.md) |
 | AI conversation (Talk) | Runs in **mock mode** unless the owner deploys the Edge Functions with an AI key and sets `EXPO_PUBLIC_TALK_AI_MODE=live` |
-| Payments | **None.** A "Premium" tier exists in the code (some content locked for free accounts) but nothing can be bought; the Plans screen is a preview |
+| Access | **Guest preview** (no account, device only), **Free** (a few items per feature) and **Premium** — see [access-and-guest-preview.md](access-and-guest-preview.md) |
+| Payments | **None.** Premium exists in the code but nothing can be bought; the Plans screen is a preview |
 | Legal | Terms/Privacy text on the consent screen is a **placeholder** — a release blocker |
 | Store listing | Draft in [store-listing.md](store-listing.md) with a claims audit and owner checklist |
 
@@ -53,8 +54,12 @@ streak-loss warnings.
 
 ```
 /                         app/index.tsx — redirect only (see 3.2)
-/welcome                  Welcome (signed out)
+/welcome                  Welcome (signed out): "Try a free lesson" / "Create account / Sign in"
 /why-tunisian             "Why Tunisian, not MSA?" explainer
+
+/guest/age                Guest preview: "Are you 18 or older?" (yes / no, no date of birth)
+/guest/create-account     Create-account explanation (nudge, limits, account-only places)
+/guest/carry-over         After sign-up: bring the preview's progress over (if any)
 
 /onboarding/age           1. Date-of-birth age gate (before an account exists)
 /auth/sign-up             2. Create account (email + password)
@@ -94,6 +99,7 @@ Pushed full-screen on top of the tabs
   /alphabet-practice, /alphabet-flashcards, /alphabet-matching, /alphabet-diacritics
   /culture                Culture Corner (proverbs)
   /favorites              Saved words
+  /search                 Dictionary / Search (from the search bar on Learn)
   /translation-requests   Ask for a translation
   /talk/[scenarioId]      AI conversation
   /account/delete         Delete account
@@ -108,7 +114,8 @@ own back/close buttons.
 ### 3.2 Where the app sends you on launch (`app/index.tsx`)
 
 1. Auth still loading → spinner.
-2. Not signed in → **/welcome**.
+2. Not signed in → **/home** in guest mode (after "Try a free lesson"),
+   otherwise **/welcome**.
 3. Signed in, no profile yet → **/onboarding/consent** (continue setup).
 4. Several legacy profiles, none chosen → **/profiles**.
 5. Otherwise → **/home**.
@@ -127,6 +134,11 @@ reminder 6 (sign-up itself has no dots).
 - **Age gate**: date of birth typed as MM / DD / YYYY (numeric fields,
   auto-advance, validation of real/future dates). Under 18 → an adults-only
   message; the date is not stored, logged or sent, and no account is made.
+  The device then blocks retrying for 24 hours, storing only a yes/no flag
+  and its expiry (the guest "Are you 18 or older?" question does the same).
+- After the reminder step, a device holding guest-preview data goes to
+  **/guest/carry-over** before Home (see
+  [access-and-guest-preview.md](access-and-guest-preview.md)).
 - **Daily goal**: "How much time do you want to commit to learning Tunisian
   each day?" — 5, 10 (default) or 15 minutes. A target, not a limit.
 - **Reminder**: optional. Notification permission is requested only if the
@@ -137,8 +149,10 @@ reminder 6 (sign-up itself has no dots).
 
 ### 3.4 Providers wrapping every screen (`app/_layout.tsx`)
 
-Theme → Auth → Admin → Active profile → Display preferences → Premium →
-Onboarding draft state.
+Theme → Auth → Guest → Admin → Active profile → Display preferences →
+Premium → Access (tier and used-item counts) → Onboarding draft state. The
+active profile's `is_premium` is re-read when the app returns to the
+foreground.
 
 ---
 
@@ -155,17 +169,23 @@ Deliberately minimal:
 3. Only when words are due: a quiet secondary link, **"N words due"** →
    Review.
 
+A guest sees no goal card: one action, **Try lesson 1**, and a quiet "Create
+a free account" link.
+
 (Removed from Home: the daily-challenges checklist, the quick-action row, the
 "recommended next" card and the 🔥 day count. Challenge flags are still
 recorded by Review and Speaking Practice, and the day-count calculation
 still exists, but nothing displays them now.)
 
 ### Learn (`/learn`)
+A search bar at the top opens **Dictionary / Search** (§6.12).
 The curriculum map: units → lessons, each lesson **completed / unlocked /
 locked**. Lessons unlock **sequentially**: a lesson is completed when every
 word in it has been answered correctly at least once, which unlocks the next.
 Progress teasers (words learning / mastered). Each lesson can be started or
-its word list browsed.
+its word list browsed. A lesson with no approved words yet (e.g. freshly
+imported drafts) is hidden, and so is a unit with no visible lessons — they
+never block the lessons after them.
 
 - **Start here** (only before any lesson is completed): an Alphabet card at
   the top.
@@ -181,11 +201,11 @@ Three groups:
   after me).
 
 ### Talk (`/talk`)
-"Talk to a Tunisian": conversation scenarios (At a Café, At the Market,
-Meeting Someone, Family, Ordering Food, …). The learner's level
-(beginner/intermediate/advanced) is derived from words mastered and lessons
-completed and **unlocks scenarios**; scenarios matching the learner's goal
-are marked "For you". See §6.10.
+"Talk to a Tunisian": 5 conversation scenarios (At a Café, At the Market,
+Meeting Someone, Family, Ordering Food). **Premium only**: everyone sees the
+list; Premium opens all 5 (no level lock); a free account sees a Premium lock
+and the upgrade flow; a guest gets the create-account explanation. Scenarios
+matching the learner's goal are marked "For you". See §6.10.
 
 ### Profile (`/profile`)
 Settings only, under headings: admin entry (admins only, at the top) ·
@@ -214,6 +234,14 @@ All learning content lives in Supabase:
   `archived`) on groups and variants. **Learners only see `approved`** — this
   is enforced in the app's data-access functions (RLS lets signed-in users
   read all rows so admins can edit).
+- `native_verified` = a native speaker checked the **written** word (set by
+  review); `is_native_voice` = the **recording** is native (set by an audio
+  upload or the admin recorder). A word's audio is a native recording only
+  with `is_native_voice`; otherwise it's a "computer voice" (placeholder).
+- Bulk content work (spreadsheet import, review CSV round trip, recording
+  sheet, audio upload) is done with `scripts/*.mjs`; review history and
+  import notes are kept privately (`content_review_events`,
+  `content_source_notes`, 0026). See [content-pipeline.md](content-pipeline.md).
 - **Curriculum units** (`is_curriculum = true`) form the lesson map;
   **phrasebook categories** are units with `is_curriculum = false`, one lesson
   each.
@@ -243,7 +271,10 @@ Picked per word in rotation: **reading match** (hear a word, tap the right
 Arabic), **typing/spelling** (type the transliteration; any variant
 accepted), **speaking** (hear → record → play back → try again; no automatic
 pronunciation scoring), **listen → choose the recording**, **listen → choose
-the meaning**. Every answer shows a result sheet (*Great job!* / *Not quite*
+the meaning**. Only native recordings are ever played in these: without one,
+reading match and typing ask from the meaning ("Tap the Tunisian for …",
+"Type the Tunisian for this") and speaking says "No native recording yet —
+read it and say it". Every answer shows a result sheet (*Great job!* / *Not quite*
 with the right answer, sound + haptic, *Next* with a 3-second countdown).
 Distractors always come from other word groups, never another form of the
 same word.
@@ -262,7 +293,8 @@ same word.
 
 ### 6.4 Review (`/review`)
 A session over due/struggling words, on the shared engine. "All caught up"
-when nothing is due. Free plan: one review a day, up to 10 words.
+when nothing is due. Not counted (no daily limit); like all practice it only
+uses approved words from lessons and categories the learner has open.
 
 ### 6.5 Flashcards (`/flashcards`, `/flashcards/[deckId]`)
 A **quiz**, not a self-rating deck:
@@ -285,39 +317,48 @@ A **quiz**, not a self-rating deck:
   sheet. One result per card is recorded through the shared scheduler.
 - Batches of 15, then the completion card with **Another batch**. Minutes
   count toward the daily goal (logged as a review session). Decks aren't
-  limited on the free plan.
+  counted; they only hold words from lessons and categories the learner has
+  open. Guests' decks come from the preview words practised on the device.
 - The **Phrasebook browse cards** (`/phrasebook/flashcards`) are a separate
   flow: browse-and-listen only, no quiz. Reached from Phrasebook and from
   Flashcards.
 
 ### 6.6 Today's Practice (`/todays-practice`)
 One short guided session from Home: up to 5 due review words + 2 new words
-from the current lesson + 2 Repeat After Me items, then a revisit round.
-Minutes logged once at the end.
+from the current lesson + 2 Repeat After Me recordings already opened, then a
+revisit round. Using the current lesson's words starts that lesson, so if it
+isn't open yet it's opened (counted) while the allowance has room. Minutes
+logged once at the end. Needs an account.
 
 ### 6.7 Phrasebook (`/phrasebook`)
-Categories of everyday phrases (one free category on the free plan). A
+Categories of everyday phrases. Each category counts as one item when first
+opened (guest preview: Greetings + First Encounters; free: 5 in total). A
 category screen lists phrases with audio, a detail modal, and favorites.
 
 ### 6.8 Listening & speaking
 - **Listening Practice**: listening-quiz questions only, from the learner's
   weakest words, favorites and current lesson; only words with an approved
   native recording qualify (needs ≥ 3, otherwise an honest empty state).
+  Not offered to guests.
 - **Speaking** (`/speaking`) chooses between **Practice words** (a speaking
   drill on weakest words → favorites → current lesson) and **Repeat after me**
-  (repeat recordings an admin selected; up to 3 attempts per item; free plan
-  5 items per session; progress saved per item).
+  (repeat recordings an admin selected; up to 3 attempts per item; each
+  recording counts as one item when first started — guest 2, free 5 in total;
+  progress saved per item). Practice words only uses words from open lessons
+  and categories (a guest drills at most 2).
 - Microphone permission is requested in context, with an explanation, the
   first time it's needed.
 
 ### 6.9 Alphabet, grammar, culture
 - **Alphabet**: letter hub with *Learn the letters* (practice), flashcards,
   a matching game (speed match), and diacritics (each letter with the three
-  short vowels). Free plan: first 3 letters.
+  short vowels). Each letter counts as one item when first opened (guest 2,
+  free 5, any letters); practice and speed match use the open letters,
+  opening the next in teaching order if too few (speed match needs 3).
 - **Grammar Notes**: static notes (sentence order, pronouns, conjugation
-  tables with examples). Free plan: one note.
+  tables with examples). Any 2 notes for a guest, 5 for a free account.
 - **Culture Corner**: Tunisian proverbs and sayings with meanings; viewed
-  ones are tracked. Free plan: two proverbs.
+  ones are tracked. Any 2 proverbs for a guest, 5 for a free account.
 
 ### 6.10 Talk to a Tunisian (AI conversation)
 - Scenario-based, **voice-first** chat with an AI tutor: the tutor's replies
@@ -341,15 +382,24 @@ category screen lists phrases with audio, a detail modal, and favorites.
 A learner asks for an English phrase in Tunisian; an admin answers with
 Arabic, transliteration, meaning and a native recording, privately visible to
 that learner (optional email notification via `translation-answered-email`).
-Free plan: one request (enforced in the database).
+Free plan: one request (enforced in the database). Guests need an account.
 
-### 6.12 Word detail & favorites
+### 6.12 Dictionary / Search (`/search`)
+Type English, Arabic script or Latin letters (with 3, 7, 9…) to find words
+and phrases — only ones the learner can open (guest: the preview, opening 2
+results; free: open lessons and categories; Premium: everything approved).
+Searched in memory on the device; nothing typed is sent or logged. Details,
+ranking and the approved letter aliases:
+[access-and-guest-preview.md](access-and-guest-preview.md#dictionary--search).
+
+### 6.13 Word detail & favorites
 `/word/[id]`: all forms, audio, notes, a **verification badge** ("Draft —
 pending native review" vs "Native-speaker verified"), progress status, a
 one-word practice drill, and a ⭐ favorite toggle. `/favorites` lists saved
-words.
+words. A word from a lesson or category the learner hasn't opened shows a
+friendly locked state instead (word and meaning hidden), and isn't listed.
 
-### 6.13 Display preferences
+### 6.14 Display preferences
 - **Script**: Arabic, Latin transliteration, or both.
 - **Form** for two-form words: masculine, feminine or both first — a
   *display* preference only, never treated as the learner's gender (tests
@@ -357,33 +407,80 @@ words.
   this form yet" instead of playing another form or a device voice.
 - **Theme**: light, dark, match device.
 
-### 6.14 Reminders
+### 6.15 Reminders
 One optional daily local notification at a chosen time, neutral wording.
 Set at signup or in Profile; permission requested only on opt-in.
 
 ---
 
-## 7. Free vs Premium
+## 7. Guest, Free and Premium
 
-| | Free | Premium |
-|---|---|---|
-| Curriculum | first lesson | all |
-| Phrasebook | 1 category | all |
-| Grammar / Alphabet / Proverbs | 1 note / 3 letters / 2 proverbs | all |
-| Review | 1 session/day, ≤ 10 words | unlimited |
-| Repeat after me | 5 items/session | unlimited |
-| Translation requests | 1 | unlimited |
+Full rules, storage and limits: [access-and-guest-preview.md](access-and-guest-preview.md).
+
+| Feature (item) | Guest | Free (total, guest use included) | Premium |
+|---|---|---|---|
+| Lessons (lesson) | first 2 in course order | 5 | all |
+| Phrasebook (category) | Greetings + First Encounters | 5 | all |
+| Grammar Notes (note) | any 2 | 5 | all |
+| Culture Corner (proverb) | any 2 | 5 | all |
+| Alphabet (letter) | any 2 | 5 | all |
+| Repeat After Me (recording) | 2 | 5 | all |
+| Review / Flashcards / Speaking / Favorites / Today's Practice | preview words only | open lessons' words | all approved words |
+| Listening | not offered | open lessons' words | all approved words |
+| Dictionary / Search | search the preview, open 2 results | open lessons' words | all approved words |
+| Translation requests | — | 1 | unlimited |
+| Talk | create-account explanation | locked (upgrade flow) | all 5 scenarios |
+
+An item counts when first opened and is never counted twice; completed
+lessons always reopen; nothing is counted while Premium, and when Premium
+ends what was opened stays open. Talk is also refused by the server for
+non-Premium accounts (403 `premium_required`, before any quota or provider
+call).
 
 **There is no payment system.** Locked items open a pricing preview
 (`/onboarding/plans`: monthly/yearly, "7-day free trial" copy) whose buttons
 charge nothing. `profiles.is_premium` can be set manually; admins can preview
-either experience. This is a known open issue for store review (§11).
+either experience (the free-plan preview counts only on their device). This
+is a known open issue for store review (§11).
+
+### Guest preview
+
+Guests are device-only: no account, no server writes, no Edge Function calls.
+They read content through four read-only views (migration 0024) that expose
+only the rows flagged by `scripts/select-guest-preview.sql`. To fill in that
+script, run this **read-only** query in the SQL editor. It lists the first two
+curriculum lessons and the first two phrasebook categories in course order,
+with their words, approval status and whether each word has an approved form:
+
+```sql
+-- Read-only: candidates for the guest preview. Changes nothing.
+with ordered as (
+  select l.id as lesson_id, l.unit_id, l.lesson_number, l.title,
+         u.name as unit_name, u.is_curriculum,
+         row_number() over (partition by u.is_curriculum
+                            order by u.sort_order, l.sort_order, l.id) as position
+  from public.lessons l
+  join public.units u on u.id = l.unit_id
+)
+select o.is_curriculum, o.position, o.unit_name, o.lesson_number, o.title,
+       o.lesson_id, w.id as word_id, w.english_meaning, w.content_status,
+       exists (select 1 from public.word_variants v
+               where v.word_group_id = w.id and v.content_status = 'approved') as has_approved_form
+from ordered o
+left join public.word_groups w on w.unit_id = o.unit_id and w.lesson_number = o.lesson_number
+where o.position <= 2
+order by o.is_curriculum desc, o.position, w.sort_order;
+```
+
+Use only rows with `content_status = 'approved'` and `has_approved_form =
+true`. The phrasebook rows must be Greetings and First Encounters (the script
+checks this and aborts otherwise).
 
 ---
 
 ## 8. Backend (Supabase)
 
-**Tables** (migrations `supabase/migrations/0001`–`0023`):
+**Tables** (migrations `supabase/migrations/0001`–`0025`):
 - Accounts & people: `accounts`, `profiles` (one per account, enforced by a
   trigger), `consent_records`, `daily_goal_settings`,
   `learner_display_preferences`, `reviewers`.
@@ -391,10 +488,15 @@ either experience. This is a known open issue for store review (§11).
   flat `words` table was replaced in 0003), Talk corpus `phrases`,
   `sentences`, `conversation_examples`.
 - Learning data: `progress`, `favorites`, `session_logs`,
-  `translation_requests`, `corrections`.
+  `translation_requests`, `corrections`, `feature_item_claims` (items a
+  free account has opened, 0025).
+- Guest preview: `is_guest_preview` flags and four read-only
+  `guest_preview_*` views (0024).
 - Stored **on the device** (AsyncStorage, per profile): Repeat After Me item
   progress, alphabet/proverb/phrasebook "viewed" progress, daily-challenge
-  flags, free-allowance usage, theme.
+  flags, the admin's free-plan preview counts, theme. Guest mode keeps its
+  used items, practice results and favorites on the device too, and the age
+  gate's 24-hour retry block is device-only.
 - AI cost control: `ai_daily_usage`, `ai_budget_reservations`,
   `ai_usage_log`.
 
@@ -415,7 +517,9 @@ corrections are written only by `talk-review` with the service role.
 
 ## 9. Admin tools (`/admin`, admins only)
 
-Dashboard with metrics, plus: **Content** (units → lessons → word groups;
+Dashboard with metrics and **Content progress** (per unit and overall:
+words, % approved, % with native audio, awaiting review, and forms that
+need a recording), plus: **Content** (units → lessons → word groups;
 create/edit words and forms, statuses), **Review queue** (content awaiting
 approval), **Recordings** (record/upload native audio per form, mark forms as
 skipped, explanation audio), **Translation requests** (answer learners),
@@ -449,6 +553,11 @@ no invented claims); grammatical form is display-only, never identity.
 2. **Premium without payments**: locked content can't be unlocked and the
    Plans screen mentions a trial; needs either real in-app purchase or
    removing the locks for launch.
+12. **Access limits are app-side for v1** (except Talk, which the server
+    refuses): content tables stay readable by any signed-in user, bundled
+    content can be read from the app, guest counts reset on reinstall, and one
+    person can make several accounts. See
+    [access-and-guest-preview.md](access-and-guest-preview.md#known-limits-of-v1-bypassable-on-purpose).
 3. **Legal**: real Terms of Use and Privacy Policy are missing.
 4. **Offline**: no content cache and no queued progress writes.
 5. **Overlap**: *Review* and *Today's Practice* both serve due words (Today's
@@ -479,12 +588,16 @@ src/components/         UI by feature: session/, exercises/, flashcards/,
 src/data/               All Supabase queries (the data-access boundary)
 src/lib/                Pure logic & contexts: spacedRepetition, flashcards,
                         reviewSelection, lessonCompletion, todaysPractice,
-                        listening, premium/, display/, auth/, account/,
+                        listening, access/ (guest/free/Premium rules),
+                        guest/ (preview mode, carry-over), premium/,
+                        display/, auth/, account/,
                         notifications/, offline/, ai/, theme/, onboarding/
 src/hooks/              useSessionTimer, useWordAudioPlayer, useExerciseQueue…
 src/constants/          appCopy (marketing copy), dailyGoal, grammar notes,
                         proverbs, Talk scenarios, theme
-supabase/migrations/    Schema, RLS, functions (0001–0023)
+supabase/migrations/    Schema, RLS, functions (0001–0025)
+supabase/rollbacks/     Rollback scripts for 0024 / 0025
+scripts/                Hand-run SQL (guest preview selection, checks)
 supabase/functions/     Edge Functions (handler.ts + index.ts each)
 supabase/tests/         Database tests (PGlite)
 docs/                   This guide, store listing, cost controls,
@@ -495,9 +608,13 @@ docs/                   This guide, store listing, cost controls,
 
 - [README.md](../README.md) — setup, environment, per-feature technical notes.
 - [APP_OVERVIEW.md](../APP_OVERVIEW.md) — original design decisions and history.
+- [access-and-guest-preview.md](access-and-guest-preview.md) — Guest / Free / Premium rules, Talk enforcement, age retry block.
+- [launch-checklist-age-and-legal.md](launch-checklist-age-and-legal.md) — open age and legal items before launch.
 - [store-listing.md](store-listing.md) — store copy, claims audit, owner checklist.
 - [cost-controls.md](cost-controls.md) — AI quotas and budget.
 - [language-review.md](language-review.md) — reviewer allowlist and verification.
+- [content-pipeline.md](content-pipeline.md) — bulk import, native review, recordings, progress.
+- [content-plan.md](content-plan.md) — proposed structure for 300–500 words.
 - [account-deletion.md](account-deletion.md) — what is deleted or anonymised.
 - [TESTING.md](TESTING.md) — how to run the test suites.
 - [CLAUDE.md](../CLAUDE.md) / [AGENTS.md](../AGENTS.md) — rules for contributors and AI agents.

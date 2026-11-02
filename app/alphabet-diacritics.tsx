@@ -4,16 +4,16 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { LetterDiacriticsModal } from '@/components/alphabet/LetterDiacriticsModal';
-import { openUpgradeFlow, PremiumBadge } from '@/components/premium/Premium';
+import { useLockedItemAction } from '@/components/access/AccessLimit';
+import { PremiumBadge } from '@/components/premium/Premium';
+import { useAccess } from '@/lib/access/AccessContext';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { radii, shadows, spacing, type ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/lib/theme/ThemeContext';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
-import { usePremium } from '@/lib/premium/PremiumContext';
 import { ARABIC_LETTERS, type ArabicLetter } from '@/lib/alphabet';
 import { getAlphabetProgress, markDiacriticLetterViewed } from '@/lib/alphabetProgress';
-import { canAccessLetter } from '@/lib/premium/access';
 import { useColumnWidth } from '@/hooks/useColumnWidth';
 
 const GRID_COLUMNS = 3;
@@ -37,12 +37,14 @@ export default function AlphabetDiacriticsScreen() {
     getAlphabetProgress(activeProfile.id).then((data) => setViewedLetterIds(data.viewedDiacriticLetterIds));
   }, [activeProfile]);
 
-  const { isPremium } = usePremium();
+  // Any letter can be picked; each counts when first opened (src/lib/access).
+  const { decide, open } = useAccess();
+  const onLockedPress = useLockedItemAction();
 
-  const selectLetter = (letter: ArabicLetter) => {
+  const selectLetter = async (letter: ArabicLetter) => {
     Haptics.selectionAsync();
-    if (!canAccessLetter(isPremium, letter.id)) {
-      openUpgradeFlow();
+    if (!(await open('alphabet_letter', letter.id).catch(() => false))) {
+      onLockedPress();
       return;
     }
     setSelectedLetter(letter);
@@ -79,7 +81,7 @@ export default function AlphabetDiacriticsScreen() {
         >
           {ARABIC_LETTERS.map((letter) => {
             const isViewed = viewedLetterIds.includes(letter.id);
-            const isLocked = !canAccessLetter(isPremium, letter.id);
+            const isLocked = decide('alphabet_letter', letter.id) === 'limit';
             return (
               <PressableScale
                 key={letter.id}

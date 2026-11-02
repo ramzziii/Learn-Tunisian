@@ -11,6 +11,8 @@ const mockResetOnboarding = jest.fn();
 let mockIsAdmin = false;
 let mockIsReviewer = false;
 
+// Signed-in account (the guest guard and Talk lock read the access tier).
+jest.mock('@/lib/access/AccessContext', () => ({ useAccess: () => ({ tier: 'free', isResolved: true }) }));
 jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,
   default: { getItem: jest.fn(async () => null), setItem: jest.fn(async () => undefined) },

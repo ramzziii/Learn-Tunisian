@@ -8,19 +8,26 @@ const mockRecordWord = jest.fn();
 const mockRecordRam = jest.fn();
 const mockMarkRamSession = jest.fn();
 const mockRecordSessionLog = jest.fn();
-const mockMarkFreeReviewStarted = jest.fn();
 const mockMarkReviewCompletedToday = jest.fn();
 const mockRouter = { back: jest.fn(), replace: jest.fn(), push: jest.fn(), canGoBack: () => true };
-let mockPremium = { isPremium: true, isResolved: true };
+let mockTier: 'free' | 'premium' = 'premium';
+let mockResolved = true;
+const mockScope = { all: true, lessonKeys: new Set(), unitIds: new Set() };
+let mockScopeState: { scope: unknown; error: boolean; reload: () => void } = { scope: mockScope, error: false, reload: jest.fn() };
+const mockClaimed = (feature: string) => new Set(feature === 'repeat_after_me' ? ['ram-open'] : []);
 const mockProfile = { id: 'p1' };
 
+// Signed-in account (the guest guard and Talk lock read the access tier).
+jest.mock('@/lib/access/AccessContext', () => ({
+  useAccess: () => ({ tier: mockTier, isResolved: mockResolved, claimed: mockClaimed }),
+}));
+jest.mock('@/lib/access/usePracticeScope', () => ({ usePracticeScope: () => mockScopeState }));
 jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,
   default: { getItem: jest.fn(async () => null), setItem: jest.fn(async () => undefined) },
 }));
 jest.mock('expo-router', () => ({ router: mockRouter }));
 jest.mock('@/lib/account/ActiveProfileContext', () => ({ useActiveProfile: () => ({ activeProfile: mockProfile }) }));
-jest.mock('@/lib/premium/PremiumContext', () => ({ usePremium: () => mockPremium }));
 jest.mock('@/data/todaysPractice', () => ({ loadTodaysPractice: (...a: unknown[]) => mockLoad(...a) }));
 jest.mock('@/data/progress', () => ({ recordWordGroupResult: (...a: unknown[]) => mockRecordWord(...a) }));
 jest.mock('@/data/sessionLogs', () => ({ recordSessionLog: (...a: unknown[]) => mockRecordSessionLog(...a) }));
@@ -28,7 +35,6 @@ jest.mock('@/lib/repeatAfterMe/progress', () => ({
   recordRepeatAfterMeItemResult: (...a: unknown[]) => mockRecordRam(...a),
   markRepeatAfterMeSessionCompleted: (...a: unknown[]) => mockMarkRamSession(...a),
 }));
-jest.mock('@/lib/premium/freeAllowance', () => ({ markFreeReviewStarted: (...a: unknown[]) => mockMarkFreeReviewStarted(...a) }));
 jest.mock('@/lib/dailyChallengeProgress', () => ({
   markReviewCompletedToday: (...a: unknown[]) => mockMarkReviewCompletedToday(...a),
 }));
@@ -99,33 +105,45 @@ const renderScreen = () =>
   );
 
 beforeEach(() => {
-  mockPremium = { isPremium: true, isResolved: true };
-  [mockLoad, mockRecordWord, mockRecordRam, mockMarkRamSession, mockRecordSessionLog, mockMarkFreeReviewStarted, mockMarkReviewCompletedToday].forEach((m) => m.mockReset());
+  mockTier = 'premium';
+  mockResolved = true;
+  mockScopeState = { scope: mockScope, error: false, reload: jest.fn() };
+  [mockLoad, mockRecordWord, mockRecordRam, mockMarkRamSession, mockRecordSessionLog, mockMarkReviewCompletedToday].forEach((m) => m.mockReset());
   mockRecordWord.mockResolvedValue({ correctCount: 1, status: 'learning' });
   mockRecordRam.mockResolvedValue(undefined);
   mockRecordSessionLog.mockResolvedValue(undefined);
-  mockMarkFreeReviewStarted.mockResolvedValue(undefined);
   mockRouter.replace.mockReset();
   mockRouter.back.mockReset();
 });
 
-it('loads for this profile with its entitlement, once the entitlement is known', async () => {
-  mockPremium = { isPremium: false, isResolved: false };
-  mockLoad.mockResolvedValue({ steps: [], usesFreeReview: false });
+it('loads for this profile with its practice scope and opened recordings, once access is known', async () => {
+  mockTier = 'free';
+  mockResolved = false;
+  mockScopeState = { scope: null, error: false, reload: jest.fn() };
+  mockLoad.mockResolvedValue({ steps: [] });
   const view = await renderScreen();
   expect(mockLoad).not.toHaveBeenCalled();
 
-  mockPremium = { isPremium: false, isResolved: true };
+  mockResolved = true;
+  mockScopeState = { scope: mockScope, error: false, reload: jest.fn() };
   await view.rerender(
     <ThemeProvider>
       <TodaysPracticeScreen />
     </ThemeProvider>
   );
-  await waitFor(() => expect(mockLoad).toHaveBeenCalledWith({ profileId: 'p1', isPremium: false }));
+  await waitFor(() =>
+    expect(mockLoad).toHaveBeenCalledWith({
+      profileId: 'p1',
+      scope: mockScope,
+      ramUnlimited: false,
+      ramOpenIds: new Set(['ram-open']),
+      openLesson: expect.any(Function),
+    })
+  );
 });
 
 it('runs the steps in order through to a clear completion state', async () => {
-  mockLoad.mockResolvedValue({ steps: [wordStep('r1', 'review'), wordStep('n1', 'new'), repeatStep('a1')], usesFreeReview: false });
+  mockLoad.mockResolvedValue({ steps: [wordStep('r1', 'review'), wordStep('n1', 'new'), repeatStep('a1')] });
   await renderScreen();
 
   expect(await screen.findByText('Word: r1')).toBeOnTheScreen();
@@ -142,7 +160,7 @@ it('runs the steps in order through to a clear completion state', async () => {
 });
 
 it('word answers update progress through the existing word progress system', async () => {
-  mockLoad.mockResolvedValue({ steps: [wordStep('r1', 'review'), wordStep('n1', 'new')], usesFreeReview: false });
+  mockLoad.mockResolvedValue({ steps: [wordStep('r1', 'review'), wordStep('n1', 'new')] });
   await renderScreen();
 
   await fireEvent.press(await screen.findByText('Answer right'));
@@ -155,7 +173,7 @@ it('word answers update progress through the existing word progress system', asy
 });
 
 it('Repeat After Me steps keep their rules (3 tries) and their own progress', async () => {
-  mockLoad.mockResolvedValue({ steps: [repeatStep('a1'), repeatStep('a2')], usesFreeReview: false });
+  mockLoad.mockResolvedValue({ steps: [repeatStep('a1'), repeatStep('a2')] });
   await renderScreen();
 
   expect(await screen.findByText('Repeat: a1 max=3')).toBeOnTheScreen();
@@ -174,7 +192,7 @@ it('Repeat After Me steps keep their rules (3 tries) and their own progress', as
 
 describe('end-of-session revisit', () => {
   it('words said wrong and Repeat After Me items missed come back once, then the session completes', async () => {
-    mockLoad.mockResolvedValue({ steps: [wordStep('w1', 'review', 'speaking'), repeatStep('a1'), wordStep('w2', 'new')], usesFreeReview: false });
+    mockLoad.mockResolvedValue({ steps: [wordStep('w1', 'review', 'speaking'), repeatStep('a1'), wordStep('w2', 'new')] });
     await renderScreen();
 
     await fireEvent.press(await screen.findByText('Say it wrong, move on')); // w1
@@ -197,7 +215,7 @@ describe('end-of-session revisit', () => {
   });
 
   it('nothing missed → straight to completion', async () => {
-    mockLoad.mockResolvedValue({ steps: [wordStep('w1', 'review')], usesFreeReview: false });
+    mockLoad.mockResolvedValue({ steps: [wordStep('w1', 'review')] });
     await renderScreen();
 
     await fireEvent.press(await screen.findByText('Answer right'));
@@ -208,7 +226,7 @@ describe('end-of-session revisit', () => {
 });
 
 it('logs daily-goal minutes exactly once at completion, as an existing session type', async () => {
-  mockLoad.mockResolvedValue({ steps: [wordStep('r1', 'review')], usesFreeReview: false });
+  mockLoad.mockResolvedValue({ steps: [wordStep('r1', 'review')] });
   await renderScreen();
 
   await fireEvent.press(await screen.findByText('Answer right'));
@@ -220,7 +238,7 @@ it('logs daily-goal minutes exactly once at completion, as an existing session t
 });
 
 it('a session with no review words logs as a lesson session', async () => {
-  mockLoad.mockResolvedValue({ steps: [wordStep('n1', 'new')], usesFreeReview: false });
+  mockLoad.mockResolvedValue({ steps: [wordStep('n1', 'new')] });
   await renderScreen();
 
   await fireEvent.press(await screen.findByText('Answer right'));
@@ -230,7 +248,7 @@ it('a session with no review words logs as a lesson session', async () => {
 });
 
 it('leaving early still logs the time once, and keeps answers already recorded', async () => {
-  mockLoad.mockResolvedValue({ steps: [wordStep('r1', 'review'), wordStep('r2', 'review')], usesFreeReview: false });
+  mockLoad.mockResolvedValue({ steps: [wordStep('r1', 'review'), wordStep('r2', 'review')] });
   await renderScreen();
 
   await fireEvent.press(await screen.findByText('Answer right'));
@@ -242,7 +260,7 @@ it('leaving early still logs the time once, and keeps answers already recorded',
 });
 
 it('does not touch unrelated daily-challenge or review-completion flags', async () => {
-  mockLoad.mockResolvedValue({ steps: [wordStep('r1', 'review')], usesFreeReview: false });
+  mockLoad.mockResolvedValue({ steps: [wordStep('r1', 'review')] });
   await renderScreen();
 
   await fireEvent.press(await screen.findByText('Answer right'));
@@ -251,26 +269,8 @@ it('does not touch unrelated daily-challenge or review-completion flags', async 
   expect(mockMarkReviewCompletedToday).not.toHaveBeenCalled();
 });
 
-it('free: uses up today’s free review only when the session actually includes review words', async () => {
-  mockPremium = { isPremium: false, isResolved: true };
-  mockLoad.mockResolvedValue({ steps: [wordStep('r1', 'review')], usesFreeReview: true });
-  await renderScreen();
-
-  await screen.findByText('Word: r1');
-  expect(mockMarkFreeReviewStarted).toHaveBeenCalledWith('p1');
-});
-
-it('no review words → the free review allowance is left alone', async () => {
-  mockPremium = { isPremium: false, isResolved: true };
-  mockLoad.mockResolvedValue({ steps: [wordStep('n1', 'new')], usesFreeReview: false });
-  await renderScreen();
-
-  await screen.findByText('Word: n1');
-  expect(mockMarkFreeReviewStarted).not.toHaveBeenCalled();
-});
-
 it('nothing to practice: a clear empty state pointing to the Practice tab — no session, nothing logged', async () => {
-  mockLoad.mockResolvedValue({ steps: [], usesFreeReview: false });
+  mockLoad.mockResolvedValue({ steps: [] });
   await renderScreen();
 
   expect(await screen.findByText(/all caught up/i)).toBeOnTheScreen();
@@ -280,7 +280,7 @@ it('nothing to practice: a clear empty state pointing to the Practice tab — no
 });
 
 it('load failure: an error with retry, not a broken session', async () => {
-  mockLoad.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce({ steps: [wordStep('r1', 'review')], usesFreeReview: false });
+  mockLoad.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce({ steps: [wordStep('r1', 'review')] });
   await renderScreen();
 
   await fireEvent.press(await screen.findByText('Try again'));

@@ -9,9 +9,11 @@ import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Reveal } from '@/components/ui/Reveal';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { radii, spacing, type ThemeColors } from '@/constants/theme';
+import { fetchLessonMap } from '@/data/content';
 import { fetchDailyGoalSettings } from '@/data/profiles';
 import { fetchReviewDueCount } from '@/data/progress';
 import { fetchMinutesLearnedToday } from '@/data/sessionLogs';
+import { useAccess } from '@/lib/access/AccessContext';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
 import { useTheme } from '@/lib/theme/ThemeContext';
 import type { DailyGoalMinutes } from '@/types/models';
@@ -31,9 +33,9 @@ interface HomeData {
  *
  * Today's Practice works for a brand-new learner too: it takes new words
  * from the one unlocked lesson (lessons unlock in order, so there is only
- * ever one), and for a new learner that is the first lesson, which the free
- * plan always includes. So there is no separate "start your first lesson"
- * fallback here — if that lesson had no words, a lesson session would have
+ * ever one) — for a new learner the first lesson, which it opens (counted)
+ * while the allowance has room. So there is no separate "start your first
+ * lesson" fallback here — if that lesson had no words, a lesson session would have
  * none either, and Today's Practice's own empty state points to Practice.
  *
  * The daily-challenge checklist and the day count are no longer shown here;
@@ -41,6 +43,50 @@ interface HomeData {
  * dailyChallengeProgress.ts, streak.ts) are left in place.
  */
 export default function Home() {
+  const { tier } = useAccess();
+  if (tier === 'guest') return <GuestHome />;
+  return <AccountHome />;
+}
+
+/**
+ * The guest preview's Home: no goal or streak (nothing is saved to an
+ * account), one action — try the first preview lesson — and a quiet way to
+ * create a free account.
+ */
+function GuestHome() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const [firstLessonId, setFirstLessonId] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchLessonMap('guest')
+      .then((units) => setFirstLessonId(units.flatMap((u) => u.lessons)[0]?.id ?? null))
+      .catch(() => setFirstLessonId(null));
+  }, []);
+
+  return (
+    <ScreenContainer themed style={{ padding: 0 }}>
+      <HomeHeader name="there" subtitle="You’re trying the free preview." />
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <Reveal style={styles.primaryAction}>
+          <Button
+            themed
+            label="Try lesson 1"
+            onPress={() => router.push(firstLessonId ? `/lesson/${firstLessonId}` : '/learn')}
+          />
+        </Reveal>
+        <Reveal delay={80}>
+          <Text style={styles.guestNote}>
+            A free account keeps your progress and opens a few more lessons, phrases, notes and letters.
+          </Text>
+          <Button themed label="Create a free account" variant="ghost" onPress={() => router.push('/onboarding/age')} />
+        </Reveal>
+      </ScrollView>
+    </ScreenContainer>
+  );
+}
+
+function AccountHome() {
   const { activeProfile } = useActiveProfile();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -90,13 +136,13 @@ export default function Home() {
   );
 }
 
-function HomeHeader({ name }: { name: string }) {
+function HomeHeader({ name, subtitle = 'Ready for today’s practice?' }: { name: string; subtitle?: string }) {
   const { colors, gradients } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <LinearGradient colors={gradients.primary} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
       <Text style={styles.greeting}>Ahla, {name}!</Text>
-      <Text style={styles.subGreeting}>Ready for today&apos;s practice?</Text>
+      <Text style={styles.subGreeting}>{subtitle}</Text>
     </LinearGradient>
   );
 }
@@ -175,6 +221,8 @@ const makeStyles = (colors: ThemeColors) => {
     greeting: { fontSize: 24, fontWeight: '700', color: colors.textOnPrimary },
     subGreeting: { fontSize: 14, color: colors.textOnPrimary, opacity: 0.85, marginTop: 2 },
     scrollContent: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.xxl },
+    primaryAction: { marginBottom: spacing.lg },
+    guestNote: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', lineHeight: 20, marginBottom: spacing.xs },
     todaysPracticeCard: {
       backgroundColor: colors.surface,
       borderRadius: radii.lg,

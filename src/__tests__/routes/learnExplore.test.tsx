@@ -19,8 +19,23 @@ jest.mock('expo-router', () => ({
 }));
 const mockProfile = { activeProfile: { id: 'p1', name: 'Sam' } };
 jest.mock('@/lib/account/ActiveProfileContext', () => ({ useActiveProfile: () => mockProfile }));
-let mockIsPremium = false;
-jest.mock('@/lib/premium/PremiumContext', () => ({ usePremium: () => ({ isPremium: mockIsPremium, isResolved: true }) }));
+// Real access rules over a fake set of used lessons.
+let mockTier: 'guest' | 'free' | 'premium' = 'free';
+let mockClaimed: string[] = [];
+jest.mock('@/lib/access/AccessContext', () => ({
+  useAccess: () => ({
+    tier: mockTier,
+    isResolved: true,
+    decide: (_f: string, key: string, opts?: { completed?: boolean }) =>
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      require('@/lib/access/accessRules').decideItemAccess({
+        tier: mockTier,
+        claimed: new Set(mockClaimed),
+        itemKey: key,
+        completed: opts?.completed,
+      }),
+  }),
+}));
 jest.mock('@/data/content', () => ({ fetchLessonMap: jest.fn(async () => mockUnits) }));
 let mockTranslationRequests: { isNewAnswer: boolean }[] = [];
 jest.mock('@/data/translationRequests', () => ({
@@ -75,17 +90,33 @@ const renderLearn = () => render(<ThemeProvider><Learn /></ThemeProvider>);
 
 beforeEach(() => {
   mockPush.mockReset();
-  mockIsPremium = false;
+  mockTier = 'free';
+  mockClaimed = [];
   mockTranslationRequests = [];
   mockUnits = unitsWith(lesson('l1', 1, 'unlocked'), lesson('l2', 2, 'locked'));
 });
 
-it('keeps the curriculum map: same lessons, order, states and Premium locks', async () => {
+it('keeps the curriculum map: same lessons, order and states; nothing locked while lessons are left', async () => {
   await renderLearn();
   expect(await screen.findByText('[lesson L1 unlocked]')).toBeOnTheScreen();
-  expect(screen.getByText('[lesson L2 locked premium]')).toBeOnTheScreen();
+  expect(screen.getByText('[lesson L2 locked]')).toBeOnTheScreen();
   await fireEvent.press(screen.getByText('[lesson L1 unlocked]'));
   expect(mockPush).toHaveBeenCalledWith('/lesson/l1');
+});
+
+it('free account with all 5 lessons used: new lessons show the lock; opened and completed ones stay open', async () => {
+  mockUnits = unitsWith(lesson('l1', 1, 'completed'), lesson('l2', 2, 'unlocked'), lesson('l3', 3, 'locked'));
+  mockClaimed = ['x1', 'x2', 'x3', 'x4', 'l2'];
+  await renderLearn();
+  expect(await screen.findByText('[lesson L1 completed]')).toBeOnTheScreen();
+  expect(screen.getByText('[lesson L2 unlocked]')).toBeOnTheScreen();
+  expect(screen.getByText('[lesson L3 locked premium]')).toBeOnTheScreen();
+});
+
+it('a search bar at the top of Learn opens the dictionary', async () => {
+  await renderLearn();
+  await fireEvent.press(await screen.findByRole('button', { name: 'Search words' }));
+  expect(mockPush).toHaveBeenCalledWith('/search');
 });
 
 it('an Explore Tunisian section below the curriculum links to each reference feature', async () => {
@@ -153,18 +184,28 @@ describe('the redesigned top of Learn', () => {
 
   it('a returning learner gets a Continue card for the lesson that’s up next', async () => {
     mockUnits = unitsWith(lesson('l1', 1, 'completed'), lesson('l2', 2, 'unlocked'), lesson('l3', 3, 'locked'));
-    mockIsPremium = true;
+    mockTier = 'premium';
     await renderLearn();
     await fireEvent.press(await screen.findByRole('button', { name: /^Continue: L2/ }));
     expect(mockPush).toHaveBeenCalledWith('/lesson/l2');
   });
 
-  it('if the next lesson is Premium on the free plan, the card opens the upgrade flow (gate unchanged)', async () => {
+  it('free account past its 5 lessons: the Continue card opens the upgrade flow', async () => {
     mockUnits = unitsWith(lesson('l1', 1, 'completed'), lesson('l2', 2, 'unlocked'));
+    mockClaimed = ['x1', 'x2', 'x3', 'x4', 'x5'];
     await renderLearn();
     await fireEvent.press(await screen.findByRole('button', { name: /^Continue: L2/ }));
     expect(mockPush).toHaveBeenCalledWith({ pathname: '/onboarding/plans', params: { source: 'premium' } });
     expect(mockPush).not.toHaveBeenCalledWith('/lesson/l2');
+  });
+
+  it('guest past its 2 preview lessons: the Continue card explains a free account', async () => {
+    mockTier = 'guest';
+    mockUnits = unitsWith(lesson('l1', 1, 'completed'), lesson('l2', 2, 'unlocked'));
+    mockClaimed = ['x1', 'x2'];
+    await renderLearn();
+    await fireEvent.press(await screen.findByRole('button', { name: /^Continue: L2/ }));
+    expect(mockPush).toHaveBeenCalledWith({ pathname: '/guest/create-account', params: { reason: 'keep-learning' } });
   });
 
   it('when every lesson is done, a celebration instead of a Continue card', async () => {

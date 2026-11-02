@@ -30,8 +30,6 @@ const inputs = (overrides: Partial<TodaysPracticeInputs> = {}): TodaysPracticeIn
   newGroups: [],
   lessonPool: [],
   repeatAfterMeItems: [],
-  isPremium: true,
-  freeReviewAvailable: true,
   ...overrides,
 });
 
@@ -116,23 +114,10 @@ describe('no duplicates within a session', () => {
   });
 });
 
-describe('free vs Premium', () => {
-  it('free with today’s free review still available: review included, and the plan says it uses that allowance', () => {
-    const plan = composeTodaysPractice(inputs({ isPremium: false, reviewGroups: [group('r1')] }));
-    expect(ids(plan)).toEqual(['review:r1']);
-    expect(plan.usesFreeReview).toBe(true);
-  });
-
-  it('free who already used today’s review: no review words (the daily limit is not bypassed)', () => {
-    const plan = composeTodaysPractice(
-      inputs({ isPremium: false, freeReviewAvailable: false, reviewGroups: [group('r1')], newGroups: [group('n1')] })
-    );
-    expect(ids(plan)).toEqual(['new:n1']);
-    expect(plan.usesFreeReview).toBe(false);
-  });
-
-  it('Premium never consumes a free allowance', () => {
-    expect(composeTodaysPractice(inputs({ reviewGroups: [group('r1')] })).usesFreeReview).toBe(false);
+describe('no allowance in the composer', () => {
+  it('review words are always included — practice isn’t counted (the loader already scoped them)', () => {
+    const plan = composeTodaysPractice(inputs({ reviewGroups: [group('r1')], newGroups: [group('n1')] }));
+    expect(ids(plan)).toEqual(['review:r1', 'new:n1']);
   });
 });
 

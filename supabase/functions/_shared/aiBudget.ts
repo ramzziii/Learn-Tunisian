@@ -388,6 +388,24 @@ export function bearerToken(req: Request): string | null {
   return match ? match[1] : null;
 }
 
+/**
+ * Talk (chat and tutor voice) is Premium only. Checked right after the caller
+ * is verified and before any quota, budget reservation or provider call.
+ * Fails closed: a lookup error refuses the request (503) rather than letting
+ * it through. Returns null when the caller may proceed.
+ */
+export async function requirePremium(
+  hasPremium: (accountId: string) => Promise<boolean>,
+  accountId: string
+): Promise<Response | null> {
+  try {
+    if (await hasPremium(accountId)) return null;
+  } catch {
+    return errorResponse('provider_error', 'Couldn’t check your plan. Please try again.', 503);
+  }
+  return errorResponse('premium_required', 'Talk is part of Premium.', 403);
+}
+
 /** consume_ai_quota's result, as the handlers see it. */
 export type QuotaResult = { allowed: boolean } | { error: { code?: string; message?: string } };
 

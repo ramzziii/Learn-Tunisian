@@ -12,6 +12,8 @@ const mockReplace = jest.fn();
 const mockPush = jest.fn();
 let mockSession: { user: { id: string } } | null = { user: { id: 'acc-1' } };
 
+// Signed-in account (the guest guard and Talk lock read the access tier).
+jest.mock('@/lib/access/AccessContext', () => ({ useAccess: () => ({ tier: 'free', isResolved: true }) }));
 jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,
   default: {

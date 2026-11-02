@@ -1,15 +1,14 @@
 // Flashcard decks screens: the deck list (card and due counts, a link to the
 // phrasebook browse deck), a deck with nothing in it (friendly empty state),
-// and Due today sharing the free plan's daily review allowance. Practice's
-// Flashcards card opens the decks.
+// decks built only from the practice scope (open lessons / categories).
+// Practice's Flashcards card opens the decks.
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 const mockPush = jest.fn();
 const mockFetchDecks = jest.fn();
 const mockFetchCards = jest.fn();
-const mockMarkFreeReview = jest.fn(async () => undefined);
-let mockUsedFreeReview = false;
 let mockIsPremium = false;
+const mockScopeState = { scope: { all: true, lessonKeys: new Set(), unitIds: new Set() }, error: false, reload: jest.fn() };
 let mockDeckId = 'category-greet';
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
@@ -25,9 +24,9 @@ jest.mock('expo-router', () => ({
 const mockProfile = { activeProfile: { id: 'p1' } };
 jest.mock('@/lib/account/ActiveProfileContext', () => ({ useActiveProfile: () => mockProfile }));
 jest.mock('@/lib/premium/PremiumContext', () => ({ usePremium: () => ({ isPremium: mockIsPremium, isResolved: true }) }));
-jest.mock('@/lib/premium/freeAllowance', () => ({
-  hasUsedFreeReviewToday: jest.fn(async () => mockUsedFreeReview),
-  markFreeReviewStarted: (...a: unknown[]) => mockMarkFreeReview(...(a as [])),
+jest.mock('@/lib/access/usePracticeScope', () => ({ usePracticeScope: () => mockScopeState }));
+jest.mock('@/lib/access/AccessContext', () => ({
+  useAccess: () => ({ tier: mockIsPremium ? 'premium' : 'free', isResolved: true }),
 }));
 jest.mock('@/data/flashcards', () => ({
   fetchFlashcardDecks: (...a: unknown[]) => mockFetchDecks(...a),
@@ -71,10 +70,9 @@ const DECKS = [
 ];
 
 beforeEach(() => {
-  [mockPush, mockFetchDecks, mockFetchCards, mockMarkFreeReview].forEach((m) => m.mockClear());
+  [mockPush, mockFetchDecks, mockFetchCards].forEach((m) => m.mockClear());
   mockFetchDecks.mockResolvedValue(DECKS);
   mockFetchCards.mockImplementation(async (ids: string[]) => ids.map((id) => ({ id })));
-  mockUsedFreeReview = false;
   mockIsPremium = false;
   mockDeckId = 'category-greet';
 });
@@ -87,7 +85,7 @@ describe('deck list', () => {
     expect(screen.getByText('12 cards · 0 due')).toBeOnTheScreen();
     expect(screen.getByText('Greetings')).toBeOnTheScreen();
     expect(screen.getByText('2 cards · 1 due')).toBeOnTheScreen();
-    expect(mockFetchDecks).toHaveBeenCalledWith('p1');
+    expect(mockFetchDecks).toHaveBeenCalledWith('p1', mockScopeState.scope);
   });
 
   it('opens a deck', async () => {
@@ -146,7 +144,6 @@ describe('a deck', () => {
     mockDeckId = 'category-food';
     await themed(<DeckScreen />);
     expect(await screen.findByText('[session c,d,e,f,g,h,i,j,k,l,m,n goal=10 pool=14]')).toBeOnTheScreen();
-    expect(mockMarkFreeReview).not.toHaveBeenCalled();
   });
 
   it('an old link to the removed Due today deck explains itself (Review is the place for due words)', async () => {
@@ -154,7 +151,6 @@ describe('a deck', () => {
     await themed(<DeckScreen />);
     expect(await screen.findByText('Deck not found')).toBeOnTheScreen();
     expect(mockFetchCards).not.toHaveBeenCalled();
-    expect(mockMarkFreeReview).not.toHaveBeenCalled();
   });
 
   it('a deck that no longer exists explains itself', async () => {

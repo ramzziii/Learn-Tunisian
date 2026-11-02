@@ -2,7 +2,9 @@ import * as Haptics from 'expo-haptics';
 import { useEffect, useMemo, useState } from 'react';
 import { LayoutAnimation, Platform, ScrollView, StyleSheet, Text, UIManager, View } from 'react-native';
 
-import { openUpgradeFlow, PremiumBadge } from '@/components/premium/Premium';
+import { useLockedItemAction } from '@/components/access/AccessLimit';
+import { PremiumBadge } from '@/components/premium/Premium';
+import { useAccess } from '@/lib/access/AccessContext';
 import { BackButton } from '@/components/ui/BackButton';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Reveal } from '@/components/ui/Reveal';
@@ -10,8 +12,6 @@ import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { radii, spacing, type ThemeColors } from '@/constants/theme';
 import { GRAMMAR_NOTES, type GrammarNote } from '@/constants/grammarNotes';
 import { useLetterSpeech } from '@/hooks/useLetterSpeech';
-import { usePremium } from '@/lib/premium/PremiumContext';
-import { canAccessGrammarNote } from '@/lib/premium/access';
 import { useTheme } from '@/lib/theme/ThemeContext';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -49,14 +49,24 @@ export default function GrammarScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const groupedNotes = useMemo(() => groupGrammarNotes(), []);
-  const { isPremium } = usePremium();
+  // Any note can be picked; each counts when first opened (src/lib/access).
+  // Only an already-open note starts expanded, so visiting counts nothing.
+  const { decide, open } = useAccess();
+  const onLockedPress = useLockedItemAction();
   const [expandedId, setExpandedId] = useState<string | null>(
-    GRAMMAR_NOTES.find((note) => canAccessGrammarNote(isPremium, note.id))?.id ?? null
+    () => GRAMMAR_NOTES.find((note) => decide('grammar_note', note.id) === 'open')?.id ?? null
   );
   const { speak, isSpeaking } = useLetterSpeech();
   const [activeKey, setActiveKey] = useState<string | null>(null);
 
-  const toggle = (id: string) => {
+  const toggle = async (id: string) => {
+    if (expandedId !== id) {
+      const allowed = await open('grammar_note', id).catch(() => false);
+      if (!allowed) {
+        onLockedPress();
+        return;
+      }
+    }
     LayoutAnimation.configureNext(EXPAND_ANIMATION);
     setExpandedId((prev) => (prev === id ? null : id));
   };
@@ -83,7 +93,7 @@ export default function GrammarScreen() {
           <View key={group.label} style={styles.categorySection}>
             <Text style={styles.categoryHeading}>{group.label}</Text>
             {group.notes.map(({ note, delay }) => {
-              const isLocked = !canAccessGrammarNote(isPremium, note.id);
+              const isLocked = decide('grammar_note', note.id) === 'limit';
               // A locked topic never expands — its body isn't rendered at all.
               const isExpanded = !isLocked && expandedId === note.id;
               return (
@@ -91,7 +101,7 @@ export default function GrammarScreen() {
                   <View style={[styles.card, styles.shadowCard, isExpanded && styles.cardExpanded]}>
                     <PressableScale
                       haptic
-                      onPress={() => (isLocked ? openUpgradeFlow() : toggle(note.id))}
+                      onPress={() => (isLocked ? onLockedPress() : toggle(note.id))}
                       style={styles.headerRow}
                     >
                       <View style={styles.emojiTile}>

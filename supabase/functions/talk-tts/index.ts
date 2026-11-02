@@ -46,6 +46,17 @@ Deno.serve(
       const { data, error } = await service.auth.getUser(token);
       return error ? null : (data.user?.id ?? null);
     },
+    // Talk is Premium only: the same rule as translation requests (admin, or
+    // any profile with is_premium), read with the service role — never from
+    // anything the app sends.
+    hasPremium: async (accountId) => {
+      const [account, premiumProfile] = await Promise.all([
+        service.from('accounts').select('is_admin').eq('id', accountId).maybeSingle(),
+        service.from('profiles').select('id').eq('account_id', accountId).eq('is_premium', true).limit(1),
+      ]);
+      if (account.error || premiumProfile.error) throw account.error ?? premiumProfile.error;
+      return account.data?.is_admin === true || (premiumProfile.data?.length ?? 0) > 0;
+    },
     consumeQuota: async (token, kind) => {
       const { data, error } = await asCaller(token).rpc('consume_ai_quota', { p_kind: kind });
       return error ? { error } : { allowed: data === true };

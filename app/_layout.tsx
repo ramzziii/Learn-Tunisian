@@ -4,10 +4,12 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { AccessProvider } from '@/lib/access/AccessContext';
 import { ActiveProfileProvider } from '@/lib/account/ActiveProfileContext';
 import { AdminProvider } from '@/lib/admin/AdminContext';
 import { AuthProvider } from '@/lib/auth/AuthContext';
 import { DisplayPreferencesProvider } from '@/lib/display/DisplayPreferencesContext';
+import { GuestProvider } from '@/lib/guest/GuestContext';
 import { OnboardingProvider } from '@/lib/onboarding/OnboardingContext';
 import { PremiumProvider } from '@/lib/premium/PremiumContext';
 import { ThemeProvider, useTheme } from '@/lib/theme/ThemeContext';
@@ -24,17 +26,21 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <ThemeProvider>
         <AuthProvider>
-          <AdminProvider>
-            <ActiveProfileProvider>
-              <DisplayPreferencesProvider>
-                <PremiumProvider>
-                  <OnboardingProvider>
-                    <RootNavigator />
-                  </OnboardingProvider>
-                </PremiumProvider>
-              </DisplayPreferencesProvider>
-            </ActiveProfileProvider>
-          </AdminProvider>
+          <GuestProvider>
+            <AdminProvider>
+              <ActiveProfileProvider>
+                <DisplayPreferencesProvider>
+                  <PremiumProvider>
+                    <AccessProvider>
+                      <OnboardingProvider>
+                        <RootNavigator />
+                      </OnboardingProvider>
+                    </AccessProvider>
+                  </PremiumProvider>
+                </DisplayPreferencesProvider>
+              </ActiveProfileProvider>
+            </AdminProvider>
+          </GuestProvider>
         </AuthProvider>
       </ThemeProvider>
     </SafeAreaProvider>

@@ -3,9 +3,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { PRONUNCIATION_MAX_ATTEMPTS, PronunciationPractice } from '@/components/pronunciation/PronunciationPractice';
+import { ComputerVoiceNote } from '@/components/ui/ComputerVoiceNote';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { radii, spacing, type ThemeColors } from '@/constants/theme';
-import { useLetterSpeech } from '@/hooks/useLetterSpeech';
 import { ExplanationPlayButton } from '@/components/ui/ExplanationPlayButton';
 import { useWordAudioPlayer } from '@/hooks/useWordAudioPlayer';
 import { useTheme } from '@/lib/theme/ThemeContext';
@@ -25,14 +25,12 @@ interface PhraseDetailModalProps {
  * bottom-sheet shape/animation) — Arabic script, transliteration, a play
  * button, the usage note, and a record-and-compare control.
  *
- * The play button prefers the variant's real recorded audio (same
+ * The play button plays the variant's recording (same
  * useWordAudioPlayer/ensureAudioCached path every lesson exercise uses, so
  * it benefits from the same offline caching and picks up admin-recorded
- * native audio immediately) and only falls back to on-device TTS
- * (useLetterSpeech, same approach the Alphabet feature uses) when this
- * particular variant genuinely has no audio_path yet — previously this
- * button used TTS unconditionally, which meant no phrase ever played a real
- * recording even after one existed.
+ * native audio immediately). Placeholder audio is labelled as a computer
+ * voice, not Tunisian; a phrase with no recording says so — the phone's own
+ * voice is never used instead.
  *
  * "Practice saying it" is the shared record → check → compare flow
  * (src/components/pronunciation/PronunciationPractice.tsx) — the same check
@@ -44,7 +42,6 @@ export function PhraseDetailModal({ phrase, onClose }: PhraseDetailModalProps) {
   const { colors } = useTheme();
   const { preferences: display } = useDisplayPreferences();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const { speak, isSpeaking } = useLetterSpeech();
   // Bumped to restart practice after finishing a go (a new phrase remounts it via the key).
   const [practiceKey, setPracticeKey] = useState(0);
 
@@ -70,15 +67,9 @@ export function PhraseDetailModal({ phrase, onClose }: PhraseDetailModalProps) {
   if (!phrase || !variant) return null;
 
   const playPhrase = () => {
+    if (!wordPlayer.hasAudio) return;
     Haptics.selectionAsync();
-    if (wordPlayer.hasAudio) {
-      wordPlayer.play();
-    } else {
-      // No audio_path recorded for this variant yet — on-device TTS as a
-      // placeholder so the phrase is still audible, same fallback
-      // SpeakingPractice-style exercises use elsewhere in the app.
-      speak(variant.wordArabic);
-    }
+    wordPlayer.play();
   };
 
 
@@ -107,15 +98,17 @@ export function PhraseDetailModal({ phrase, onClose }: PhraseDetailModalProps) {
 
               <PressableScale
                 onPress={playPhrase}
-                style={[styles.playButton, (wordPlayer.isPlaying || isSpeaking) && styles.playButtonActive]}
+                accessibilityRole="button"
+                accessibilityLabel={`Play ${phrase.englishMeaning}`}
+                style={[styles.playButton, wordPlayer.isPlaying && styles.playButtonActive]}
               >
-                <Text style={styles.playIcon}>
-                  {wordPlayer.isResolving ? '…' : wordPlayer.isPlaying || isSpeaking ? '🔊' : '▶'}
-                </Text>
+                <Text style={styles.playIcon}>{wordPlayer.isResolving ? '…' : wordPlayer.isPlaying ? '🔊' : '▶'}</Text>
               </PressableScale>
-              <Text style={styles.sourceLabel}>
-                {wordPlayer.isFallbackVoice ? '🤖 Generated voice' : '🎙️ Native recording'}
-              </Text>
+              {wordPlayer.source === 'computer' ? (
+                <ComputerVoiceNote style={styles.sourceLabel} />
+              ) : (
+                <Text style={styles.sourceLabel}>{wordPlayer.source === 'native' ? '🎙️ Native recording' : 'No recording yet'}</Text>
+              )}
               <ExplanationPlayButton variant={variant} style={{ marginTop: 8 }} />
             </Animated.View>
 
@@ -135,7 +128,6 @@ export function PhraseDetailModal({ phrase, onClose }: PhraseDetailModalProps) {
                   nativeVariant={variant}
                   matchGroup={phrase}
                   maxAttempts={PRONUNCIATION_MAX_ATTEMPTS}
-                  allowFallbackVoice
                   showNativeButton={false}
                   outOfTriesMessage="Keep practicing — listen to the native speaker again and have another go anytime."
                   onFinish={() => setPracticeKey((k) => k + 1)}

@@ -16,23 +16,17 @@ export type TodaysPracticeStep =
 
 export interface TodaysPracticePlan {
   steps: TodaysPracticeStep[];
-  /** True when a free learner's session includes review words — starting it
-   * uses up today's free review, same as the Review screen. */
-  usesFreeReview: boolean;
 }
 
 export interface TodaysPracticeInputs {
   /** Due review words, already in review-priority order (fetchReviewQueue). */
   reviewGroups: WordGroupWithVariants[];
-  /** Not-yet-practiced words from an accessible current lesson. */
+  /** Not-yet-practiced words from the current lesson, when it's open. */
   newGroups: WordGroupWithVariants[];
   /** That lesson's words — extra distractors for multiple-choice questions. */
   lessonPool: WordGroupWithVariants[];
-  /** Eligible Repeat After Me items, already free-capped by their loader. */
+  /** Eligible Repeat After Me items (recordings already opened; all with Premium). */
   repeatAfterMeItems: RepeatAfterMeItem[];
-  isPremium: boolean;
-  /** Free plan only: today's free review hasn't been used yet. */
-  freeReviewAvailable: boolean;
 }
 
 function uniqueById<T extends { id: string }>(items: readonly T[], exclude: ReadonlySet<string>): T[] {
@@ -47,10 +41,7 @@ function uniqueById<T extends { id: string }>(items: readonly T[], exclude: Read
  * and option-building as lessons; types rotate deterministically.
  */
 export function composeTodaysPractice(inputs: TodaysPracticeInputs): TodaysPracticePlan {
-  const reviewAllowed = inputs.isPremium || inputs.freeReviewAvailable;
-  const review = reviewAllowed
-    ? uniqueById(inputs.reviewGroups, new Set()).slice(0, TODAYS_PRACTICE_LIMITS.review)
-    : [];
+  const review = uniqueById(inputs.reviewGroups, new Set()).slice(0, TODAYS_PRACTICE_LIMITS.review);
   const newWords = uniqueById(inputs.newGroups, new Set(review.map((g) => g.id))).slice(0, TODAYS_PRACTICE_LIMITS.newWords);
   const words = [...review.map((group) => ({ group, source: 'review' as const })), ...newWords.map((group) => ({ group, source: 'new' as const }))];
 
@@ -82,7 +73,6 @@ export function composeTodaysPractice(inputs: TodaysPracticeInputs): TodaysPract
 
   return {
     steps: [...wordSteps, ...repeatItems.map((item) => ({ kind: 'repeat' as const, key: `today-repeat-${item.id}`, item }))],
-    usesFreeReview: !inputs.isPremium && review.length > 0,
   };
 }
 

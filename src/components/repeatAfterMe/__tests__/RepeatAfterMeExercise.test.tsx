@@ -58,7 +58,6 @@ it("checks against the admin's recording, with no generated-voice fallback", asy
       nativeVariant: item.variant,
       matchGroup: { id: 'g1', variants: [item.variant] },
       maxAttempts: 3,
-      allowFallbackVoice: false,
     })
   );
   expect(screen.getByText('hello')).toBeOnTheScreen();

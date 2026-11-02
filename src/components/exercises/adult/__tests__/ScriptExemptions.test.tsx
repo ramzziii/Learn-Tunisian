@@ -12,7 +12,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   default: { getItem: jest.fn(async () => null), setItem: jest.fn(async () => undefined) },
 }));
 jest.mock('@/hooks/useWordAudioPlayer', () => ({
-  useWordAudioPlayer: () => ({ play: jest.fn(), hasAudio: true, isResolving: false, hasError: false, isFallbackVoice: false, isPlaying: false, retry: jest.fn() }),
+  useWordAudioPlayer: () => ({ play: jest.fn(), hasAudio: true, isResolving: false, hasError: false, source: 'native', isPlaying: false, retry: jest.fn() }),
 }));
 jest.mock('@/hooks/useAnswerFeedback', () => ({ useAnswerFeedback: () => ({ playCorrect: jest.fn(), playIncorrect: jest.fn() }) }));
 jest.mock('@/components/exercises/shared/VariantCallout', () => ({ VariantCallout: () => null }));

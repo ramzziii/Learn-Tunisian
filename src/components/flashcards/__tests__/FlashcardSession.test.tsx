@@ -41,7 +41,7 @@ jest.mock('@/hooks/useWordAudioPlayer', () => ({
       isPlaying: false,
       isResolving: mockAudio.isResolving,
       hasAudio: !mockAudio.hasError,
-      isFallbackVoice: false,
+      source: 'native',
       hasError: mockAudio.hasError,
       retry: jest.fn(),
     };

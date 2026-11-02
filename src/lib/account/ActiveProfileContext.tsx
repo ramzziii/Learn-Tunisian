@@ -1,7 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { AppState } from 'react-native';
 
 import { useAuth } from '@/lib/auth/AuthContext';
+import { useGuest } from '@/lib/guest/GuestContext';
 import { listProfiles } from '@/data/profiles';
 import { ACTIVE_PROFILE_STORAGE_KEY } from '@/lib/localStorageKeys';
 import type { Profile } from '@/types/models';
@@ -14,10 +16,26 @@ interface ActiveProfileContextValue {
   refreshProfiles: () => Promise<Profile[]>;
 }
 
+/** The device-only profile used in the signed-out guest preview. Never on the server, never Premium. */
+export const GUEST_PROFILE_ID = 'guest';
+const GUEST_PROFILE: Profile = {
+  id: GUEST_PROFILE_ID,
+  accountId: GUEST_PROFILE_ID,
+  name: 'there',
+  dateOfBirth: '',
+  nativeLanguage: '',
+  country: '',
+  startingProficiency: 'none',
+  learningGoal: null,
+  isPremium: false,
+  createdAt: '',
+};
+
 const ActiveProfileContext = createContext<ActiveProfileContextValue | undefined>(undefined);
 
 export function ActiveProfileProvider({ children }: { children: ReactNode }) {
   const { session } = useAuth();
+  const { isGuest } = useGuest();
   const accountId = session?.user.id ?? null;
 
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -67,14 +85,24 @@ export function ActiveProfileProvider({ children }: { children: ReactNode }) {
     };
   }, [accountId]);
 
+  // Re-read profiles (and so is_premium) whenever the app comes back to the
+  // foreground, so a Premium change made elsewhere isn't stale.
+  useEffect(() => {
+    if (!accountId) return;
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') refreshProfiles().catch(() => undefined);
+    });
+    return () => subscription.remove();
+  }, [accountId, refreshProfiles]);
+
   const setActiveProfileId = useCallback(async (profileId: string) => {
     setActiveProfileIdState(profileId);
     await AsyncStorage.setItem(ACTIVE_PROFILE_STORAGE_KEY, profileId);
   }, []);
 
   const activeProfile = useMemo(
-    () => profiles.find((p) => p.id === activeProfileId) ?? null,
-    [profiles, activeProfileId]
+    () => (isGuest && !accountId ? GUEST_PROFILE : (profiles.find((p) => p.id === activeProfileId) ?? null)),
+    [isGuest, accountId, profiles, activeProfileId]
   );
 
   const value = useMemo<ActiveProfileContextValue>(

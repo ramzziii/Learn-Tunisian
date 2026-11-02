@@ -1,8 +1,16 @@
 import { mapWordGroup, mapWordVariant } from '@/data/mappers';
+import { inPracticeScope, type PracticeScope } from '@/lib/access/practiceScope';
 import { buildFlashcardDecks, type FlashcardDeck } from '@/lib/flashcards';
+import { isGuestSessionActive } from '@/lib/guest/guestSession';
 import { supabase } from '@/lib/supabase/client';
 import type { WordGroupRow, WordVariantRow } from '@/types/database';
 import type { WordGroupWithVariants } from '@/types/models';
+
+// Guest-preview helpers, loaded only in guest mode (they use device storage).
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const guestLearning = async (): Promise<typeof import('@/data/guest/guestLearning')> => require('@/data/guest/guestLearning');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const guestContent = async (): Promise<typeof import('@/data/guest/guestContent')> => require('@/data/guest/guestContent');
 
 /**
  * Flashcard data access. Only approved content (content_status =
@@ -13,8 +21,45 @@ import type { WordGroupWithVariants } from '@/types/models';
 
 const isApproved = (row: { content_status?: string }) => row.content_status === 'approved';
 
-/** This profile's decks: My favorites and one per practised category. Read-only. */
-export async function fetchFlashcardDecks(profileId: string, now: Date = new Date()): Promise<FlashcardDeck[]> {
+/** A guest's decks: the preview words practised / starred on this device. No server reads of progress or favorites. */
+async function guestFlashcardDecks(scope: PracticeScope, now: Date): Promise<FlashcardDeck[]> {
+  const learning = await guestLearning();
+  const [words, favoriteIds, units] = await Promise.all([
+    learning.guestPractisedWords(),
+    learning.guestFavoriteIds(),
+    (await guestContent()).fetchGuestUnits(),
+  ]);
+  const inScope = words.filter((w) => inPracticeScope(scope, w));
+  const progress = (await Promise.all(inScope.map((w) => learning.guestProgressFor(w.id)))).filter(
+    (p): p is NonNullable<typeof p> => p !== null
+  );
+  return buildFlashcardDecks(
+    {
+      progress: progress.map((p) => ({
+        wordGroupId: p.wordGroupId,
+        nextReviewAt: p.nextReviewAt,
+        consecutiveIncorrect: p.consecutiveIncorrect,
+        correctCount: p.correctCount,
+      })),
+      favoriteIds: inScope.map((w) => w.id).filter((id) => favoriteIds.has(id)),
+      groups: inScope.map((w) => ({ id: w.id, unitId: w.unitId, sortOrder: w.sortOrder })),
+      units: units.map((u) => ({ id: u.id, name: u.name, sortOrder: u.sortOrder })),
+    },
+    now
+  );
+}
+
+/**
+ * This profile's decks: My favorites and one per practised category.
+ * Read-only. Practice isn't counted: only words in the practice scope (open
+ * lessons / categories, approved) reach a deck.
+ */
+export async function fetchFlashcardDecks(
+  profileId: string,
+  scope: PracticeScope,
+  now: Date = new Date()
+): Promise<FlashcardDeck[]> {
+  if (isGuestSessionActive()) return guestFlashcardDecks(scope, now);
   const [{ data: progressRows, error: progressError }, { data: favoriteRows, error: favoritesError }] = await Promise.all([
     supabase
       .from('progress')
@@ -43,12 +88,15 @@ export async function fetchFlashcardDecks(profileId: string, now: Date = new Dat
 
   const { data: groupRows, error: groupsError } = await supabase
     .from('word_groups')
-    .select('id, unit_id, sort_order, content_status')
+    .select('id, unit_id, lesson_number, sort_order, content_status')
     .in('id', ids)
     .eq('content_status', 'approved');
   if (groupsError) throw groupsError;
-  const groups = ((groupRows ?? []) as { id: string; unit_id: string; sort_order: number; content_status: string }[])
+  const groups = (
+    (groupRows ?? []) as { id: string; unit_id: string; lesson_number: number; sort_order: number; content_status: string }[]
+  )
     .filter(isApproved)
+    .filter((g) => inPracticeScope(scope, { unitId: g.unit_id, lessonNumber: g.lesson_number, contentStatus: g.content_status }))
     .map((g) => ({ id: g.id, unitId: g.unit_id, sortOrder: g.sort_order }));
 
   const unitIds = [...new Set(groups.map((g) => g.unitId))];
@@ -73,6 +121,12 @@ export async function fetchFlashcardDecks(profileId: string, now: Date = new Dat
  */
 export async function fetchFlashcards(groupIds: string[]): Promise<WordGroupWithVariants[]> {
   if (groupIds.length === 0) return [];
+  if (isGuestSessionActive()) {
+    const words = await (await guestContent()).fetchGuestWordGroups({ ids: groupIds });
+    return groupIds
+      .map((id) => words.find((w) => w.id === id))
+      .filter((w): w is WordGroupWithVariants => !!w && w.variants.length > 0);
+  }
 
   const { data: groupRows, error: groupsError } = await supabase
     .from('word_groups')

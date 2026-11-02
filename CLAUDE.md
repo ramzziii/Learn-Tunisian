@@ -24,6 +24,34 @@
   Terms/Privacy documents are an open release blocker. Don't invent legal
   copy.
 
+## Access: Guest preview, Free, Premium
+
+- One access table: `src/lib/access/accessRules.ts`; screens ask
+  `useAccess()` (`decide` / `open`), never `isPremium` + their own lists.
+  Details: docs/access-and-guest-preview.md.
+- Counted items (lesson, phrasebook category, grammar note, proverb, letter,
+  Repeat After Me recording): guest 2, free 5 in total (guest use included),
+  Premium all. Count on first open/start, never twice; completed lessons
+  always reopen; nothing counted while Premium. Open an item through
+  `open()` *before* loading its content.
+- Practice (Review, Flashcards, Listening, Speaking, Favorites) is not
+  counted and uses only `usePracticeScope()` words (approved, from open
+  lessons/categories). If access or scope can't load, show an error — never
+  fall back to open.
+- Free counts live on the server (`feature_item_claims`, 0025, RPCs only).
+  Guests are device-only: no anon Auth users, no server writes, no Edge
+  Function calls; they read only the `guest_preview_*` views (0024). Admin
+  free-plan preview counts stay on the device.
+- Talk is Premium only, enforced in the app and in `talk-to-a-tunisian` /
+  `talk-tts` via `requirePremium` before quota/budget/provider. Keep
+  `talk-stt` open to signed-in free accounts (pronunciation checks).
+- Dictionary / Search indexes only what the learner can open (`src/data/search.ts`)
+  and keeps it in memory (`src/lib/search/`); search text is never logged,
+  stored or sent. All keys come from `searchKeys.ts`; never merge sounds
+  that differ (7≠h, 3≠a, 9≠k, 5≠k, 8≠g, 2≠a) or add aliases without approval.
+- The age retry block (`src/lib/age/retryBlock.ts`) stores only a yes/no flag
+  and expiry; one constant (24 h). Don't claim legal compliance anywhere.
+
 ## Language review (AI content verification)
 
 - Reviewing/verifying AI-generated Tunisian Arabic is limited to accounts in
@@ -79,3 +107,22 @@
   checking ignores it — every variant of a word group counts.
 - A form without a recording shows "No recording for this form yet"; never
   play another form's audio or a device voice in its place.
+- Audio with `is_native_voice = false` is a computer voice (seeded MSA
+  text-to-speech): label it (`ComputerVoiceNote`), play it only on tap, never
+  autoplay it and never use it in listening or pronunciation exercises
+  (`useWordAudioPlayer`'s `source` / `nativeOnly`). The phone's voice is
+  never used for words.
+
+## Content pipeline
+
+- Bulk content goes through `scripts/*.mjs` (docs/content-pipeline.md):
+  dry run by default; writes need `--execute` and an exact `--confirm-host`;
+  service-role key from the environment only. Logic lives in
+  `scripts/lib/content/` and is tested with `npm run test:scripts`.
+- Imports arrive as draft, never approved; only `import-review` (reviewer in
+  `public.reviewers`) approves. Never write Tunisian words or mark them
+  approved yourself; never correct a reviewer's sheet.
+- `native_verified` = text checked by a native speaker; `is_native_voice` =
+  native recording. A text review never sets `is_native_voice`.
+- Lessons with no approved words are hidden from learners (and left out of
+  the unlock order) in `fetchLessonMap` / `guestLessonMap`.

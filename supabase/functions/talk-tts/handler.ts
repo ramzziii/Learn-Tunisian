@@ -21,6 +21,7 @@ import {
   type Env,
   type FetchLike,
   type QuotaResult,
+  requirePremium,
 } from '../_shared/aiBudget.ts';
 
 const DEFAULT_BASE_URL = 'https://api.openai.com/v1';
@@ -36,6 +37,8 @@ export interface TtsDeps {
   env: Env;
   /** The account the JWT belongs to, or null if it isn't a valid session token. */
   getUserId: (token: string) => Promise<string | null>;
+  /** True when the account may use Talk: an admin, or any of its profiles has is_premium (read with the service role). Throws if the lookup fails. */
+  hasPremium: (accountId: string) => Promise<boolean>;
   /** consume_ai_quota('tts') run with the caller's JWT. */
   consumeQuota: (token: string, kind: 'tts') => Promise<QuotaResult>;
   store: BudgetStore;
@@ -58,6 +61,10 @@ export function createTtsHandler(deps: TtsDeps): (req: Request) => Promise<Respo
     if (!token || !accountId) {
       return errorResponse('unauthorized', SIGN_IN_MESSAGE, 401);
     }
+
+    // Premium only — before the API key, quota, budget or any provider call.
+    const notPremium = await requirePremium(deps.hasPremium, accountId);
+    if (notPremium) return notPremium;
 
     const apiKey = deps.env('AI_API_KEY');
     if (!apiKey) {

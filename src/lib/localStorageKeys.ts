@@ -20,3 +20,16 @@ export const THEME_STORAGE_KEY = 'learn-tunisian.theme-preference';
 export function tutorSpeechFilePrefix(profileId: string): string {
   return `tutor-speech-${profileId}-`;
 }
+
+/**
+ * Age retry block (src/lib/age/retryBlock.ts): a yes/no flag and when it
+ * ends — never a date of birth. Device-wide and not account data, so account
+ * deletion leaves it; reinstalling the app resets it (accepted).
+ */
+export const AGE_RETRY_BLOCK_STORAGE_KEY = 'learn-tunisian.age-retry-block';
+
+/** Signed-out guest preview is on (GuestContext). Device-wide. */
+export const GUEST_MODE_STORAGE_KEY = 'learn-tunisian.guest-mode';
+
+/** The guest preview's device-only data: used items, practice results, favorites (src/lib/guest/guestStore.ts). */
+export const GUEST_DATA_STORAGE_KEY = 'learn-tunisian.guest-data';

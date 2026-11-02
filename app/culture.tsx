@@ -4,7 +4,9 @@ import { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { ProverbDetailModal } from '@/components/culture/ProverbDetailModal';
-import { openUpgradeFlow, PremiumBadge } from '@/components/premium/Premium';
+import { useLockedItemAction } from '@/components/access/AccessLimit';
+import { PremiumBadge } from '@/components/premium/Premium';
+import { useAccess } from '@/lib/access/AccessContext';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Reveal } from '@/components/ui/Reveal';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
@@ -12,8 +14,6 @@ import { radii, shadows, spacing, type ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/lib/theme/ThemeContext';
 import { PROVERBS, type Proverb } from '@/constants/proverbs';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
-import { usePremium } from '@/lib/premium/PremiumContext';
-import { canAccessProverb } from '@/lib/premium/access';
 import { getViewedProverbIds, markProverbViewed } from '@/lib/proverbProgress';
 import { TunisianText } from '@/components/tunisian/TunisianText';
 import { useColumnWidth } from '@/hooks/useColumnWidth';
@@ -44,12 +44,14 @@ export default function CultureScreen() {
     }, [activeProfile])
   );
 
-  const { isPremium } = usePremium();
+  // Any proverb can be picked; each counts when first opened (src/lib/access).
+  const { decide, open } = useAccess();
+  const onLockedPress = useLockedItemAction();
 
-  const selectProverb = (proverb: Proverb) => {
+  const selectProverb = async (proverb: Proverb) => {
     Haptics.selectionAsync();
-    if (!canAccessProverb(isPremium, proverb.id)) {
-      openUpgradeFlow();
+    if (!(await open('proverb', proverb.id).catch(() => false))) {
+      onLockedPress();
       return;
     }
     setSelectedProverb(proverb);
@@ -85,7 +87,7 @@ export default function CultureScreen() {
         <View style={styles.grid}>
           {PROVERBS.map((proverb, index) => {
             const isViewed = viewedIds.includes(proverb.id);
-            const isLocked = !canAccessProverb(isPremium, proverb.id);
+            const isLocked = decide('proverb', proverb.id) === 'limit';
             return (
               <Reveal key={proverb.id} delay={Math.min(index * 40, 400)}>
                 <PressableScale

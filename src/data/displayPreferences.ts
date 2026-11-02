@@ -1,4 +1,5 @@
-import { parseDisplayPreferences } from '@/lib/display/displayRules';
+import { DEFAULT_DISPLAY_PREFERENCES, parseDisplayPreferences } from '@/lib/display/displayRules';
+import { isGuestSessionActive } from '@/lib/guest/guestSession';
 import { supabase } from '@/lib/supabase/client';
 import type { DisplayPreferences } from '@/types/models';
 
@@ -9,6 +10,7 @@ import type { DisplayPreferences } from '@/types/models';
  * analytics or the AI tutor.
  */
 export async function fetchDisplayPreferences(profileId: string): Promise<DisplayPreferences> {
+  if (isGuestSessionActive()) return DEFAULT_DISPLAY_PREFERENCES;
   const { data, error } = await supabase
     .from('learner_display_preferences')
     .select('script, form')
@@ -19,6 +21,8 @@ export async function fetchDisplayPreferences(profileId: string): Promise<Displa
 }
 
 export async function saveDisplayPreferences(profileId: string, preferences: DisplayPreferences): Promise<void> {
+  // Guest preview: display settings are not saved anywhere.
+  if (isGuestSessionActive()) return;
   const { error } = await supabase
     .from('learner_display_preferences')
     .upsert({ profile_id: profileId, script: preferences.script, form: preferences.form }, { onConflict: 'profile_id' });
