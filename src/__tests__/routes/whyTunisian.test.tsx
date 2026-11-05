@@ -40,10 +40,12 @@ describe('Welcome', () => {
     expect(screen.queryByText(/shaped around/i)).toBeNull();
   });
 
-  it('signing up is still the main action', async () => {
+  it('two clear choices: try a free lesson (guest preview) or create account / sign in', async () => {
     await themed(<Welcome />);
-    await fireEvent.press(screen.getByRole('button', { name: 'Start learning free' }));
-    expect(mockPush).toHaveBeenCalledWith('/onboarding/age');
+    await fireEvent.press(screen.getByRole('button', { name: 'Try a free lesson' }));
+    expect(mockPush).toHaveBeenCalledWith('/guest/age');
+    await fireEvent.press(screen.getByRole('button', { name: 'Create account / Sign in' }));
+    expect(mockPush).toHaveBeenCalledWith('/auth/sign-in');
   });
 
   it('links to “Why Tunisian, not MSA?”', async () => {

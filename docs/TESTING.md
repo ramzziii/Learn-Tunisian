@@ -33,8 +33,16 @@ flags `@expo/config-plugins`, which is installed on purpose (see AGENTS.md).
 
 | Journey | Tests |
 | --- | --- |
-| Free vs. Premium boundaries | `src/lib/__tests__/premiumAccess.test.ts`, `src/lib/__tests__/freeAllowance.test.ts` |
-| Locked content by direct link | `src/data/__tests__/premiumAccess.test.ts` (content never fetched), `src/__tests__/routes/lessonRouteAccess.test.tsx` (gate rendered instead of a session) |
+| Guest / Free / Premium rules | `src/lib/access/__tests__/` (rules, `AccessContext`, practice scope, letter pool), `src/lib/guest/__tests__/guestStore.test.ts`, `supabase/tests/featureClaims.test.mjs`, `supabase/tests/guestPreview.test.mjs` |
+| Locked content by direct link | `src/__tests__/routes/lessonRouteAccess.test.tsx` (opened before any content loads; gate or create-account prompt instead), `phrasebookAccess`, `grammarCultureAccess`, `alphabetAccess`, `practiceAccess` route tests |
+| Guest preview | `guestAgeConfirm`, `guestRouteGuards`, `guestCarryOver`, `homeTodaysPractice` route tests; `src/data/__tests__/guestDataLayer.test.ts` |
+| Dictionary / Search | `src/lib/search/__tests__/` (keys and sound guards, ranking, grouping, in-memory cache), `src/data/__tests__/search.test.ts` (only accessible rows are fetched), `src/__tests__/routes/search.test.tsx` (no network on typing, identical empty state, guest allowance) |
+| Content pipeline | `scripts/tests/` via `npm run test:scripts` (validation rules, idempotent import, several lessons per unit, review ok/fix/reject and unknown ids, audio matching, dry-run default), `supabase/tests/contentPipeline.test.mjs` and `contentReviewLog.test.mjs` (real schema) |
+| Placeholder (computer) voice | `src/hooks/__tests__/useWordAudioPlayer.test.ts`, `HearExercisesNativeOnly.test.tsx`, `PronunciationPractice.test.tsx`, `FormDisplay.test.tsx`, `PhraseDetailModal.test.tsx`, `phrasebookAccess` and `practiceAccess` route tests |
+| Words used (phrase → words) | `src/lib/phraseWords/__tests__/suggestWordLinks.test.ts` (matches, possible matches, never-merged sounds), `src/components/admin/__tests__/PhraseWordsEditor.test.tsx` (nothing linked without Save), `src/data/__tests__/phraseWords.test.ts`, `src/components/phraseWords/__tests__/WordsUsedSection.test.tsx` (order, locked cards, errors), `supabase/tests/phraseWordLinks.test.mjs` (admin-only writes, cascades, guest view) |
+| Admin tabs (Today / Requests / Review / Audio / Content) | `src/__tests__/routes/adminTabs.test.tsx`, `src/lib/admin/__tests__/needsAttention.test.ts` |
+| Hidden empty lessons | `src/data/__tests__/lessonMapEmptyLessons.test.ts` (signed in and guest; progression not blocked) |
+| Talk is Premium only | `src/__tests__/routes/talkPremiumLock.test.tsx` (app), `src/__tests__/functions/talkChatHandler.test.ts` / `talkTtsHandler.test.ts` (403 before quota/provider) |
 | Admin edits & Supabase rejections | `src/data/admin/__tests__/content.test.ts`, `src/lib/admin/__tests__/wordGroupValidation.test.ts` |
 | Audio upload → save path → delete old file | `src/lib/__tests__/audioPlayback.test.ts`, `src/components/admin/__tests__/AudioRecorderField.test.tsx` (what the admin sees on failure/success) |
 | Learner playback refresh after re-recording | `src/lib/__tests__/audioCacheResolution.test.ts` (native cache/download/fallback and web) |
@@ -62,10 +70,11 @@ they can't prove the policies themselves are right. Check against a
   upload to the `audio` bucket.
 - A learner can only read/write their own `progress`, `favorites`,
   `session_logs`.
-- **Known gap:** `profiles_all_own` lets a user update their own row,
-  including `is_premium` — Premium is currently self-grantable, and Premium
-  content isn't restricted by RLS (gating is client-side). Fix before
-  charging money.
+- **Known gap:** Premium content isn't restricted by RLS — content tables
+  are readable by any signed-in user, so item locks are app-side (free
+  accounts' used-item counts are enforced by the `claim_feature_item` RPC;
+  Talk is refused server-side). `is_premium` can't be self-granted (trigger
+  in 0015). Revisit before charging money.
 
 If these become automated, put them in `supabase/tests/` (pgTAP, run with
 `supabase test db`) as a separate workflow that only runs where a local

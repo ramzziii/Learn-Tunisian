@@ -362,7 +362,7 @@ describe('one request', () => {
         includePronunciation: true,
         includeExplanation: false, // this answer has no explanation recording
       });
-      expect(await screen.findByText(/Added to the Approval Queue/)).toBeOnTheScreen();
+      expect(await screen.findByText(/Added to Review/)).toBeOnTheScreen();
     });
 
     it('a unit with a single lesson selects it for you, so Add for review works straight away', async () => {
@@ -374,7 +374,7 @@ describe('one request', () => {
       await fireEvent.press(screen.getByText('Add for review'));
 
       expect(mockShare).toHaveBeenCalledWith(expect.objectContaining({ unitId: 'unit-1', lessonNumber: 2 }));
-      expect(await screen.findByText(/Added to the Approval Queue/)).toBeOnTheScreen();
+      expect(await screen.findByText(/Added to Review/)).toBeOnTheScreen();
     });
 
     it('pressing Add for review before choosing says what is missing (never a silent no-op)', async () => {
@@ -421,7 +421,7 @@ describe('one request', () => {
       expect(await screen.findByText(/duplicate key/)).toBeOnTheScreen();
 
       await fireEvent.press(screen.getByText('Add for review'));
-      expect(await screen.findByText(/Added to the Approval Queue/)).toBeOnTheScreen();
+      expect(await screen.findByText(/Added to Review/)).toBeOnTheScreen();
     });
   });
 

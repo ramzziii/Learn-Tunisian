@@ -8,6 +8,8 @@ const mockSignOut = jest.fn();
 let mockEmail: string | undefined = 'ramzi@example.com';
 const mockProfile = { id: 'p1', name: 'Ramzi', isPremium: false };
 
+// Signed-in account (the guest guard and Talk lock read the access tier).
+jest.mock('@/lib/access/AccessContext', () => ({ useAccess: () => ({ tier: 'free', isResolved: true }) }));
 jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,
   default: { getItem: jest.fn(async () => null), setItem: jest.fn(async () => undefined) },
@@ -169,9 +171,9 @@ it('Sign out still asks to confirm, as before', async () => {
   alertSpy.mockRestore();
 });
 
-it('the rest of Profile is unchanged (settings sections still render)', async () => {
+it('the rest of Profile still renders (settings grouped; translations moved to Learn)', async () => {
   await renderProfile();
   expect(await screen.findByText('Appearance')).toBeOnTheScreen();
-  expect(screen.getByText('Daily goal')).toBeOnTheScreen();
-  expect(screen.getByText('[translation requests entry]')).toBeOnTheScreen();
+  expect(screen.getByText('Daily goal & reminder')).toBeOnTheScreen();
+  expect(screen.queryByText('[translation requests entry]')).toBeNull();
 });

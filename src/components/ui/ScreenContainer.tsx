@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { FreePreviewBanner } from '@/components/access/FreePreviewBanner';
 import { colors as lightColors, spacing, type ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/lib/theme/ThemeContext';
 
@@ -25,6 +26,7 @@ export function ScreenContainer({ children, style, themed = false }: ScreenConta
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <FreePreviewBanner />
       <View style={[styles.container, style]}>{children}</View>
     </SafeAreaView>
   );

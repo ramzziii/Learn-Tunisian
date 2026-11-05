@@ -1,6 +1,7 @@
 import { Redirect, router } from 'expo-router';
 import { useMemo } from 'react';
 import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
+import { RequireAccount } from '@/components/guest/RequireAccount';
 
 import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
@@ -23,7 +24,7 @@ import type { Profile } from '@/types/models';
  * profile. An account with one (or no) profile never stays here, and once a
  * profile is in use this is not a switcher: it just goes home.
  */
-export default function ProfileChooser() {
+function ProfileChooser() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { profiles, activeProfile, isLoading, setActiveProfileId } = useActiveProfile();
@@ -109,3 +110,12 @@ const makeStyles = (colors: ThemeColors) =>
     name: { fontSize: 17, fontWeight: '700', color: colors.textPrimary },
     meta: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
   });
+
+/** Account only: a guest gets the create-account explanation (src/components/guest/RequireAccount.tsx). */
+export default function ProfileChooserScreen() {
+  return (
+    <RequireAccount>
+      <ProfileChooser />
+    </RequireAccount>
+  );
+}

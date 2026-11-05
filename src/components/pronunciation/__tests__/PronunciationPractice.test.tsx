@@ -69,7 +69,7 @@ const { PronunciationPractice, PRONUNCIATION_MAX_ATTEMPTS, REVISIT_AUTO_ADVANCE_
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { ThemeProvider } = require('@/lib/theme/ThemeContext');
 
-const native = { id: 'v1', variantLabel: 'primary', wordArabic: 'عسلامة', transliteration: '3aslema', audioPath: 'g1/v1.m4a' };
+const native = { id: 'v1', variantLabel: 'primary', wordArabic: 'عسلامة', transliteration: '3aslema', audioPath: 'g1/v1.m4a', isNativeVoice: true };
 const matchGroup = { id: 'g1', variants: [native] };
 
 async function renderPractice(props: Record<string, unknown> = {}) {
@@ -108,7 +108,7 @@ beforeEach(() => {
     hasAudio: true,
     isResolving: false,
     hasError: false,
-    isFallbackVoice: false,
+    source: 'native',
     isPlaying: false,
     retry: jest.fn(),
   });
@@ -118,9 +118,29 @@ it('three tries everywhere', () => {
   expect(PRONUNCIATION_MAX_ATTEMPTS).toBe(3);
 });
 
-it('plays the native recording first, honouring whether the generated-voice fallback is allowed', async () => {
-  await renderPractice({ allowFallbackVoice: false });
-  expect(mockUseWordAudioPlayer).toHaveBeenCalledWith(native, { autoPlay: true, fallbackVoice: false });
+it('plays the native recording first — native only, never a computer voice', async () => {
+  await renderPractice();
+  expect(mockUseWordAudioPlayer).toHaveBeenCalledWith(native, { autoPlay: true, nativeOnly: true });
+  expect(screen.getByRole('button', { name: 'Play audio' })).toBeOnTheScreen();
+});
+
+describe('no native recording (only the computer voice, or nothing)', () => {
+  const computerOnly = { ...native, isNativeVoice: false };
+
+  it('says so instead of a play button, and never loads the computer voice', async () => {
+    await renderPractice({ nativeVariant: computerOnly });
+    expect(screen.getByText('No native recording yet — read it and say it.')).toBeOnTheScreen();
+    expect(screen.queryByRole('button', { name: 'Play audio' })).toBeNull();
+    expect(mockUseWordAudioPlayer).toHaveBeenCalledWith(null, { autoPlay: true, nativeOnly: true });
+  });
+
+  it('recording and the check still work; no "Native" compare button', async () => {
+    mockTranscribe.mockResolvedValue({ ok: true, text: 'شي حاجة أخرى' });
+    await renderPractice({ nativeVariant: computerOnly });
+    await recordOnce();
+    expect(await screen.findByText('▶ Your voice')).toBeOnTheScreen();
+    expect(screen.queryByText('▶ Native')).toBeNull();
+  });
 });
 
 describe('automatic check (the existing transcription check)', () => {

@@ -2,7 +2,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 
-import { PremiumGate } from '@/components/premium/Premium';
+import { AccessCheckProblem, AccessLimitScreen } from '@/components/access/AccessLimit';
 import { BackButton } from '@/components/ui/BackButton';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { PressableScale } from '@/components/ui/PressableScale';
@@ -10,11 +10,10 @@ import { Reveal } from '@/components/ui/Reveal';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { radii, shadows, spacing, type ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/lib/theme/ThemeContext';
-import { fetchAccessibleLessonWordGroups } from '@/data/premiumAccess';
+import { fetchWordGroupsForLesson } from '@/data/content';
 import { fetchFavoriteWordGroupIds } from '@/data/favorites';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
-import { usePremium } from '@/lib/premium/PremiumContext';
-import { PremiumRequiredError } from '@/lib/premium/access';
+import { useLessonAccess } from '@/lib/access/useLessonAccess';
 import { preferredVariant } from '@/lib/display/displayRules';
 import { useDisplayPreferences } from '@/lib/display/useDisplayPreferences';
 import { TunisianText } from '@/components/tunisian/TunisianText';
@@ -28,34 +27,23 @@ export default function LessonWordList() {
   const { activeProfile } = useActiveProfile();
   const [groups, setGroups] = useState<WordGroupWithVariants[] | null>(null);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
-  const [isPremiumLocked, setIsPremiumLocked] = useState(false);
-  const { isPremium, isResolved } = usePremium();
+  const access = useLessonAccess(lessonId);
 
   useEffect(() => {
-    if (!activeProfile || !lessonId || !isResolved) return;
-    setIsPremiumLocked(false);
+    if (!activeProfile || !lessonId || access.status !== 'open') return;
     (async () => {
-      try {
-        const [lessonGroups, favorites] = await Promise.all([
-          fetchAccessibleLessonWordGroups(lessonId, isPremium),
-          fetchFavoriteWordGroupIds(activeProfile.id),
-        ]);
-        setGroups(lessonGroups);
-        setFavoriteIds(favorites);
-      } catch (error) {
-        if (error instanceof PremiumRequiredError) setIsPremiumLocked(true);
-        else throw error;
-      }
+      const [lessonGroups, favorites] = await Promise.all([
+        fetchWordGroupsForLesson(lessonId),
+        fetchFavoriteWordGroupIds(activeProfile.id),
+      ]);
+      setGroups(lessonGroups);
+      setFavoriteIds(favorites);
     })();
-  }, [activeProfile, lessonId, isPremium, isResolved]);
+  }, [activeProfile, lessonId, access.status]);
 
-  if (isPremiumLocked) {
-    return (
-      <PremiumGate
-        title="These words are part of Premium"
-        message="Your free plan includes the first lesson's words. Upgrade to browse every lesson."
-      />
-    );
+  if (access.status === 'limit') return <AccessLimitScreen feature={access.target?.feature ?? 'lesson'} />;
+  if (access.status === 'missing' || access.status === 'error') {
+    return <AccessCheckProblem kind={access.status} onRetry={access.retry} />;
   }
 
   if (!groups) return <LoadingScreen themed />;

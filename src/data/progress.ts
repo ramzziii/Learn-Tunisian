@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase/client';
+import { isGuestSessionActive } from '@/lib/guest/guestSession';
 import { mapProgress, mapWordGroup, mapWordVariant } from '@/data/mappers';
 import { startOfLocalDayIso } from '@/data/sessionLogs';
 import { calculateMasteryStatus } from '@/lib/masteryStatus';
@@ -7,7 +8,12 @@ import { calculateNextReview, INITIAL_SPACED_REPETITION_STATE } from '@/lib/spac
 import type { ProgressRow, WordGroupRow, WordVariantRow } from '@/types/database';
 import type { Progress, ProgressStatus, WordGroupWithVariants } from '@/types/models';
 
+// Guest-preview helpers, loaded only in guest mode (they use device storage).
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const guestLearning = async (): Promise<typeof import('@/data/guest/guestLearning')> => require('@/data/guest/guestLearning');
+
 export async function fetchProgressForWordGroup(profileId: string, wordGroupId: string): Promise<Progress | null> {
+  if (isGuestSessionActive()) return (await guestLearning()).guestProgressFor(wordGroupId);
   const { data, error } = await supabase
     .from('progress')
     .select('*')
@@ -21,6 +27,10 @@ export async function fetchProgressForWordGroup(profileId: string, wordGroupId: 
 /** Which of `wordGroupIds` this profile already has a progress row for —
  * i.e. has practiced at least once. */
 export async function fetchSeenWordGroupIds(profileId: string, wordGroupIds: string[]): Promise<Set<string>> {
+  if (isGuestSessionActive()) {
+    const seen = new Set(await (await guestLearning()).guestPractisedIds());
+    return new Set(wordGroupIds.filter((id) => seen.has(id)));
+  }
   if (wordGroupIds.length === 0) return new Set();
   const { data, error } = await supabase
     .from('progress')
@@ -54,6 +64,8 @@ export async function recordWordGroupResult(
   wordGroupId: string,
   wasCorrect: boolean
 ): Promise<RecordResultOutcome> {
+  // Guest preview: kept on this device only.
+  if (isGuestSessionActive()) return (await guestLearning()).guestRecordResult(wordGroupId, wasCorrect);
   const { data: existing, error: fetchError } = await supabase
     .from('progress')
     .select('correct_count, incorrect_count, review_interval_days, ease_factor, consecutive_correct, consecutive_incorrect')
@@ -108,6 +120,7 @@ export interface ProfileProgressSummary {
 }
 
 export async function fetchProgressSummary(profileId: string): Promise<ProfileProgressSummary> {
+  if (isGuestSessionActive()) return (await guestLearning()).guestSummary();
   const { data, error } = await supabase
     .from('progress')
     .select('status, correct_count, incorrect_count')
@@ -138,6 +151,7 @@ export interface TodayPracticeSummary {
  * distinction isn't worth a migration for a home-screen encouragement card.
  */
 export async function fetchTodayPracticeSummary(profileId: string): Promise<TodayPracticeSummary> {
+  if (isGuestSessionActive()) return { wordsPracticedToday: 0, wordsMasteredToday: 0 };
   const { data, error } = await supabase
     .from('progress')
     .select('status')
@@ -196,6 +210,8 @@ async function hydrateWordGroupsInOrder(groupIds: string[]): Promise<WordGroupWi
 }
 
 export async function fetchReviewQueue(profileId: string): Promise<WordGroupWithVariants[]> {
+  // Guest preview: review the words practised in the preview.
+  if (isGuestSessionActive()) return (await guestLearning()).guestPractisedWords();
   const { data: dueRows, error: dueError } = await supabase
     .from('progress')
     .select('word_group_id, next_review_at, consecutive_incorrect, correct_count')
@@ -226,6 +242,7 @@ export async function fetchReviewQueue(profileId: string): Promise<WordGroupWith
  * where "not due yet" shouldn't matter.
  */
 export async function fetchWeakestWordGroups(profileId: string, limit: number): Promise<WordGroupWithVariants[]> {
+  if (isGuestSessionActive()) return (await guestLearning()).guestPractisedWords(limit);
   const { data: rows, error } = await supabase
     .from('progress')
     .select('word_group_id, correct_count, incorrect_count')
@@ -242,6 +259,7 @@ export async function fetchWeakestWordGroups(profileId: string, limit: number): 
  * "N words due" count shown on Home never disagrees with what review
  * actually contains. */
 export async function fetchReviewDueCount(profileId: string): Promise<number> {
+  if (isGuestSessionActive()) return 0;
   const { count, error } = await supabase
     .from('progress')
     .select('id', { count: 'exact', head: true })

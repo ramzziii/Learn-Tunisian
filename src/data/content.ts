@@ -1,8 +1,15 @@
 import { supabase } from '@/lib/supabase/client';
+import { isGuestSessionActive } from '@/lib/guest/guestSession';
 import { mapLesson, mapUnit, mapWordGroup, mapWordVariant } from '@/data/mappers';
 import { computeLessonStates } from '@/lib/lessonCompletion';
 import type { LessonRow, UnitRow, WordGroupRow, WordVariantRow } from '@/types/database';
 import type { LessonWithState, WordGroupWithVariants } from '@/types/models';
+
+// Guest-preview helpers, loaded only in guest mode (they use device storage).
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const guestLearning = async (): Promise<typeof import('@/data/guest/guestLearning')> => require('@/data/guest/guestLearning');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const guestContent = async (): Promise<typeof import('@/data/guest/guestContent')> => require('@/data/guest/guestContent');
 
 export interface UnitWithLessons {
   unit: ReturnType<typeof mapUnit>;
@@ -21,6 +28,7 @@ export interface UnitWithLessons {
  * first lesson is always unlocked.
  */
 export async function fetchLessonMap(profileId: string): Promise<UnitWithLessons[]> {
+  if (isGuestSessionActive()) return (await guestLearning()).guestLessonMap();
   const [{ data: unitRows, error: unitsError }, { data: lessonRows, error: lessonsError }] =
     await Promise.all([
       // Phrasebook categories (is_curriculum = false) are deliberately excluded
@@ -69,7 +77,13 @@ export async function fetchLessonMap(profileId: string): Promise<UnitWithLessons
     groupsByLesson.set(key, list);
   }
 
-  const sortedLessons = [...lessons].sort((a, b) => {
+  // Lessons with no approved words are hidden (imported lessons stay draft
+  // until reviewed). They must also be left out of computeLessonStates: a
+  // lesson only completes once it has words, so an empty one would lock
+  // every lesson after it.
+  const visibleLessons = lessons.filter((l) => groupsByLesson.has(lessonKey(l.unit_id, l.lesson_number)));
+
+  const sortedLessons = [...visibleLessons].sort((a, b) => {
     const unitA = units.find((u) => u.id === a.unit_id);
     const unitB = units.find((u) => u.id === b.unit_id);
     const unitOrder = (unitA?.sort_order ?? 0) - (unitB?.sort_order ?? 0);
@@ -85,9 +99,9 @@ export async function fetchLessonMap(profileId: string): Promise<UnitWithLessons
   });
   const stateByLessonId = computeLessonStates(lessonCompletionInputs);
 
-  return units.map((unitRow) => {
+  const unitsWithLessons = units.map((unitRow) => {
     const unit = mapUnit(unitRow);
-    const unitLessons = lessons
+    const unitLessons = visibleLessons
       .filter((l) => l.unit_id === unitRow.id)
       .sort((a, b) => a.sort_order - b.sort_order)
       .map((lessonRow) => {
@@ -103,6 +117,8 @@ export async function fetchLessonMap(profileId: string): Promise<UnitWithLessons
       });
     return { unit, lessons: unitLessons };
   });
+  // A unit whose lessons are all hidden isn't shown either.
+  return unitsWithLessons.filter(({ lessons: unitLessons }) => unitLessons.length > 0);
 }
 
 export interface PhrasebookCategory {
@@ -122,6 +138,18 @@ export interface PhrasebookCategory {
  * per-profile concerns — just "which categories exist and how big are they."
  */
 export async function fetchPhrasebookCategories(): Promise<PhrasebookCategory[]> {
+  if (isGuestSessionActive()) {
+    // Guests see only the selected categories (guest views).
+    const [units, lessons, words] = await Promise.all([(await guestContent()).fetchGuestUnits(), (await guestContent()).fetchGuestLessons(), (await guestContent()).fetchGuestWordGroups()]);
+    return units
+      .filter((u) => !u.isCurriculum)
+      .flatMap((u) => {
+        const lesson = lessons.find((l) => l.unitId === u.id);
+        return lesson
+          ? [{ unitId: u.id, lessonId: lesson.id, name: u.name, sortOrder: u.sortOrder, phraseCount: words.filter((w) => w.unitId === u.id).length }]
+          : [];
+      });
+  }
   const { data: unitRows, error: unitsError } = await supabase
     .from('units')
     .select('*')
@@ -165,6 +193,7 @@ export async function fetchPhrasebookCategories(): Promise<PhrasebookCategory[]>
 }
 
 export async function fetchWordGroupsForLesson(lessonId: string): Promise<WordGroupWithVariants[]> {
+  if (isGuestSessionActive()) return (await guestLearning()).guestWordGroupsForLesson(lessonId);
   const { data: lessonRow, error: lessonError } = await supabase
     .from('lessons')
     .select('unit_id, lesson_number')
@@ -209,6 +238,12 @@ export async function fetchWordGroupsForLesson(lessonId: string): Promise<WordGr
 export async function fetchWordGroupWithSiblings(
   wordGroupId: string
 ): Promise<{ group: WordGroupWithVariants; siblings: WordGroupWithVariants[] }> {
+  if (isGuestSessionActive()) {
+    const all = await (await guestContent()).fetchGuestWordGroups();
+    const group = all.find((g) => g.id === wordGroupId);
+    if (!group) throw new Error('This word is not part of the preview.');
+    return { group, siblings: all.filter((g) => g.id !== group.id && g.unitId === group.unitId && g.lessonNumber === group.lessonNumber) };
+  }
   const { data: groupRow, error: groupError } = await supabase
     .from('word_groups')
     .select('*')

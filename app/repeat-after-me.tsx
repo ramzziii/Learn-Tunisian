@@ -2,7 +2,8 @@ import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
 
-import { openUpgradeFlow, PremiumBadge } from '@/components/premium/Premium';
+import { freeLimitTitle, useLockedItemAction } from '@/components/access/AccessLimit';
+import { PremiumBadge } from '@/components/premium/Premium';
 import { RepeatAfterMeExercise } from '@/components/repeatAfterMe/RepeatAfterMeExercise';
 import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
@@ -13,7 +14,8 @@ import { radii, spacing, type ThemeColors } from '@/constants/theme';
 import { loadRepeatAfterMeSession, type RepeatAfterMeItem } from '@/data/repeatAfterMe';
 import { useSlideInOnChange } from '@/hooks/useSlideInOnChange';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
-import { usePremium } from '@/lib/premium/PremiumContext';
+import { itemAllowance } from '@/lib/access/accessRules';
+import { useAccess } from '@/lib/access/AccessContext';
 import {
   getRepeatAfterMeProgress,
   markRepeatAfterMeSessionCompleted,
@@ -23,7 +25,6 @@ import {
   continueAfterUpgradeGate,
   currentItem,
   finishItem,
-  RAM_FREE_ITEMS_PER_SESSION,
   RAM_MAX_ATTEMPTS,
   startSession,
   type RamSessionState,
@@ -34,16 +35,18 @@ type Session = RamSessionState<RepeatAfterMeItem>;
 
 /**
  * Repeat After Me: practice saying recordings an admin chose to include.
- * Session rules live in src/lib/repeatAfterMe/session.ts; the free limit is
- * enforced where items load (src/data/repeatAfterMe.ts) and again when the
- * session starts. Progress is saved per item as each one is finished, so
+ * Session rules live in src/lib/repeatAfterMe/session.ts. Each recording
+ * counts as one item when first started (src/lib/access); which ones fit the
+ * allowance is decided where items load (src/data/repeatAfterMe.ts). Progress is saved per item as each one is finished, so
  * leaving early keeps what was done.
  */
 export default function RepeatAfterMeScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { activeProfile } = useActiveProfile();
-  const { isPremium, isResolved } = usePremium();
+  const { tier, isResolved, claimed, decide, open } = useAccess();
+  const onLimitPress = useLockedItemAction();
+  const unlimited = tier === 'premium';
   const [session, setSession] = useState<Session | null>(null);
   const [loadError, setLoadError] = useState(false);
   const slideIn = useSlideInOnChange(`${session?.phase}-${session?.index}`);
@@ -54,16 +57,37 @@ export default function RepeatAfterMeScreen() {
     setSession(null);
     try {
       const progress = await getRepeatAfterMeProgress(activeProfile.id);
-      const { items, lockedCount } = await loadRepeatAfterMeSession({ isPremium, progress: progress.items });
-      setSession(startSession(items, { isPremium, lockedCount }));
+      const openIds = unlimited ? new Set<string>() : new Set(claimed('repeat_after_me'));
+      const { items, lockedCount } = await loadRepeatAfterMeSession({
+        unlimited,
+        openIds,
+        remaining: unlimited ? 0 : Math.max(0, itemAllowance(tier) - openIds.size),
+        progress: progress.items,
+      });
+      setSession(startSession(items, { unlimited, lockedCount }));
     } catch {
       setLoadError(true);
     }
-  }, [activeProfile, isPremium, isResolved]);
+    // Loaded once per learner/tier — counting items as they start mustn't reload the session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeProfile, unlimited, tier, isResolved]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  // A new recording counts as it starts (an opened one never again).
+  const startingId = session?.phase === 'practice' ? currentItem(session)?.id ?? null : null;
+  useEffect(() => {
+    if (!startingId || decide('repeat_after_me', startingId) !== 'claim') return;
+    open('repeat_after_me', startingId)
+      .then((allowed) => {
+        if (!allowed) setLoadError(true);
+      })
+      .catch(() => setLoadError(true));
+    // Only when a new item starts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startingId]);
 
   /** Applies a transition and persists whatever it just finished. */
   const commit = (previous: Session, next: Session) => {
@@ -122,12 +146,18 @@ export default function RepeatAfterMeScreen() {
         <Reveal style={styles.centered}>
           <PremiumBadge />
           <Text style={styles.centeredTitle}>
-            You&apos;ve practiced {RAM_FREE_ITEMS_PER_SESSION} recordings
+            {tier === 'guest' ? 'Create a free account to keep learning' : freeLimitTitle('repeat_after_me')}
           </Text>
           <Text style={styles.centeredBody}>
-            The free plan includes {RAM_FREE_ITEMS_PER_SESSION} per session — {session.lockedCount} more with Premium.
+            Recordings you&apos;ve practised stay open. {session.lockedCount} more{' '}
+            {tier === 'guest' ? 'with a free account and Premium.' : 'with Premium.'}
           </Text>
-          <Button themed label="See Premium plans" onPress={openUpgradeFlow} style={styles.fullWidth} />
+          <Button
+            themed
+            label={tier === 'guest' ? 'Create a free account' : 'See Premium plans'}
+            onPress={onLimitPress}
+            style={styles.fullWidth}
+          />
           <Button
             themed
             label={hasReview ? 'Continue to review' : 'Finish'}

@@ -22,6 +22,7 @@ Where it's enforced:
 | `talk-review` Edge Function | Verifies the caller's JWT (401 if missing/invalid), then looks the verified user id up in `public.reviewers` with the service role (403 if not listed, 503 if the lookup fails). Nothing the client sends — user id, email, profile id, flags — is used for this. |
 | `corrections` RLS | Only reviewers can read the queue (pending or reviewed). Learners can only log new pending turns for their own profile. No client can update or delete a row. |
 | `phrases` / `sentences` / `conversation_examples` | No client (admin or not) can insert, update or delete. Promotion happens only through `talk-review`, using the service role. Learners still read verified rows as before. |
+| `scripts/import-review.mjs` (bulk word review) | Applies a reviewer's CSV only for a `--reviewer-account` listed in `public.reviewers` (checked with the service role); the verdicts are logged in `content_review_events` (0026). See [content-pipeline.md](content-pipeline.md). |
 | `public.reviewers` | Clients can only see whether **their own** user id is listed (`is_reviewer()`, or selecting their own row). Nobody can add, change or remove reviewers from the app. |
 | App (`app/admin/corrections.tsx`) | Checks membership before fetching or showing the queue; shows access denied for non-reviewers. This is a convenience — the rules above are what actually protect the data. The screen is under `/admin`, so in the app a reviewer also needs to be an admin to open it. |
 

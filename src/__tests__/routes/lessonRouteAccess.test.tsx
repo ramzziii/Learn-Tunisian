@@ -1,47 +1,48 @@
-// Deep link / direct navigation to /lesson/[lessonId]: a free profile must
-// get the Premium gate *instead of* a session for a locked lesson, and the
-// normal session for a free one. Real access guard + real route component;
-// only Supabase, the router, and the session engine itself are faked.
-import { render, screen } from '@testing-library/react-native';
+// Deep link / direct navigation to /lesson/[lessonId] and /words/[lessonId]:
+// the lesson is "opened" through the access layer *before* any of its
+// content is fetched. A curriculum lesson counts as a lesson; a phrasebook
+// category's lesson counts as that category. At the limit a free account gets
+// the Premium gate and a guest the create-account prompt — and the lesson's
+// words are never requested. A completed lesson always reopens.
+import { fireEvent, render, screen } from '@testing-library/react-native';
 
-import { createFakeSupabase } from '@/test-utils/fakeSupabase';
+let mockLessonId = 'lesson-2';
+let mockTier: 'guest' | 'free' | 'premium' = 'free';
+const mockOpen = jest.fn(async () => true);
+const mockFetchWordGroups = jest.fn(async () => [{ id: 'g1', variants: [] }]);
+let mockTarget: unknown = { feature: 'lesson', key: 'lesson-2', completed: false };
+const mockFetchTarget = jest.fn(async () => mockTarget);
 
-const mockDb = createFakeSupabase();
-let mockLessonId = 'lesson-1';
-let mockIsPremium = false;
-let mockIsAdmin = false;
-const mockStorage = new Map<string, string>();
-
-jest.mock('@/lib/supabase/client', () => ({ supabase: mockDb.client }));
 jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,
-  default: {
-    getItem: jest.fn(async (key: string) => mockStorage.get(key) ?? null),
-    setItem: jest.fn(async (key: string, value: string) => void mockStorage.set(key, value)),
-  },
+  default: { getItem: jest.fn(async () => null), setItem: jest.fn(async () => undefined) },
 }));
+const mockPush = jest.fn();
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => ({ lessonId: mockLessonId }),
-  router: { push: jest.fn(), back: jest.fn(), replace: jest.fn(), canGoBack: () => true },
+  router: { push: (...a: unknown[]) => mockPush(...a), back: jest.fn(), replace: jest.fn(), canGoBack: () => true },
 }));
-// Stable identity per entitlement, like the real context — a fresh object
-// every render would re-trigger the route's [activeProfile] effect forever.
-const mockProfiles = {
-  free: { id: 'p1', isPremium: false },
-  premium: { id: 'p1', isPremium: true },
-};
-jest.mock('@/lib/account/ActiveProfileContext', () => ({
-  useActiveProfile: () => ({ activeProfile: mockIsPremium ? mockProfiles.premium : mockProfiles.free }),
+jest.mock('@/lib/supabase/client', () => ({ supabase: { from: jest.fn(), rpc: jest.fn() } }));
+const mockProfile = { activeProfile: { id: 'p1' } };
+jest.mock('@/lib/account/ActiveProfileContext', () => ({ useActiveProfile: () => mockProfile }));
+jest.mock('@/lib/access/AccessContext', () => ({
+  useAccess: () => ({ tier: mockTier, isResolved: true, loadError: false, open: mockOpen }),
 }));
-jest.mock('@/lib/admin/AdminContext', () => ({
-  useIsAdmin: () => ({ isAdmin: mockIsAdmin, isLoading: false }),
-}));
+jest.mock('@/data/lessonAccess', () => ({ fetchLessonAccessTarget: (...a: unknown[]) => mockFetchTarget(...(a as [])) }));
+jest.mock('@/data/content', () => ({ fetchWordGroupsForLesson: (...a: unknown[]) => mockFetchWordGroups(...(a as [])) }));
+jest.mock('@/data/profiles', () => ({ fetchDailyGoalSettings: jest.fn(async () => null) }));
+jest.mock('@/data/favorites', () => ({ fetchFavoriteWordGroupIds: jest.fn(async () => new Set()) }));
+jest.mock('@/lib/display/useDisplayPreferences', () => ({ useDisplayPreferences: () => ({ preferences: { script: 'both', form: 'default' } }) }));
 jest.mock('@/lib/offline/audioCache', () => ({ prefetchLessonAudio: jest.fn() }));
 jest.mock('@/components/session/SessionRunner', () => ({
-  SessionRunner: ({ groups }: { groups: unknown[] }) => {
+  SessionRunner: ({ groups, onComplete }: { groups: unknown[]; onComplete?: () => void }) => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { Text: RNText } = require('react-native');
-    return <RNText>{`Session started with ${groups.length} words`}</RNText>;
+    const { Text: RNText, Pressable } = require('react-native');
+    return (
+      <Pressable onPress={() => onComplete?.()}>
+        <RNText>{`Session started with ${groups.length} words`}</RNText>
+      </Pressable>
+    );
   },
 }));
 
@@ -49,92 +50,109 @@ jest.mock('@/components/session/SessionRunner', () => ({
 const LessonSession = require('../../../app/lesson/[lessonId]').default;
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { ThemeProvider } = require('@/lib/theme/ThemeContext');
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { PremiumProvider } = require('@/lib/premium/PremiumContext');
+
+const renderRoute = () => render(<ThemeProvider><LessonSession /></ThemeProvider>);
 
 beforeEach(() => {
-  mockDb.reset();
-  mockStorage.clear();
-  mockIsAdmin = false;
-  mockDb.respond('units.select', {
-    data: [
-      { id: 'u1', sort_order: 1, is_curriculum: true },
-      { id: 'pb-greetings', sort_order: 100, is_curriculum: false },
-    ],
-    error: null,
-  });
-  mockDb.respond('lessons.select', {
-    data: [
-      { id: 'lesson-1', unit_id: 'u1', sort_order: 1, lesson_number: 1 },
-      { id: 'lesson-2', unit_id: 'u1', sort_order: 2, lesson_number: 2 },
-    ],
-    error: null,
-  });
-  mockDb.respond('word_groups.select', { data: [], error: null });
-  mockDb.respond('word_variants.select', { data: [], error: null });
-  mockDb.respond('daily_goal_settings.select', { data: null, error: null });
+  mockPush.mockReset();
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  require('@/lib/guest/nudge').resetGuestNudgeForTests();
+  mockLessonId = 'lesson-2';
+  mockTier = 'free';
+  mockTarget = { feature: 'lesson', key: 'lesson-2', completed: false };
+  mockOpen.mockReset().mockResolvedValue(true);
+  mockFetchWordGroups.mockClear();
+  mockFetchTarget.mockClear();
 });
 
-const renderRoute = () =>
-  render(
-    <ThemeProvider>
-      <PremiumProvider>
-        <LessonSession />
-      </PremiumProvider>
-    </ThemeProvider>
-  );
-
-it('free profile opening a locked lesson by URL sees the Premium gate, and no session starts', async () => {
-  mockLessonId = 'lesson-2';
-  mockIsPremium = false;
-
+it('opens the lesson through the access layer, then starts the session', async () => {
   await renderRoute();
+  expect(await screen.findByText('Session started with 1 words')).toBeOnTheScreen();
+  expect(mockFetchTarget).toHaveBeenCalledWith('p1', 'lesson-2');
+  expect(mockOpen).toHaveBeenCalledWith('lesson', 'lesson-2', { completed: false });
+});
 
-  expect(await screen.findByText('This lesson is part of Premium')).toBeOnTheScreen();
+it('a completed lesson is opened as completed (always reopens)', async () => {
+  mockTarget = { feature: 'lesson', key: 'lesson-2', completed: true };
+  await renderRoute();
+  await screen.findByText(/Session started/);
+  expect(mockOpen).toHaveBeenCalledWith('lesson', 'lesson-2', { completed: true });
+});
+
+it('a phrasebook category lesson counts as that category', async () => {
+  mockTarget = { feature: 'phrasebook_category', key: 'pb-greetings', completed: false };
+  await renderRoute();
+  await screen.findByText(/Session started/);
+  expect(mockOpen).toHaveBeenCalledWith('phrasebook_category', 'pb-greetings', { completed: false });
+});
+
+it('free account at the limit: the Premium gate, and the words are never requested', async () => {
+  mockOpen.mockResolvedValue(false);
+  await renderRoute();
+  expect(await screen.findByText(/used your 5 free lessons/i)).toBeOnTheScreen();
   expect(screen.getByText('See Premium plans')).toBeOnTheScreen();
   expect(screen.queryByText(/Session started/)).toBeNull();
-  // The locked lesson's words were never requested.
-  expect(mockDb.queries.some((q) => q.table === 'word_groups')).toBe(false);
+  expect(mockFetchWordGroups).not.toHaveBeenCalled();
 });
 
-it('free profile opening the free first lesson gets the normal session', async () => {
-  mockLessonId = 'lesson-1';
-  mockIsPremium = false;
-
+it('guest at the limit: the create-account prompt, nothing fetched', async () => {
+  mockTier = 'guest';
+  mockOpen.mockResolvedValue(false);
   await renderRoute();
-
-  expect(await screen.findByText(/Session started/)).toBeOnTheScreen();
-  expect(screen.queryByText('This lesson is part of Premium')).toBeNull();
+  expect(await screen.findByText('Create a free account to keep learning')).toBeOnTheScreen();
+  expect(mockFetchWordGroups).not.toHaveBeenCalled();
 });
 
-it('Premium profile opens any lesson directly', async () => {
-  mockLessonId = 'lesson-2';
-  mockIsPremium = true;
-
+it('an unknown (or not-in-preview) lesson is not available, nothing fetched or counted', async () => {
+  mockTarget = null;
   await renderRoute();
-
-  expect(await screen.findByText(/Session started/)).toBeOnTheScreen();
+  expect(await screen.findByText(/isn.t available/i)).toBeOnTheScreen();
+  expect(mockOpen).not.toHaveBeenCalled();
+  expect(mockFetchWordGroups).not.toHaveBeenCalled();
 });
 
-it('admin (not a paying profile) opens a locked lesson directly — full Premium access by default', async () => {
-  mockLessonId = 'lesson-2';
-  mockIsPremium = false;
-  mockIsAdmin = true;
-
+it('if access can’t be checked, an explicit error — never the lesson', async () => {
+  mockOpen.mockRejectedValue(new Error('offline'));
   await renderRoute();
-
-  expect(await screen.findByText(/Session started/)).toBeOnTheScreen();
-  expect(screen.queryByText('This lesson is part of Premium')).toBeNull();
+  expect(await screen.findByText(/couldn.t check/i)).toBeOnTheScreen();
+  expect(mockFetchWordGroups).not.toHaveBeenCalled();
 });
 
-it('admin previewing the free plan gets the same gate a free learner would', async () => {
-  mockLessonId = 'lesson-2';
-  mockIsPremium = false;
-  mockIsAdmin = true;
-  mockStorage.set('learn-tunisian.admin-premium-preview', 'free');
+describe('the guest nudge after finishing a lesson', () => {
+  it('guest: once per launch, "Create a free account to keep learning" — never blocks', async () => {
+    mockTier = 'guest';
+    await renderRoute();
+    await fireEvent.press(await screen.findByText(/Session started/));
+    expect(mockPush).toHaveBeenCalledWith({ pathname: '/guest/create-account', params: { reason: 'keep-learning' } });
 
-  await renderRoute();
+    mockPush.mockReset();
+    await renderRoute();
+    await fireEvent.press(await screen.findByText(/Session started/));
+    expect(mockPush).not.toHaveBeenCalled();
+  });
 
-  expect(await screen.findByText('This lesson is part of Premium')).toBeOnTheScreen();
-  expect(screen.queryByText(/Session started/)).toBeNull();
+  it('a signed-in learner is never nudged', async () => {
+    await renderRoute();
+    await fireEvent.press(await screen.findByText(/Session started/));
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+});
+
+describe('/words/[lessonId] uses the same check', () => {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const WordList = require('../../../app/words/[lessonId]').default;
+
+  it('at the limit shows the gate and never loads the words', async () => {
+    mockOpen.mockResolvedValue(false);
+    await render(<ThemeProvider><WordList /></ThemeProvider>);
+    expect(await screen.findByText(/used your 5 free lessons/i)).toBeOnTheScreen();
+    expect(mockFetchWordGroups).not.toHaveBeenCalled();
+  });
+
+  it('when open, loads the words', async () => {
+    await render(<ThemeProvider><WordList /></ThemeProvider>);
+    await screen.findAllByText(/./);
+    expect(mockOpen).toHaveBeenCalledWith('lesson', 'lesson-2', { completed: false });
+    expect(mockFetchWordGroups).toHaveBeenCalledWith('lesson-2');
+  });
 });

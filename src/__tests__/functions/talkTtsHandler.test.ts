@@ -14,21 +14,26 @@ const { createTtsHandler } = require('../../../supabase/functions/talk-tts/handl
 const ACCOUNT = 'acc-1';
 const audio = () => new Response(new Uint8Array([1, 2, 3]), { status: 200, headers: { 'Content-Type': 'audio/mpeg' } });
 
-function setup(opts: { env?: Record<string, string>; quota?: unknown; store?: ReturnType<typeof createFakeBudgetStore>; speech?: (init: RequestInit) => Response | Promise<Response> } = {}) {
+function setup(opts: { env?: Record<string, string>; quota?: unknown; store?: ReturnType<typeof createFakeBudgetStore>; speech?: (init: RequestInit) => Response | Promise<Response>; premium?: boolean | 'error' } = {}) {
   const store = opts.store ?? createFakeBudgetStore();
   const provider = fakeProvider({ '/audio/speech': opts.speech ?? audio });
   const consumeQuota = jest.fn(async () => opts.quota ?? { allowed: true });
   const env = { AI_API_KEY: 'test-key', ...opts.env };
+  const hasPremium = jest.fn(async () => {
+    if (opts.premium === 'error') throw new Error('lookup failed');
+    return opts.premium ?? true;
+  });
   const handler = createTtsHandler({
     env: (name: string) => (env as Record<string, string>)[name],
     getUserId: async (token: string) => (token === 'good' ? ACCOUNT : null),
+    hasPremium,
     consumeQuota,
     store,
     fetch: provider.fetch,
     timeoutMs: 50,
     log: jest.fn(),
   });
-  return { handler, store, provider, consumeQuota };
+  return { handler, store, provider, consumeQuota, hasPremium };
 }
 
 const req = (body: unknown, token: string | null = 'good') =>
@@ -167,5 +172,26 @@ describe('the paid call', () => {
     expect(res.status).toBe(500);
     expect((await errorOf(res)).kind).toBe('accounting_failed');
     expect(store.reservations[0].status).toBe('reserved');
+  });
+});
+
+describe('the tutor voice is Premium only — checked on the server before anything is spent', () => {
+  it('a signed-in non-Premium account → 403 premium_required; no quota, reservation or provider call', async () => {
+    const { handler, store, provider, consumeQuota } = setup({ premium: false });
+    const res = await handler(req({ text: 'aslema' }));
+    expect(res.status).toBe(403);
+    expect((await errorOf(res)).kind).toBe('premium_required');
+    expect(consumeQuota).not.toHaveBeenCalled();
+    expect(store.reservations).toHaveLength(0);
+    expect(provider.calls).toHaveLength(0);
+  });
+
+  it('the plan lookup failing fails closed (503); nothing spent', async () => {
+    const { handler, store, provider, consumeQuota } = setup({ premium: 'error' });
+    const res = await handler(req({ text: 'aslema' }));
+    expect(res.status).toBe(503);
+    expect(consumeQuota).not.toHaveBeenCalled();
+    expect(store.reservations).toHaveLength(0);
+    expect(provider.calls).toHaveLength(0);
   });
 });

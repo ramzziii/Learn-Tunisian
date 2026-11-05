@@ -2,7 +2,8 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { openUpgradeFlow, PremiumBadge } from '@/components/premium/Premium';
+import { useLockedItemAction } from '@/components/access/AccessLimit';
+import { PremiumBadge } from '@/components/premium/Premium';
 import { BackButton } from '@/components/ui/BackButton';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { PressableScale } from '@/components/ui/PressableScale';
@@ -11,8 +12,7 @@ import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { Button } from '@/components/ui/Button';
 import { radii, spacing, type ThemeColors } from '@/constants/theme';
 import { fetchPhrasebookCategories, type PhrasebookCategory } from '@/data/content';
-import { canAccessPhrasebookCategory } from '@/data/premiumAccess';
-import { usePremium } from '@/lib/premium/PremiumContext';
+import { useAccess } from '@/lib/access/AccessContext';
 import { useTheme } from '@/lib/theme/ThemeContext';
 
 /** Presentation-only metadata (icon + tile color) per phrasebook category —
@@ -40,7 +40,9 @@ const FALLBACK_META = { emoji: '💬', color: '#3E7CB1' };
 export default function PhrasebookScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const { isPremium } = usePremium();
+  // A category counts once opened; locked only when the allowance is used up.
+  const { decide } = useAccess();
+  const onLockedPress = useLockedItemAction();
   const [categories, setCategories] = useState<PhrasebookCategory[] | null>(null);
   const [loadError, setLoadError] = useState(false);
 
@@ -71,6 +73,15 @@ export default function PhrasebookScreen() {
       <Text style={styles.eyebrow}>Real-life Tunisian</Text>
       <Text style={styles.title}>Phrasebook</Text>
       <Text style={styles.subtitle}>Real lines for real moments — pick a situation and learn what to say.</Text>
+      {/* The browse-and-listen cards for every phrase (a separate flow from the
+          study quiz on Practice → Flashcards). */}
+      <Button
+        themed
+        label="Phrase cards — listen and browse"
+        variant="secondary"
+        onPress={() => router.push('/phrasebook/flashcards')}
+        style={{ marginBottom: spacing.lg }}
+      />
 
       {categories === null ? (
         loadError ? (
@@ -86,14 +97,14 @@ export default function PhrasebookScreen() {
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.list}>
           {categories.map((category, index) => {
             const meta = CATEGORY_META[category.name] ?? FALLBACK_META;
-            const isLocked = !canAccessPhrasebookCategory(isPremium, category.unitId, categories);
+            const isLocked = decide('phrasebook_category', category.unitId) === 'limit';
             return (
               <Reveal key={category.unitId} delay={Math.min(index * 50, 400)}>
                 <PressableScale
                   haptic
                   onPress={() =>
                     isLocked
-                      ? openUpgradeFlow()
+                      ? onLockedPress()
                       : router.push({ pathname: '/phrasebook/[categoryId]', params: { categoryId: category.unitId } })
                   }
                   style={[styles.card, styles.shadowCard]}

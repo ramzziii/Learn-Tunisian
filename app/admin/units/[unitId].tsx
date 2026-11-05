@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { PillSelect } from '@/components/admin/PillSelect';
@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
-import { colors, radii, shadows, spacing } from '@/constants/theme';
+import { radii, shadows, spacing, type ThemeColors } from '@/constants/theme';
 import {
   createLesson,
   deleteUnit,
@@ -18,6 +18,7 @@ import {
 } from '@/data/admin/content';
 import { useAuth } from '@/lib/auth/AuthContext';
 import type { Lesson, Unit } from '@/types/models';
+import { useTheme } from '@/lib/theme/ThemeContext';
 
 const CURRICULUM_OPTIONS = [
   { value: 'true', label: 'Curriculum' },
@@ -25,6 +26,8 @@ const CURRICULUM_OPTIONS = [
 ];
 
 export default function AdminUnitDetail() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { unitId } = useLocalSearchParams<{ unitId: string }>();
   const { session } = useAuth();
   const actorAccountId = session?.user.id ?? '';
@@ -133,21 +136,21 @@ export default function AdminUnitDetail() {
 
   if (loadError) {
     return (
-      <ScreenContainer>
-        <BackButton />
+      <ScreenContainer themed>
+        <BackButton themed />
         <View style={styles.centered}>
           <Text style={styles.centeredTitle}>Couldn&apos;t load this unit</Text>
-          <Button label="Try again" variant="secondary" onPress={load} />
+          <Button themed label="Try again" variant="secondary" onPress={load} />
         </View>
       </ScreenContainer>
     );
   }
 
-  if (unit === null || lessons === null) return <LoadingScreen />;
+  if (unit === null || lessons === null) return <LoadingScreen themed />;
 
   return (
-    <ScreenContainer>
-      <BackButton />
+    <ScreenContainer themed>
+      <BackButton themed />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         <Text style={styles.title}>{unit.name}</Text>
 
@@ -158,7 +161,7 @@ export default function AdminUnitDetail() {
           <Text style={styles.fieldLabel}>Sort order</Text>
           <TextInput value={sortOrder} onChangeText={setSortOrder} style={styles.input} keyboardType="number-pad" />
           <PillSelect label="Type" options={CURRICULUM_OPTIONS} value={isCurriculum} onChange={setIsCurriculum} />
-          <Button label="Save" onPress={handleSave} loading={isSaving} style={{ marginTop: spacing.sm }} />
+          <Button themed label="Save" onPress={handleSave} loading={isSaving} style={{ marginTop: spacing.sm }} />
         </View>
 
         <Text style={styles.sectionTitle}>Lessons</Text>
@@ -198,49 +201,50 @@ export default function AdminUnitDetail() {
               keyboardType="number-pad"
             />
             <View style={styles.actionsRow}>
-              <Button label="Cancel" variant="secondary" onPress={() => setIsAddingLesson(false)} style={{ flex: 1 }} />
-              <Button label="Create" onPress={handleAddLesson} loading={isSavingLesson} style={{ flex: 1 }} />
+              <Button themed label="Cancel" variant="secondary" onPress={() => setIsAddingLesson(false)} style={{ flex: 1 }} />
+              <Button themed label="Create" onPress={handleAddLesson} loading={isSavingLesson} style={{ flex: 1 }} />
             </View>
           </View>
         ) : (
-          <Button label="+ New Lesson" variant="secondary" onPress={() => setIsAddingLesson(true)} />
+          <Button themed label="+ New Lesson" variant="secondary" onPress={() => setIsAddingLesson(true)} />
         )}
 
-        <Button label="Delete Unit" variant="ghost" onPress={handleDelete} style={styles.deleteButton} />
+        <Button themed label="Delete Unit" variant="ghost" onPress={handleDelete} style={styles.deleteButton} />
       </ScrollView>
     </ScreenContainer>
   );
 }
 
-const styles = StyleSheet.create({
-  scroll: { gap: spacing.sm, paddingBottom: spacing.xl },
-  title: { fontSize: 22, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md, marginBottom: spacing.sm },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md },
-  card: { backgroundColor: colors.surface, borderRadius: radii.lg, padding: spacing.md, gap: 4 },
-  errorText: { fontSize: 13, color: colors.error, marginBottom: spacing.xs },
-  fieldLabel: { fontSize: 11, fontWeight: '700', color: colors.textSecondary, marginTop: spacing.sm, textTransform: 'uppercase' },
-  input: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.sm,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 6,
-    fontSize: 15,
-    color: colors.textPrimary,
-    backgroundColor: colors.background,
-  },
-  actionsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: radii.md,
-    padding: spacing.md,
-  },
-  rowTitle: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
-  rowMeta: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
-  chevron: { fontSize: 18, color: colors.textSecondary },
-  deleteButton: { marginTop: spacing.lg },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
-  centeredTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    scroll: { gap: spacing.sm, paddingBottom: spacing.xl },
+    title: { fontSize: 22, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md, marginBottom: spacing.sm },
+    sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md },
+    card: { backgroundColor: colors.surface, borderRadius: radii.lg, padding: spacing.md, gap: 4 },
+    errorText: { fontSize: 13, color: colors.error, marginBottom: spacing.xs },
+    fieldLabel: { fontSize: 11, fontWeight: '700', color: colors.textSecondary, marginTop: spacing.sm, textTransform: 'uppercase' },
+    input: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: radii.sm,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 6,
+      fontSize: 15,
+      color: colors.textPrimary,
+      backgroundColor: colors.background,
+    },
+    actionsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderRadius: radii.md,
+      padding: spacing.md,
+    },
+    rowTitle: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
+    rowMeta: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+    chevron: { fontSize: 18, color: colors.textSecondary },
+    deleteButton: { marginTop: spacing.lg },
+    centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
+    centeredTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
+  });

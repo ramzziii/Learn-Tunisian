@@ -3,15 +3,15 @@ import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { openUpgradeFlow, PremiumBadge } from '@/components/premium/Premium';
+import { useLockedItemAction } from '@/components/access/AccessLimit';
+import { PremiumBadge } from '@/components/premium/Premium';
+import { useAccess } from '@/lib/access/AccessContext';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { radii, shadows, spacing, type ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/lib/theme/ThemeContext';
 import { buildAlphabetSet, splitAtLetter } from '@/lib/alphabet';
-import { usePremium } from '@/lib/premium/PremiumContext';
-import { canAccessLetter, FREE_ALPHABET_LETTER_IDS } from '@/lib/premium/access';
 import { useFadeInOnChange } from '@/hooks/useFadeInOnChange';
 import { useLetterSpeech } from '@/hooks/useLetterSpeech';
 
@@ -24,9 +24,16 @@ export default function AlphabetFlashcardsScreen() {
   const { speak, isSpeaking } = useLetterSpeech();
   const fadeAnim = useFadeInOnChange(String(index));
 
-  const { isPremium } = usePremium();
+  // A card shows once its letter is open; tapping an unopened one opens it
+  // (counted) while the allowance lasts, then → upgrade / create-account.
+  const { decide, open } = useAccess();
+  const onLockedPress = useLockedItemAction();
   const letter = letters[index];
-  const isLocked = !canAccessLetter(isPremium, letter.id);
+  const decision = decide('alphabet_letter', letter.id);
+  const isLocked = decision !== 'open';
+  const openLetter = async () => {
+    if (!(await open('alphabet_letter', letter.id).catch(() => false))) onLockedPress();
+  };
   const example = letter.examples[0];
   const highlighted = splitAtLetter(example.arabic, letter);
 
@@ -65,16 +72,16 @@ export default function AlphabetFlashcardsScreen() {
       </Text>
 
       {isLocked ? (
-        // Past the free letters: the card stays visible and in order (so the
-        // deck's size is honest), but shows no audio/examples — just what's
-        // locked and how to unlock it.
-        <PressableScale haptic onPress={openUpgradeFlow} style={[styles.card, shadows.raised]}>
-          <PremiumBadge />
+        // Not opened yet: the card stays visible and in order (so the deck's
+        // size is honest), but shows no audio/examples until it's opened.
+        <PressableScale haptic onPress={openLetter} style={[styles.card, shadows.raised]}>
+          {decision === 'limit' ? <PremiumBadge /> : null}
           <Text style={[styles.bigLetter, styles.lockedText]}>{letter.label}</Text>
           <Text style={[styles.name, styles.lockedText]}>{letter.name}</Text>
           <Text style={styles.lockedHint}>
-            The free plan includes the first {FREE_ALPHABET_LETTER_IDS.length} letters. Tap to unlock all{' '}
-            {letters.length} with Premium.
+            {decision === 'claim'
+              ? 'Tap to open this letter — it counts as one of your letters.'
+              : `You’ve opened all the letters your plan includes. Tap to see how to open all ${letters.length}.`}
           </Text>
         </PressableScale>
       ) : (

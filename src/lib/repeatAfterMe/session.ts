@@ -9,13 +9,14 @@
  *   it later"), recorded as needs_review, and continue once acknowledged.
  * - After the items, each missed item gets exactly one more attempt in a
  *   review pass; then the session is done.
- * - Free plan: at most RAM_FREE_ITEMS_PER_SESSION distinct items. Before a
- *   sixth would start, the session stops at 'upgrade-gate'; continuing from
- *   there still runs the review pass for items already practiced.
+ * - Allowance: each recording counts as one item when first started (guest 2,
+ *   free 5 in total, Premium all — src/lib/access/accessRules.ts). Which
+ *   items fit is decided where they load (src/data/repeatAfterMe.ts); when
+ *   more exist, the session stops at 'upgrade-gate' after them — continuing
+ *   from there still runs the review pass for items already practiced.
  */
 
 export const RAM_MAX_ATTEMPTS = 3;
-export const RAM_FREE_ITEMS_PER_SESSION = 5;
 
 export type RamResult = 'correct' | 'needs_review';
 
@@ -35,8 +36,9 @@ export type RamPhase = 'practice' | 'upgrade-gate' | 'review' | 'done';
 
 export interface RamSessionState<T extends { id: string }> {
   items: T[];
-  isPremium: boolean;
-  /** Items beyond what this session may practice (free plan only). */
+  /** Premium: no allowance, never a limit screen. */
+  unlimited: boolean;
+  /** Items beyond what this session may practice (past the allowance). */
   lockedCount: number;
   phase: RamPhase;
   /** Position in `items` (practice) or `missedIds` (review). */
@@ -49,15 +51,13 @@ export interface RamSessionState<T extends { id: string }> {
 
 export function startSession<T extends { id: string }>(
   items: readonly T[],
-  options: { isPremium: boolean; lockedCount: number }
+  options: { unlimited: boolean; lockedCount: number }
 ): RamSessionState<T> {
-  // Enforced here too, not only where items are loaded.
-  const allowed = options.isPremium ? [...items] : items.slice(0, RAM_FREE_ITEMS_PER_SESSION);
   return {
-    items: allowed,
-    isPremium: options.isPremium,
-    lockedCount: options.isPremium ? 0 : options.lockedCount + (items.length - allowed.length),
-    phase: allowed.length > 0 ? 'practice' : 'done',
+    items: [...items],
+    unlimited: options.unlimited,
+    lockedCount: options.unlimited ? 0 : options.lockedCount,
+    phase: items.length > 0 ? 'practice' : 'done',
     index: 0,
     attemptsOnCurrent: 0,
     notice: null,
@@ -77,7 +77,7 @@ export function currentItem<T extends { id: string }>(state: RamSessionState<T>)
 
 function afterPractice<T extends { id: string }>(state: RamSessionState<T>): RamSessionState<T> {
   const base = { ...state, index: 0, attemptsOnCurrent: 0, notice: null };
-  if (!state.isPremium && state.lockedCount > 0) return { ...base, phase: 'upgrade-gate' };
+  if (!state.unlimited && state.lockedCount > 0) return { ...base, phase: 'upgrade-gate' };
   return { ...base, phase: state.missedIds.length > 0 ? 'review' : 'done' };
 }
 

@@ -14,12 +14,16 @@ const mockPlayer = { replace: jest.fn(), seekTo: jest.fn(async () => undefined),
 
 class MockLimitError extends Error {}
 
+// Signed-in account (the guest guard and Talk lock read the access tier).
+jest.mock('@/lib/access/AccessContext', () => ({ useAccess: () => ({ tier: 'free', isResolved: true }) }));
 jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,
   default: { getItem: jest.fn(async () => null), setItem: jest.fn(async () => undefined) },
 }));
+let mockParams: { text?: string } = {};
 jest.mock('expo-router', () => ({
   router: { push: (...a: unknown[]) => mockPush(...a), back: jest.fn(), replace: jest.fn(), canGoBack: () => true },
+  useLocalSearchParams: () => mockParams,
 }));
 jest.mock('expo-audio', () => ({
   useAudioPlayer: () => mockPlayer,
@@ -121,6 +125,33 @@ describe('allowance', () => {
     mockAllowance.mockResolvedValue({ isPremium: true, used: 4, remaining: null });
     await renderScreen();
     expect(await screen.findByText(/Premium: unlimited requests/)).toBeOnTheScreen();
+  });
+});
+
+describe('prefilled from Dictionary / Search ("Ask for this word")', () => {
+  afterEach(() => {
+    mockParams = {};
+  });
+
+  it('starts with the searched text (trimmed), and never sends it by itself', async () => {
+    mockParams = { text: '  kosksi bel 7out  ' };
+    await renderScreen();
+    expect((await screen.findByPlaceholderText(/English phrase or sentence/)).props.value).toBe('kosksi bel 7out');
+    expect(mockSubmit).not.toHaveBeenCalled();
+  });
+
+  it('cuts an over-long prefill to the request limit', async () => {
+    mockParams = { text: 'a'.repeat(900) };
+    await renderScreen();
+    expect((await screen.findByPlaceholderText(/English phrase or sentence/)).props.value).toHaveLength(500);
+  });
+
+  it('the free limit and its message are unchanged', async () => {
+    mockParams = { text: 'kosksi' };
+    mockAllowance.mockResolvedValue({ isPremium: false, used: 1, remaining: 0 });
+    await renderScreen();
+    expect(await screen.findByText(/used your free request/i)).toBeOnTheScreen();
+    expect(mockSubmit).not.toHaveBeenCalled();
   });
 });
 

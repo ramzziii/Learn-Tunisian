@@ -1,15 +1,23 @@
 import { mapFavorite, mapWordGroup, mapWordVariant } from '@/data/mappers';
+import { isGuestSessionActive } from '@/lib/guest/guestSession';
 import { supabase } from '@/lib/supabase/client';
 import type { FavoriteRow, WordGroupRow, WordVariantRow } from '@/types/database';
 import type { Favorite, WordGroupWithVariants } from '@/types/models';
 
+// Guest-preview helpers, loaded only in guest mode (they use device storage).
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const guestLearning = async (): Promise<typeof import('@/data/guest/guestLearning')> => require('@/data/guest/guestLearning');
+
 export async function fetchFavoriteWordGroupIds(profileId: string): Promise<Set<string>> {
+  if (isGuestSessionActive()) return (await guestLearning()).guestFavoriteIds();
   const { data, error } = await supabase.from('favorites').select('word_group_id').eq('profile_id', profileId);
   if (error) throw error;
   return new Set((data ?? []).map((row) => row.word_group_id as string));
 }
 
 export async function addFavorite(profileId: string, wordGroupId: string): Promise<Favorite> {
+  // Guest preview: favorites stay on this device.
+  if (isGuestSessionActive()) return (await guestLearning()).guestSetFavorite(wordGroupId, true);
   const { data, error } = await supabase
     .from('favorites')
     .insert({ profile_id: profileId, word_group_id: wordGroupId })
@@ -20,6 +28,10 @@ export async function addFavorite(profileId: string, wordGroupId: string): Promi
 }
 
 export async function removeFavorite(profileId: string, wordGroupId: string): Promise<void> {
+  if (isGuestSessionActive()) {
+    await (await guestLearning()).guestSetFavorite(wordGroupId, false);
+    return;
+  }
   const { error } = await supabase
     .from('favorites')
     .delete()
@@ -29,6 +41,7 @@ export async function removeFavorite(profileId: string, wordGroupId: string): Pr
 }
 
 export async function fetchFavoriteWordGroups(profileId: string): Promise<WordGroupWithVariants[]> {
+  if (isGuestSessionActive()) return (await guestLearning()).guestFavoriteWords();
   const { data: favoriteRows, error: favoritesError } = await supabase
     .from('favorites')
     .select('word_group_id')

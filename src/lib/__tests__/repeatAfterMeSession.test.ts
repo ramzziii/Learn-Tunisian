@@ -1,6 +1,7 @@
 // Repeat After Me session rules (pure): three total attempts per item, early
-// success, missed items revisited once in an end review pass, and the free
-// plan's five-distinct-items-per-session limit.
+// success, missed items revisited once in an end review pass, and the limit
+// screen when more recordings exist than the learner's allowance (which items
+// fit is decided where they load — src/data/repeatAfterMe.ts).
 import {
   advanceAfterNotice,
   assessAttempt,
@@ -8,7 +9,6 @@ import {
   continueAfterUpgradeGate,
   currentItem,
   orderItemsForSession,
-  RAM_FREE_ITEMS_PER_SESSION,
   RAM_MAX_ATTEMPTS,
   startSession,
 } from '@/lib/repeatAfterMe/session';
@@ -16,22 +16,21 @@ import {
 const items = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `item-${i + 1}` }));
 
 describe('limits', () => {
-  it('three total attempts per item; five distinct items per free session', () => {
+  it('three total attempts per item', () => {
     expect(RAM_MAX_ATTEMPTS).toBe(3);
-    expect(RAM_FREE_ITEMS_PER_SESSION).toBe(5);
   });
 });
 
 describe('attempts on one item', () => {
   it('marking an attempt correct moves straight on (early success)', () => {
-    let s = startSession(items(2), { isPremium: true, lockedCount: 0 });
+    let s = startSession(items(2), { unlimited: true, lockedCount: 0 });
     s = assessAttempt(s, true);
     expect(currentItem(s)?.id).toBe('item-2');
     expect(s.results['item-1']).toEqual({ attempts: 1, result: 'correct' });
   });
 
   it('a "not yet" keeps the same item and counts the attempt', () => {
-    let s = startSession(items(2), { isPremium: true, lockedCount: 0 });
+    let s = startSession(items(2), { unlimited: true, lockedCount: 0 });
     s = assessAttempt(s, false);
     expect(currentItem(s)?.id).toBe('item-1');
     expect(s.attemptsOnCurrent).toBe(1);
@@ -39,7 +38,7 @@ describe('attempts on one item', () => {
   });
 
   it('correct on the third attempt still counts as correct', () => {
-    let s = startSession(items(1), { isPremium: true, lockedCount: 0 });
+    let s = startSession(items(1), { unlimited: true, lockedCount: 0 });
     s = assessAttempt(s, false);
     s = assessAttempt(s, false);
     s = assessAttempt(s, true);
@@ -48,7 +47,7 @@ describe('attempts on one item', () => {
   });
 
   it('three "not yet": tells them it will be revisited, records it missed, then continues', () => {
-    let s = startSession(items(2), { isPremium: true, lockedCount: 0 });
+    let s = startSession(items(2), { unlimited: true, lockedCount: 0 });
     for (let i = 0; i < RAM_MAX_ATTEMPTS; i++) s = assessAttempt(s, false);
 
     expect(s.notice).toBe('missed');
@@ -66,7 +65,7 @@ describe('attempts on one item', () => {
 
 describe('end review pass', () => {
   function missFirstOfThree() {
-    let s = startSession(items(3), { isPremium: true, lockedCount: 0 });
+    let s = startSession(items(3), { unlimited: true, lockedCount: 0 });
     for (let i = 0; i < RAM_MAX_ATTEMPTS; i++) s = assessAttempt(s, false);
     s = advanceAfterNotice(s);
     s = assessAttempt(s, true); // item-2
@@ -95,29 +94,29 @@ describe('end review pass', () => {
   });
 
   it('no missed items → finishes without a review pass', () => {
-    let s = startSession(items(2), { isPremium: true, lockedCount: 0 });
+    let s = startSession(items(2), { unlimited: true, lockedCount: 0 });
     s = assessAttempt(s, true);
     s = assessAttempt(s, true);
     expect(s.phase).toBe('done');
   });
 });
 
-describe('free plan: five distinct items per session', () => {
-  it('a free session never holds more than five items, whatever it is given', () => {
-    const s = startSession(items(8), { isPremium: false, lockedCount: 0 });
-    expect(s.items.map((i) => i.id)).toEqual(['item-1', 'item-2', 'item-3', 'item-4', 'item-5']);
-    expect(s.lockedCount).toBe(3);
+describe('the allowance limit screen', () => {
+  it('holds exactly the items it is given (the loader decides what fits)', () => {
+    const s = startSession(items(3), { unlimited: false, lockedCount: 4 });
+    expect(s.items.map((i) => i.id)).toEqual(['item-1', 'item-2', 'item-3']);
+    expect(s.lockedCount).toBe(4);
   });
 
   it('shows the upgrade gate before a sixth item would start', () => {
-    let s = startSession(items(5), { isPremium: false, lockedCount: 4 });
+    let s = startSession(items(5), { unlimited: false, lockedCount: 4 });
     for (let i = 0; i < 5; i++) s = assessAttempt(s, true);
     expect(s.phase).toBe('upgrade-gate');
     expect(currentItem(s)).toBeNull();
   });
 
   it('the limit does not block reviewing items already practiced this session', () => {
-    let s = startSession(items(5), { isPremium: false, lockedCount: 4 });
+    let s = startSession(items(5), { unlimited: false, lockedCount: 4 });
     for (let i = 0; i < RAM_MAX_ATTEMPTS; i++) s = assessAttempt(s, false);
     s = advanceAfterNotice(s);
     for (let i = 0; i < 4; i++) s = assessAttempt(s, true);
@@ -131,13 +130,13 @@ describe('free plan: five distinct items per session', () => {
   });
 
   it('no gate when everything available fit in the session', () => {
-    let s = startSession(items(3), { isPremium: false, lockedCount: 0 });
+    let s = startSession(items(3), { unlimited: false, lockedCount: 0 });
     for (let i = 0; i < 3; i++) s = assessAttempt(s, true);
     expect(s.phase).toBe('done');
   });
 
   it('Premium gets every item, no gate', () => {
-    let s = startSession(items(8), { isPremium: true, lockedCount: 0 });
+    let s = startSession(items(8), { unlimited: true, lockedCount: 0 });
     expect(s.items).toHaveLength(8);
     for (let i = 0; i < 8; i++) s = assessAttempt(s, true);
     expect(s.phase).toBe('done');
@@ -156,14 +155,14 @@ describe('orderItemsForSession', () => {
 
 describe('finishItem (the shared practice flow reports a finished item)', () => {
   it('said right → correct with its attempt count, next item', () => {
-    let s = startSession(items(2), { isPremium: true, lockedCount: 0 });
+    let s = startSession(items(2), { unlimited: true, lockedCount: 0 });
     s = finishItem(s, { correct: true, attempts: 2 });
     expect(s.results['item-1']).toEqual({ attempts: 2, result: 'correct' });
     expect(currentItem(s)?.id).toBe('item-2');
   });
 
   it('moved on (or out of tries) → needs review, queued for the end review pass, next item', () => {
-    let s = startSession(items(2), { isPremium: true, lockedCount: 0 });
+    let s = startSession(items(2), { unlimited: true, lockedCount: 0 });
     s = finishItem(s, { correct: false, attempts: 1 });
     expect(s.results['item-1']).toEqual({ attempts: 1, result: 'needs_review' });
     expect(s.missedIds).toEqual(['item-1']);
@@ -172,7 +171,7 @@ describe('finishItem (the shared practice flow reports a finished item)', () => 
   });
 
   it('the review pass adds its attempt and finishes', () => {
-    let s = startSession(items(1), { isPremium: true, lockedCount: 0 });
+    let s = startSession(items(1), { unlimited: true, lockedCount: 0 });
     s = finishItem(s, { correct: false, attempts: 3 });
     expect(s.phase).toBe('review');
     s = finishItem(s, { correct: true, attempts: 1 });
@@ -181,7 +180,7 @@ describe('finishItem (the shared practice flow reports a finished item)', () => 
   });
 
   it('free: still stops at the upgrade gate after five, then reviews what was missed', () => {
-    let s = startSession(items(5), { isPremium: false, lockedCount: 2 });
+    let s = startSession(items(5), { unlimited: false, lockedCount: 2 });
     s = finishItem(s, { correct: false, attempts: 3 });
     for (let i = 0; i < 4; i++) s = finishItem(s, { correct: true, attempts: 1 });
     expect(s.phase).toBe('upgrade-gate');

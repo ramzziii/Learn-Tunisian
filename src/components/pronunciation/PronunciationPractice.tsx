@@ -48,8 +48,6 @@ interface PronunciationPracticeProps {
   /** Accepted spellings for the automatic check (any variant matches). */
   matchGroup: Pick<WordGroupWithVariants, 'variants'> & { id?: string };
   maxAttempts: number;
-  /** Device voice when the native recording is missing. False for Repeat After Me. */
-  allowFallbackVoice?: boolean;
   /** Hide the big native play button (the host already shows one). */
   showNativeButton?: boolean;
   /** Replaces "we'll revisit this one later" (e.g. in an end-of-session revisit). */
@@ -78,7 +76,6 @@ export function PronunciationPractice({
   nativeVariant,
   matchGroup,
   maxAttempts,
-  allowFallbackVoice = true,
   showNativeButton = true,
   outOfTriesMessage,
   onFinish,
@@ -86,7 +83,11 @@ export function PronunciationPractice({
 }: PronunciationPracticeProps) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const native = useWordAudioPlayer(nativeVariant, { autoPlay: true, fallbackVoice: allowFallbackVoice });
+  // Only a native recording is ever the model to copy — never the computer
+  // voice (placeholder audio) or the phone's voice. Without one, the learner
+  // reads the word and says it; the check works the same.
+  const hasNativeRecording = !!(nativeVariant.isNativeVoice && nativeVariant.audioPath);
+  const native = useWordAudioPlayer(hasNativeRecording ? nativeVariant : null, { autoPlay: true, nativeOnly: true });
 
   const [permission, setPermission] = useState<PermissionStage>('checking');
   const [stage, setStage] = useState<Stage>('idle');
@@ -265,16 +266,16 @@ export function PronunciationPractice({
     </View>
   );
 
-  const compareButtons = pair(
-    recordedUri ? (
-      <Button
-        themed
-        label={ownPlayerStatus.playing ? '⏸ Playing…' : '▶ Your voice'}
-        variant="secondary"
-        onPress={playMine}
-        style={styles.compactButton}
-      />
-    ) : null,
+  const yourVoiceButton = recordedUri ? (
+    <Button
+      themed
+      label={ownPlayerStatus.playing ? '⏸ Playing…' : '▶ Your voice'}
+      variant="secondary"
+      onPress={playMine}
+      style={styles.compactButton}
+    />
+  ) : null;
+  const nativeButton = hasNativeRecording ? (
     <Button
       themed
       label={native.isPlaying ? '⏸ Playing…' : '▶ Native'}
@@ -282,7 +283,13 @@ export function PronunciationPractice({
       onPress={playNative}
       style={styles.compactButton}
     />
-  );
+  ) : null;
+  // Without a native recording there's nothing to compare with — just their own take.
+  const compareButtons = nativeButton
+    ? pair(yourVoiceButton, nativeButton)
+    : yourVoiceButton
+      ? pair(null, yourVoiceButton)
+      : null;
 
   const assessButtons = pair(
     <Button themed label="Not yet" variant="secondary" onPress={() => judge(false)} style={styles.compactButton} />,
@@ -404,7 +411,10 @@ export function PronunciationPractice({
 
   return (
     <View style={styles.container}>
-      {showNativeButton ? (
+      {showNativeButton && !hasNativeRecording ? (
+        <Text style={styles.noNative}>No native recording yet — read it and say it.</Text>
+      ) : null}
+      {showNativeButton && hasNativeRecording ? (
         <AudioPlayButton
           onPress={native.play}
           hasAudio={native.hasAudio}
@@ -423,6 +433,7 @@ export function PronunciationPractice({
 const makeStyles = (colors: ThemeColors) =>
   StyleSheet.create({
     container: { alignItems: 'center', gap: spacing.sm, alignSelf: 'stretch' },
+    noNative: { fontSize: 14, color: colors.textSecondary, textAlign: 'center' },
     attemptLabel: {
       fontSize: 12,
       fontWeight: '700',

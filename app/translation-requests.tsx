@@ -1,7 +1,8 @@
 import { useAudioPlayer } from 'expo-audio';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { RequireAccount } from '@/components/guest/RequireAccount';
 
 import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
@@ -19,7 +20,12 @@ import {
   type TranslationRequest,
 } from '@/data/translationRequests';
 import { computeResponseDeadline, describeDeadline, formatTunisDay } from '@/lib/translationRequests/deadline';
-import { createClientRequestId, MAX_REQUEST_LENGTH, validateRequestText } from '@/lib/translationRequests/validation';
+import {
+  createClientRequestId,
+  MAX_REQUEST_LENGTH,
+  prefillRequestText,
+  validateRequestText,
+} from '@/lib/translationRequests/validation';
 import { useTheme } from '@/lib/theme/ThemeContext';
 import { TunisianText } from '@/components/tunisian/TunisianText';
 
@@ -30,7 +36,7 @@ import { TunisianText } from '@/components/tunisian/TunisianText';
  * limit (one request) and ownership are enforced by the database
  * (0015_translation_requests.sql); this screen just reflects them.
  */
-export default function TranslationRequestsScreen() {
+function TranslationRequestsScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
@@ -38,7 +44,9 @@ export default function TranslationRequestsScreen() {
   const [allowance, setAllowance] = useState<TranslationAllowance | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const [text, setText] = useState('');
+  // Optional starting text (Dictionary's "Ask for this word"); only sent when the learner presses Send.
+  const { text: prefill } = useLocalSearchParams<{ text?: string }>();
+  const [text, setText] = useState(() => prefillRequestText(prefill));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [sentMessage, setSentMessage] = useState<string | null>(null);
@@ -323,3 +331,12 @@ const makeStyles = (c: ThemeColors) =>
     confirm: { gap: spacing.xs },
     confirmText: { fontSize: 14, fontWeight: '700', color: c.textPrimary },
   });
+
+/** Account only: a guest gets the create-account explanation (src/components/guest/RequireAccount.tsx). */
+export default function TranslationRequestsRoute() {
+  return (
+    <RequireAccount>
+      <TranslationRequestsScreen />
+    </RequireAccount>
+  );
+}

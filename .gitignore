@@ -45,6 +45,13 @@ yarn-error.*
 # upload to Supabase Storage, don't commit
 /generated-audio
 
+# native recordings (scripts/upload-audio.mjs uploads them to Storage) and
+# the content pipeline's working files — never committed
+/recordings/
+*.mp3
+*.m4a
+/content-work/
+
 # Supabase CLI local state (project link, etc.)
 supabase/.temp/
 

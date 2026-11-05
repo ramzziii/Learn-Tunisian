@@ -43,3 +43,8 @@ Upgrade notes from the 57→58 jump:
   (Expo Go provides it; standalone builds may crash without it) — installed.
 - Web export output is unchanged (single-page `index.html`); no `web.output`
   config was needed.
+
+Access rules (Guest preview / Free / Premium, Talk enforcement) are product
+rules, not Expo ones — see CLAUDE.md and docs/access-and-guest-preview.md.
+New screens that show counted content must open it through `useAccess()`
+first; tests that render such screens mock `@/lib/access/AccessContext`.

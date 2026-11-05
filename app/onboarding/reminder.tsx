@@ -9,6 +9,7 @@ import { colors, spacing } from '@/constants/theme';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
 import { ProfileAlreadyExistsError } from '@/lib/account/profileLimit';
 import { useAuth } from '@/lib/auth/AuthContext';
+import { getGuestData, hasGuestData } from '@/lib/guest/guestStore';
 import { requestNotificationPermission } from '@/lib/notifications/reminders';
 import { useOnboarding } from '@/lib/onboarding/OnboardingContext';
 
@@ -41,7 +42,9 @@ export default function ReminderSetup() {
       await refreshProfiles();
       await setActiveProfileId(profile.id);
       reset();
-      router.replace('/home');
+      // Preview data on this device? Offer to bring it over (carry-over step).
+      const hasPreviewData = hasGuestData(await getGuestData());
+      router.replace(hasPreviewData ? '/guest/carry-over' : '/home');
     } catch (e) {
       setHasExistingProfile(e instanceof ProfileAlreadyExistsError);
       setError(

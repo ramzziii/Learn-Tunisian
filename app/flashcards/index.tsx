@@ -9,16 +9,24 @@ import { PressableScale } from '@/components/ui/PressableScale';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { radii, spacing, type ThemeColors } from '@/constants/theme';
 import { fetchFlashcardDecks } from '@/data/flashcards';
+import { usePracticeScope } from '@/lib/access/usePracticeScope';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
 import type { FlashcardDeck } from '@/lib/flashcards';
 import { useTheme } from '@/lib/theme/ThemeContext';
 
-const DECK_EMOJI: Record<FlashcardDeck['kind'], string> = { due: '🔄', favorites: '⭐', category: '🗂️' };
+const DECK_EMOJI: Record<FlashcardDeck['kind'], string> = { favorites: '⭐', category: '🗂️' };
+
+/** Related flows, kept separate: the phrasebook's browse-and-listen cards and
+ * the full saved-words list (Profile no longer links to it). */
+const MORE_LINKS: { emoji: string; title: string; description: string; href: '/phrasebook/flashcards' | '/favorites' }[] = [
+  { emoji: '🎧', title: 'Phrase cards — listen and browse', description: 'Every phrasebook phrase, no quiz', href: '/phrasebook/flashcards' },
+  { emoji: '⭐', title: 'Saved words', description: 'Everything you’ve starred', href: '/favorites' },
+];
 
 /**
- * Flashcard decks built from what the learner has already met: Due today,
- * My favorites and one deck per practised category (see buildFlashcardDecks).
- * Refetched on focus so counts are fresh after a session.
+ * Flashcard decks built from what the learner has already met: My favorites
+ * and one deck per practised category (see buildFlashcardDecks). Due words
+ * are Review's job. Refetched on focus so counts are fresh after a session.
  */
 export default function FlashcardDecksScreen() {
   const { colors } = useTheme();
@@ -26,22 +34,24 @@ export default function FlashcardDecksScreen() {
   const { activeProfile } = useActiveProfile();
   const [decks, setDecks] = useState<FlashcardDeck[] | null>(null);
   const [loadError, setLoadError] = useState(false);
+  // Practice isn't counted: decks only hold words from open lessons / categories.
+  const { scope, error: scopeError } = usePracticeScope();
 
   const load = useCallback(() => {
-    if (!activeProfile) return () => {};
+    if (!activeProfile || !scope) return () => {};
     let cancelled = false;
     setLoadError(false);
-    fetchFlashcardDecks(activeProfile.id)
+    fetchFlashcardDecks(activeProfile.id, scope)
       .then((result) => !cancelled && setDecks(result))
       .catch(() => !cancelled && setLoadError(true));
     return () => {
       cancelled = true;
     };
-  }, [activeProfile]);
+  }, [activeProfile, scope]);
 
   useFocusEffect(load);
 
-  if (loadError) {
+  if (loadError || scopeError) {
     return (
       <ScreenContainer themed>
         <BackButton themed />
@@ -62,7 +72,7 @@ export default function FlashcardDecksScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.list}>
         <BackButton themed />
         <Text style={styles.title}>Flashcards</Text>
-        <Text style={styles.subtitle}>Decks from words you&apos;ve already met. Rate each card and we&apos;ll bring it back at the right time.</Text>
+        <Text style={styles.subtitle}>Quiz yourself on words you&apos;ve already met. Each answer helps decide when a word comes back.</Text>
 
         {decks.map((deck) => (
           <PressableScale
@@ -89,13 +99,26 @@ export default function FlashcardDecksScreen() {
           </Text>
         ) : null}
 
-        <Button
-          themed
-          label="Browse all phrasebook phrases"
-          variant="ghost"
-          onPress={() => router.push('/phrasebook/flashcards')}
-          style={{ marginTop: spacing.md }}
-        />
+        <Text style={styles.sectionHeading} accessibilityRole="header">
+          More ways to study
+        </Text>
+        {MORE_LINKS.map((link) => (
+          <PressableScale
+            haptic
+            key={link.href}
+            accessibilityRole="button"
+            accessibilityLabel={`${link.title}. ${link.description}`}
+            onPress={() => router.push(link.href)}
+            style={styles.deck}
+          >
+            <Text style={styles.deckEmoji}>{link.emoji}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.deckTitle}>{link.title}</Text>
+              <Text style={styles.deckMeta}>{link.description}</Text>
+            </View>
+            <Text style={styles.chevron}>›</Text>
+          </PressableScale>
+        ))}
       </ScrollView>
     </ScreenContainer>
   );
@@ -120,6 +143,7 @@ const makeStyles = (colors: ThemeColors) =>
     deckTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
     deckMeta: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
     chevron: { fontSize: 22, color: colors.textSecondary },
+    sectionHeading: { fontSize: 18, fontWeight: '800', color: colors.textPrimary, marginTop: spacing.lg },
     hint: { fontSize: 14, color: colors.textSecondary, lineHeight: 20, marginTop: spacing.sm },
     center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: spacing.md, padding: spacing.lg },
     emptyTitle: { fontSize: 20, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },

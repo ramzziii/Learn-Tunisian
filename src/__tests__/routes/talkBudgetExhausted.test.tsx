@@ -8,6 +8,9 @@ const mockRetry = jest.fn();
 const mockReplace = jest.fn();
 let mockError: { kind: string; message: string } | null = null;
 
+// Signed-in account (the guest guard and Talk lock read the access tier).
+let mockMessages: unknown[] = [];
+jest.mock('@/lib/access/AccessContext', () => ({ useAccess: () => ({ tier: 'premium', isResolved: true }) }));
 jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,
   default: { getItem: jest.fn(async () => null), setItem: jest.fn(async () => undefined) },
@@ -26,7 +29,7 @@ jest.mock('@/lib/ai/functionsClient', () => ({ transcribeAudio: jest.fn() }));
 jest.mock('@/hooks/useConversation', () => ({
   useConversation: () => ({
     status: 'error',
-    messages: [],
+    messages: mockMessages,
     vocabulary: [],
     error: mockError,
     sendMessage: jest.fn(),
@@ -55,6 +58,15 @@ const renderScreen = () =>
 beforeEach(() => {
   mockRetry.mockReset();
   mockReplace.mockReset();
+  mockMessages = [];
+});
+
+it('the tutor’s voice is labelled as a computer voice, not a Tunisian speaker', async () => {
+  mockMessages = [
+    { id: 't1', role: 'tutor', response: { tunisian: 'أهلا', transliteration: 'ahla', english: 'Hi', correction: null, suggestedReplies: [] } },
+  ];
+  await renderScreen();
+  expect(await screen.findByText('Computer voice — not a Tunisian speaker')).toBeOnTheScreen();
 });
 
 it('budget_exhausted: friendly message, a way back, and no "Try again"', async () => {

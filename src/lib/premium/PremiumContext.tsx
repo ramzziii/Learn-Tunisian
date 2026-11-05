@@ -5,6 +5,7 @@ import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
 import { useIsAdmin } from '@/lib/admin/AdminContext';
 import { ADMIN_PREVIEW_STORAGE_KEY } from '@/lib/localStorageKeys';
 import { resolveEffectivePremium, type AdminPremiumPreview } from '@/lib/premium/access';
+import { AdminPreviewStateContext, type AdminPreviewState } from '@/lib/premium/adminPreviewState';
 
 interface PremiumContextValue {
   /** The entitlement every Premium gate should use — never read
@@ -61,7 +62,13 @@ export function PremiumProvider({ children }: { children: ReactNode }) {
     [activeProfile?.isPremium, isAdmin, isAdminLoading, adminPreview, isPreviewLoaded, setAdminPreview]
   );
 
-  return <PremiumContext.Provider value={value}>{children}</PremiumContext.Provider>;
+  const previewState = useMemo<AdminPreviewState>(() => ({ isAdmin, adminPreview }), [isAdmin, adminPreview]);
+
+  return (
+    <PremiumContext.Provider value={value}>
+      <AdminPreviewStateContext.Provider value={previewState}>{children}</AdminPreviewStateContext.Provider>
+    </PremiumContext.Provider>
+  );
 }
 
 export function usePremium(): PremiumContextValue {
@@ -69,3 +76,4 @@ export function usePremium(): PremiumContextValue {
   if (!ctx) throw new Error('usePremium must be used within a PremiumProvider');
   return ctx;
 }
+

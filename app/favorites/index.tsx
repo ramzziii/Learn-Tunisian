@@ -10,6 +10,8 @@ import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { radii, shadows, spacing, type ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/lib/theme/ThemeContext';
 import { fetchFavoriteWordGroups } from '@/data/favorites';
+import { filterToPracticeScope } from '@/lib/access/practiceScope';
+import { usePracticeScope } from '@/lib/access/usePracticeScope';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
 import { getPromptVariant } from '@/lib/wordVariants';
 import { useDisplayPreferences } from '@/lib/display/useDisplayPreferences';
@@ -22,11 +24,14 @@ export default function Favorites() {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { activeProfile } = useActiveProfile();
   const [groups, setGroups] = useState<WordGroupWithVariants[] | null>(null);
+  // Only words the learner can open are listed (a saved word from a lesson
+  // that isn't open stays saved, just not shown).
+  const { scope } = usePracticeScope();
 
   useEffect(() => {
-    if (!activeProfile) return;
-    fetchFavoriteWordGroups(activeProfile.id).then(setGroups);
-  }, [activeProfile]);
+    if (!activeProfile || !scope) return;
+    fetchFavoriteWordGroups(activeProfile.id).then((all) => setGroups(filterToPracticeScope(scope, all)));
+  }, [activeProfile, scope]);
 
   if (!groups) return <LoadingScreen themed />;
 

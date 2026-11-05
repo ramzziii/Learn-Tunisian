@@ -26,6 +26,7 @@ function setup(
     embeddings?: Route;
     chat?: Route;
     matches?: string[];
+    premium?: boolean | 'error';
   } = {}
 ) {
   const store = opts.store ?? createFakeBudgetStore();
@@ -36,10 +37,15 @@ function setup(
   const consumeQuota = jest.fn(async () => opts.quota ?? { allowed: true });
   const ownsProfile = jest.fn(async (_token: string, profileId: string) => profileId === PROFILE);
   const logCorrection = jest.fn(async () => {});
+  const hasPremium = jest.fn(async () => {
+    if (opts.premium === 'error') throw new Error('lookup failed');
+    return opts.premium ?? true;
+  });
   const env = { AI_API_KEY: 'test-key', ...opts.env };
   const handler = createChatHandler({
     env: (name: string) => (env as Record<string, string>)[name],
     getUserId: async (token: string) => (token === 'good' ? ACCOUNT : null),
+    hasPremium,
     ownsProfile,
     consumeQuota,
     matchVerifiedContent: async () => opts.matches ?? ['aslema — hello'],
@@ -49,7 +55,7 @@ function setup(
     timeoutMs: 50,
     log: jest.fn(),
   });
-  return { handler, store, provider, consumeQuota, ownsProfile, logCorrection };
+  return { handler, store, provider, consumeQuota, ownsProfile, logCorrection, hasPremium };
 }
 
 const turn = (extra: Record<string, unknown> = {}, token: string | null = 'good') =>
@@ -257,5 +263,41 @@ describe('failed and ambiguous provider calls', () => {
     expect(res.status).toBe(500);
     expect((await errorOf(res)).kind).toBe('accounting_failed');
     expect(provider.callsTo('/chat/completions')).toHaveLength(0);
+  });
+});
+
+describe('Talk is Premium only — checked on the server before anything is spent', () => {
+  it('a signed-in non-Premium account → 403 premium_required; no quota, reservation or provider call', async () => {
+    const { handler, store, provider, consumeQuota, hasPremium } = setup({ premium: false });
+    const res = await handler(turn());
+    expect(res.status).toBe(403);
+    expect((await errorOf(res)).kind).toBe('premium_required');
+    expect(hasPremium).toHaveBeenCalledWith(ACCOUNT);
+    expect(consumeQuota).not.toHaveBeenCalled();
+    expect(store.reservations).toHaveLength(0);
+    expect(provider.calls).toHaveLength(0);
+  });
+
+  it('the plan lookup failing fails closed (503); nothing spent', async () => {
+    const { handler, store, provider, consumeQuota } = setup({ premium: 'error' });
+    const res = await handler(turn());
+    expect(res.status).toBe(503);
+    expect(consumeQuota).not.toHaveBeenCalled();
+    expect(store.reservations).toHaveLength(0);
+    expect(provider.calls).toHaveLength(0);
+  });
+
+  it('the plan is checked only for a verified caller (no lookup for an unauthenticated request)', async () => {
+    const { handler, hasPremium } = setup();
+    await handler(turn({}, null));
+    expect(hasPremium).not.toHaveBeenCalled();
+  });
+
+  it('Premium proceeds through the usual quota → budget → provider path', async () => {
+    const { handler, consumeQuota, provider } = setup({ premium: true });
+    const res = await handler(turn());
+    expect(res.status).toBe(200);
+    expect(consumeQuota).toHaveBeenCalled();
+    expect(provider.calls.length).toBeGreaterThan(0);
   });
 });

@@ -7,8 +7,29 @@ import { createFakeSupabase } from '@/test-utils/fakeSupabase';
 const mockDb = createFakeSupabase();
 jest.mock('@/lib/supabase/client', () => ({ supabase: mockDb.client }));
 
+let mockGuest = false;
+jest.mock('@/lib/guest/guestSession', () => ({ isGuestSessionActive: () => mockGuest }));
+const mockGuestWords = jest.fn();
+const mockGuestFavoriteIds = jest.fn();
+const mockGuestProgressFor = jest.fn();
+jest.mock('@/data/guest/guestLearning', () => ({
+  guestPractisedWords: (...a: unknown[]) => mockGuestWords(...a),
+  guestFavoriteWords: jest.fn(async () => []),
+  guestFavoriteIds: (...a: unknown[]) => mockGuestFavoriteIds(...a),
+  guestProgressFor: (...a: unknown[]) => mockGuestProgressFor(...a),
+}));
+const mockGuestUnits = jest.fn();
+const mockGuestWordGroups = jest.fn();
+jest.mock('@/data/guest/guestContent', () => ({
+  fetchGuestUnits: (...a: unknown[]) => mockGuestUnits(...a),
+  fetchGuestWordGroups: (...a: unknown[]) => mockGuestWordGroups(...a),
+}));
+
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { fetchFlashcardDecks, fetchFlashcards } = require('@/data/flashcards');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { buildPracticeScope } = require('@/lib/access/practiceScope');
+const ALL = buildPracticeScope({ all: true, openLessons: [], openUnitIds: [] });
 
 const groupRow = (id: string, unitId: string, status = 'approved') => ({
   id,
@@ -50,7 +71,10 @@ const query = (table: string) => mockDb.queries.find((q) => q.table === table &&
 const hasApprovedFilter = (table: string) =>
   query(table)!.calls.some((c) => c[0] === 'eq' && c[1] === 'content_status' && c[2] === 'approved');
 
-beforeEach(() => mockDb.reset());
+beforeEach(() => {
+  mockDb.reset();
+  mockGuest = false;
+});
 
 describe('fetchFlashcardDecks', () => {
   beforeEach(() => {
@@ -75,21 +99,56 @@ describe('fetchFlashcardDecks', () => {
   });
 
   it('reads this profile’s progress and favorites, and only approved words', async () => {
-    await fetchFlashcardDecks('p1');
+    await fetchFlashcardDecks('p1', ALL);
     expect(query('progress')!.calls).toContainEqual(['eq', 'profile_id', 'p1']);
     expect(query('favorites')!.calls).toContainEqual(['eq', 'profile_id', 'p1']);
     expect(hasApprovedFilter('word_groups')).toBe(true);
   });
 
   it('a word that isn’t approved is in no deck, even if the query returns it', async () => {
-    const decks = await fetchFlashcardDecks('p1');
+    const decks = await fetchFlashcardDecks('p1', ALL);
     expect(decks.flatMap((d: { cardIds: string[] }) => d.cardIds)).not.toContain('draft');
     expect(decks.find((d: { id: string }) => d.id === 'category-greet')).toMatchObject({ cardIds: ['hello'] });
   });
 
   it('writes nothing', async () => {
-    await fetchFlashcardDecks('p1');
+    await fetchFlashcardDecks('p1', ALL);
     expect(mockDb.writes()).toEqual([]);
+  });
+
+  it('only words from open lessons / categories reach a deck (practice scope)', async () => {
+    mockDb.respond('word_groups.select', {
+      data: [
+        { id: 'hello', unit_id: 'greet', lesson_number: 1, sort_order: 1, content_status: 'approved' },
+        { id: 'bye', unit_id: 'greet', lesson_number: 2, sort_order: 2, content_status: 'approved' },
+      ],
+      error: null,
+    });
+    mockDb.respond('progress.select', {
+      data: [
+        { word_group_id: 'hello', next_review_at: new Date().toISOString(), consecutive_incorrect: 0, correct_count: 1 },
+        { word_group_id: 'bye', next_review_at: new Date().toISOString(), consecutive_incorrect: 0, correct_count: 1 },
+      ],
+      error: null,
+    });
+    const scope = buildPracticeScope({ all: false, openLessons: [{ unitId: 'greet', lessonNumber: 1 }], openUnitIds: [] });
+    const decks = await fetchFlashcardDecks('p1', scope);
+    const ids = decks.flatMap((d: { cardIds: string[] }) => d.cardIds);
+    expect(ids).toContain('hello');
+    expect(ids).not.toContain('bye');
+  });
+
+  it('guest: decks from the preview words practised on this device — no server reads of progress or favorites', async () => {
+    mockGuest = true;
+    mockGuestWords.mockResolvedValue([
+      { id: 'g1', unitId: 'gu', lessonNumber: 1, sortOrder: 1, contentStatus: 'approved', variants: [] },
+    ]);
+    mockGuestFavoriteIds.mockResolvedValue(new Set(['g1']));
+    mockGuestProgressFor.mockResolvedValue({ wordGroupId: 'g1', nextReviewAt: new Date().toISOString(), consecutiveIncorrect: 0, correctCount: 1 });
+    mockGuestUnits.mockResolvedValue([{ id: 'gu', name: 'Greetings', sortOrder: 1 }]);
+    const decks = await fetchFlashcardDecks('guest', ALL);
+    expect(decks.flatMap((d: { cardIds: string[] }) => d.cardIds)).toContain('g1');
+    expect(mockDb.queries).toEqual([]);
   });
 });
 

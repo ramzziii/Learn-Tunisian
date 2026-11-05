@@ -155,3 +155,20 @@ it('no Skip where skipping makes no sense (already-skipped list)', async () => {
   await renderStation({ onSkip: undefined });
   expect(screen.queryByText('Skip')).toBeNull();
 });
+
+it('"Edit word" opens the word; hidden while a take is unsaved, so it is never lost', async () => {
+  const onEdit = jest.fn();
+  await renderStation({ onEdit });
+  await fireEvent.press(screen.getByText('✏️ Edit word'));
+  expect(onEdit).toHaveBeenCalledTimes(1);
+
+  await recordOnce();
+  expect(screen.queryByText('✏️ Edit word')).toBeNull();
+  await fireEvent.press(screen.getByText('Record again'));
+  expect(screen.getByText('✏️ Edit word')).toBeOnTheScreen();
+});
+
+it('no "Edit word" where the screen offers none', async () => {
+  await renderStation();
+  expect(screen.queryByText('✏️ Edit word')).toBeNull();
+});

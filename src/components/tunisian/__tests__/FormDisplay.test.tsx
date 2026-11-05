@@ -3,7 +3,7 @@
 // toggle that doesn't change the saved preference; each form plays ITS OWN
 // recording, and a form without one says so instead of playing the other
 // form's audio or a device voice. One-form words show just that form.
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
 import { makeGroup, makeVariant } from '@/test-utils/wordGroupFixtures';
 
@@ -102,4 +102,23 @@ it('a one-form word: just that form, no form label, no toggle', async () => {
 it('never words the forms as the learner’s identity', async () => {
   await renderWith('both');
   expect(screen.queryByText(/boy|girl|your gender|you are a/i)).toBeNull();
+});
+
+describe('computer voice (placeholder audio) vs native recordings', () => {
+  it('a computer-voice form is labelled as not Tunisian, and revealing it never autoplays', async () => {
+    await renderWith('feminine');
+    await fireEvent.press(screen.getByRole('button', { name: 'Show the other form' }));
+    await waitFor(() => expect(mockPlayer.replace).toHaveBeenCalledWith({ uri: 'file:///tired/m.m4a' }));
+    expect(screen.getAllByText('Computer voice — not a Tunisian speaker').length).toBeGreaterThan(0);
+    expect(mockPlayer.play).not.toHaveBeenCalled();
+  });
+
+  it('a native form has no label, and revealing it autoplays', async () => {
+    const nativeM = { ...masculine, isNativeVoice: true };
+    const nativeF = { ...feminine, isNativeVoice: true };
+    await renderWith('feminine', makeGroup('tired', { variants: [nativeM, nativeF] }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Show the other form' }));
+    await waitFor(() => expect(mockPlayer.play).toHaveBeenCalled());
+    expect(screen.queryByText('Computer voice — not a Tunisian speaker')).toBeNull();
+  });
 });

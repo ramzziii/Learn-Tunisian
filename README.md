@@ -1,15 +1,35 @@
 # Learn Tunisian
 
+> **New here?** [docs/APP_GUIDE.md](docs/APP_GUIDE.md) describes everything the app does, how navigation is structured, the data model, current status and known gaps.
+
 A Duolingo-style app for learning Tunisian Arabic, for adults (18+). Each
 account has one learner profile; every learner gets the same exercise set
-(reading match, typing/spelling, speaking practice) and Talk to a Tunisian.
+(reading match, typing/spelling, speaking practice). Talk to a Tunisian is
+Premium.
+
+## Guest preview, Free and Premium
+
+Signed-out adults can **try a free lesson** without an account (guest mode,
+device only, after a yes/no "Are you 18 or older?"). A free account opens 5
+items per feature (lessons, phrasebook categories, grammar notes, proverbs,
+letters, Repeat After Me recordings; guest use included). Premium opens
+everything, including Talk. An item counts when first opened and stays open.
+Practice (Review, Flashcards, Listening, Speaking, Favorites) isn't counted
+but only uses words from lessons and categories the learner has open. Talk
+is refused by the server for non-Premium accounts (403 `premium_required`).
+The rules live in `src/lib/access/accessRules.ts`; the full table, guest
+flow, carry-over at sign-up, database migrations (0024, 0025) and the v1
+limits are in [docs/access-and-guest-preview.md](docs/access-and-guest-preview.md).
 
 ## Onboarding (adults only)
 
-1. Welcome (`app/welcome.tsx`).
+1. Welcome (`app/welcome.tsx`): "Try a free lesson" (guest preview) or
+   "Create account / Sign in".
 2. Date-of-birth age gate (`app/onboarding/age.tsx`), before any account
    exists. Under 18 shows a friendly "adults only" message; nothing is
-   created, and the under-18 date is never stored, logged or sent. An adult
+   created, and the under-18 date is never stored, logged or sent. The
+   device then blocks retrying for 24 hours (`src/lib/age/retryBlock.ts`;
+   only a yes/no flag and its expiry are stored). An adult
    date stays in memory (`OnboardingContext`) until profile setup. The check
    is self-declared — `isAdult` in `src/lib/age.ts` (exactly 18 passes).
 3. Create account (`app/auth/sign-up.tsx` — redirects to the age gate if no
@@ -28,6 +48,10 @@ account has one learner profile; every learner gets the same exercise set
 7. Optional daily reminder: "Set reminder" asks for notification permission
    only then; "Not now" finishes signup with the reminder saved as off.
    Profile can turn it on, off or change the time later.
+8. If this device holds guest-preview data: carry-over
+   (`app/guest/carry-over.tsx`). The used items are always recorded on the
+   account; practice results and saved words move only with the learner's
+   yes.
 
 **One profile per account** (an account is one Supabase Auth user, so one
 login email). Enforced in the database by
@@ -194,24 +218,36 @@ system for review.
 Practice → Flashcards (`app/flashcards/`) studies decks built from what the
 learner has already met — no second review system:
 
-- **Decks** (`buildFlashcardDecks` in `src/lib/flashcards.ts`): Due today
-  (due or struggling — the same rule as Review), My favorites, and one deck per
-  category with words that have a `progress` row. Nothing from a lesson not
-  reached yet. Due cards come first in every deck.
+- **Decks** (`buildFlashcardDecks` in `src/lib/flashcards.ts`): My favorites
+  and one deck per category with words that have a `progress` row. Nothing
+  from a lesson not reached yet. Due cards (due or struggling — the same rule
+  as Review) come first in every deck; there's no separate "due" deck, since
+  Review does that. The deck list also links to the Phrasebook browse cards
+  and to Saved words (`/favorites`).
 - **Approved content only**: `src/data/flashcards.ts` filters
   `content_status = 'approved'` on words and forms (RLS doesn't), and drops
   anything else returned.
-- **Ratings** go through `recordWordGroupResult`, once per card shown:
-  Missed it → wrong, **Almost → wrong**, Got it → right (the scheduler only
-  takes right/wrong).
+- **Quiz**: each card is a multiple-choice question — "What does this
+  mean?" (Tunisian → meaning) or "Which is the Tunisian?" (meaning →
+  Tunisian), switchable per deck. Up to 4 choices (at least 3); wrong answers
+  come from other words the learner has met, never another form of the right
+  word and never a look-alike (same meaning or same Tunisian text). Any form
+  of the right word counts. A card without enough fair choices is skipped.
+- **Audio**: the word's own recording plays by itself as the card appears
+  (Tunisian → meaning), or after answering (meaning → Tunisian, where playing
+  first would give it away). No recording → silent, never a device voice.
+- **Results**: the app checks the answer and shows the standard result sheet
+  (`AnswerFeedback`: "Great job!" / "Not quite" with the right answer, Next
+  with a countdown), and records one result per card through
+  `recordWordGroupResult` — right → correct, wrong → incorrect.
 - **Sessions**: batches of 15 on the standard timer and completion card
   (Another batch, Add more time, Back to home); minutes are logged as a
   `'review'` session, so they count toward the daily goal.
-- **Free plan**: Due today shares Review's daily free allowance; category and
-  favorites decks are open.
+- **Access**: decks aren't counted; they only hold words from lessons and
+  categories the learner has open (all approved words with Premium).
 - **Offline**: decks need a connection to load (content isn't cached). Audio
-  already played plays offline. There's no offline queue for ratings — a
-  rating that can't be saved is reported on screen.
+  already played plays offline. There's no offline queue for results — a
+  result that can't be saved is reported on screen.
 
 The phrasebook browse deck (`app/phrasebook/flashcards.tsx`) is unchanged and
 linked from the deck list.
@@ -225,6 +261,22 @@ contextually (only the first time this exercise type is reached, with an
 explanation screen first) and a denial is handled gracefully — the learner
 can still hear the word and continue the session.
 
+## Dictionary / Search
+
+The search bar on Learn opens `app/search.tsx`: English, Arabic script or
+Latin letters with chat digits, over an in-memory index of only the words the
+learner can open (nothing typed is sent or logged). One result per word;
+sounds that differ are never merged (7 ≠ h, 3 ≠ a, 9 ≠ k …). See
+[docs/access-and-guest-preview.md](docs/access-and-guest-preview.md#dictionary--search).
+
+## Content pipeline (bulk words, review, recordings)
+
+`scripts/import-content.mjs` (spreadsheet → draft words), `export-for-review`
+/ `import-review` (native reviewer's CSV round trip), `export-recording-list`
+and `upload-audio` (native recordings), plus Content progress on the admin
+dashboard. Dry run by default. See [docs/content-pipeline.md](docs/content-pipeline.md)
+and [docs/content-plan.md](docs/content-plan.md).
+
 ## Favorites & word detail
 
 Tap "See words" on any unit, or a favorited word from Settings, to reach a
@@ -235,10 +287,15 @@ native review," which is accurate).
 
 ## Talk to a Tunisian (AI conversation, voice-first)
 
-The learner's level (beginner/intermediate/advanced) is derived automatically
-from their existing progress (`src/lib/talkLevel.ts` — words mastered and
-lessons completed, no separate manual rating) and gates which scenarios are
-unlocked in the picker (`app/talk/index.tsx`); the conversation itself
+**Premium only.** Everyone sees the 5 scenarios (`app/(tabs)/talk.tsx`);
+Premium opens all of them, a free account gets the upgrade flow, a guest
+the create-account explanation. The session route checks again, and the
+server refuses chat (`talk-to-a-tunisian`) and tutor voice (`talk-tts`) for
+non-Premium accounts with 403 `premium_required` before any quota, budget or
+provider call (`requirePremium` in `supabase/functions/_shared/aiBudget.ts`).
+`talk-stt` stays available to free accounts for pronunciation checks. The
+learner's level (beginner/intermediate/advanced) is still derived from their
+progress (`src/lib/talkLevel.ts`) for the conversation; the conversation itself
 (`app/talk/[scenarioId].tsx`) is grounded in the app's own
 `word_groups`/`word_variants` — there's no second vocabulary source for the AI.
 
@@ -459,5 +516,6 @@ real audio recording/playback or the two new binary Edge Functions
 - **Speaking practice** is record-and-playback for
   self-comparison — no automated pronunciation scoring in v1, by design (see
   the product brief's rationale on this).
-- **`is_premium`** exists on `profiles` now but is unused — monetization is
-  out of scope for v1.
+- **`is_premium`** on `profiles` drives Premium (see
+  [docs/access-and-guest-preview.md](docs/access-and-guest-preview.md)), but
+  nothing in the app can buy it yet — payments are out of scope for v1.

@@ -21,11 +21,19 @@ interface ReadingMatchProps {
   onComplete: (wasCorrect: boolean) => void;
 }
 
-/** listen to a word, tap the matching written Arabic script. */
+/**
+ * Listen to a word, tap the matching written Arabic script. Only a native
+ * recording is ever played here (never the computer voice); a word without
+ * one is asked from its meaning instead.
+ */
 export function ReadingMatch({ exercise, onComplete }: ReadingMatchProps) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const { play, hasAudio, isResolving, hasError, retry } = useWordAudioPlayer(exercise.promptVariant, { autoPlay: true });
+  const hasNativeRecording = !!(exercise.promptVariant.isNativeVoice && exercise.promptVariant.audioPath);
+  const { play, hasAudio, isResolving, hasError, retry } = useWordAudioPlayer(hasNativeRecording ? exercise.promptVariant : null, {
+    autoPlay: true,
+    nativeOnly: true,
+  });
   const { playCorrect, playIncorrect } = useAnswerFeedback();
   const { shake, shakeStyle } = useShake();
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
@@ -46,15 +54,23 @@ export function ReadingMatch({ exercise, onComplete }: ReadingMatchProps) {
 
   return (
     <View style={styles.container}>
-      <AudioPlayButton
-        onPress={play}
-        hasAudio={hasAudio}
-        isResolving={isResolving}
-        hasError={hasError}
-        onRetry={retry}
-        style={{ marginTop: spacing.lg }}
-      />
-      <Text style={styles.instructions}>Tap the word you hear</Text>
+      {hasNativeRecording ? (
+        <>
+          <AudioPlayButton
+            onPress={play}
+            hasAudio={hasAudio}
+            isResolving={isResolving}
+            hasError={hasError}
+            onRetry={retry}
+            style={{ marginTop: spacing.lg }}
+          />
+          <Text style={styles.instructions}>Tap the word you hear</Text>
+        </>
+      ) : (
+        <Text style={[styles.instructions, { marginTop: spacing.lg }]}>
+          Tap the Tunisian for “{exercise.targetGroup.englishMeaning}”
+        </Text>
+      )}
       <ScriptExemptionNote exempt="arabic" />
       <VariantCallout group={exercise.targetGroup} />
 

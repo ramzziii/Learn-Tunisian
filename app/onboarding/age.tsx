@@ -7,6 +7,7 @@ import { OnboardingStepLayout } from '@/components/onboarding/OnboardingStepLayo
 import { Button } from '@/components/ui/Button';
 import { colors, radii, spacing } from '@/constants/theme';
 import { isAdult } from '@/lib/age';
+import { blockAgeRetry, isAgeRetryBlocked } from '@/lib/age/retryBlock';
 import { useAuth } from '@/lib/auth/AuthContext';
 import { useOnboarding } from '@/lib/onboarding/OnboardingContext';
 
@@ -31,12 +32,19 @@ export default function AgeGate() {
   const { update, reset } = useOnboarding();
   const [dateOfBirth, setDateOfBirth] = useState<string | null>(null);
   const [isUnderage, setIsUnderage] = useState(false);
+  // While the device's retry block is on (after an under-18 answer), the
+  // gate shows the adults-only message instead of the date fields.
+  const [isChecking, setIsChecking] = useState(true);
   const isSignedIn = !!session;
 
   useEffect(() => {
     // A fresh start before any account exists. Not when resuming signed in,
     // which must keep the consent already given.
     if (!isSignedIn) reset();
+    isAgeRetryBlocked()
+      .then((blocked) => blocked && setIsUnderage(true))
+      .catch(() => undefined)
+      .finally(() => setIsChecking(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -46,6 +54,8 @@ export default function AgeGate() {
       setDateOfBirth(null);
       update({ dateOfBirth: null });
       setIsUnderage(true);
+      // Only a yes/no flag and when it ends are stored — never the date.
+      blockAgeRetry().catch(() => undefined);
       return;
     }
     update({ dateOfBirth });
@@ -53,11 +63,13 @@ export default function AgeGate() {
     else router.push('/auth/sign-up');
   };
 
+  if (isChecking) return null;
+
   if (isUnderage) {
     return (
       <OnboardingStepLayout
         title="Thanks for your interest!"
-        subtitle="Learn Tunisian is only for adults (18 and over), so we can't set up an account for you. We haven't saved the date you entered."
+        subtitle="Learn Tunisian is only for adults (18 and over), so we can't set up an account for you. We haven't saved the date you entered. Please come back later."
         step={1}
         totalSteps={6}
         footer={

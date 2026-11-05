@@ -1,14 +1,15 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocalSearchParams } from 'expo-router';
 import { ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
 import { AudioRecorderField } from '@/components/admin/AudioRecorderField';
+import { PhraseWordsEditor } from '@/components/admin/PhraseWordsEditor';
 import { PillSelect } from '@/components/admin/PillSelect';
 import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
-import { colors, radii, shadows, spacing } from '@/constants/theme';
+import { radii, shadows, spacing, type ThemeColors } from '@/constants/theme';
 import {
   createWordVariant,
   deleteWordVariant,
@@ -20,11 +21,12 @@ import { setRepeatAfterMeInclusion } from '@/data/repeatAfterMe';
 import { hasApprovedPrimaryOrGenderPair } from '@/lib/admin/wordGroupValidation';
 import { useAuth } from '@/lib/auth/AuthContext';
 import type { ContentStatus, VariantLabel, WordGroupWithVariants, WordVariant } from '@/types/models';
+import { useTheme } from '@/lib/theme/ThemeContext';
 
 const CONTENT_STATUS_OPTIONS: { value: ContentStatus; label: string }[] = [
   { value: 'draft', label: 'Draft' },
-  { value: 'pending_review', label: 'Pending review' },
-  { value: 'approved', label: 'Approved' },
+  { value: 'pending_review', label: 'Waiting for review' },
+  { value: 'approved', label: 'Live' },
   { value: 'rejected', label: 'Rejected' },
   { value: 'archived', label: 'Archived' },
 ];
@@ -37,6 +39,8 @@ const VARIANT_LABEL_OPTIONS: { value: VariantLabel; label: string }[] = [
 ];
 
 export default function AdminWordGroupDetail() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { wordGroupId } = useLocalSearchParams<{ wordGroupId: string }>();
   const { session } = useAuth();
   const actorAccountId = session?.user.id ?? '';
@@ -117,21 +121,21 @@ export default function AdminWordGroupDetail() {
 
   if (loadError) {
     return (
-      <ScreenContainer>
-        <BackButton />
+      <ScreenContainer themed>
+        <BackButton themed />
         <View style={styles.centered}>
           <Text style={styles.centeredTitle}>Couldn&apos;t load this word group</Text>
-          <Button label="Try again" variant="secondary" onPress={load} />
+          <Button themed label="Try again" variant="secondary" onPress={load} />
         </View>
       </ScreenContainer>
     );
   }
 
-  if (group === null) return <LoadingScreen />;
+  if (group === null) return <LoadingScreen themed />;
 
   return (
-    <ScreenContainer>
-      <BackButton />
+    <ScreenContainer themed>
+      <BackButton themed />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         <Text style={styles.title}>{group.englishMeaning}</Text>
 
@@ -149,10 +153,10 @@ export default function AdminWordGroupDetail() {
             value={contentStatus}
             onChange={(v) => setContentStatus(v as ContentStatus)}
           />
-          <Button label="Save" onPress={handleSaveGroup} loading={isSavingGroup} style={{ marginTop: spacing.sm }} />
+          <Button themed label="Save" onPress={handleSaveGroup} loading={isSavingGroup} style={{ marginTop: spacing.sm }} />
         </View>
 
-        <Text style={styles.sectionTitle}>Variants ({group.variants.length})</Text>
+        <Text style={styles.sectionTitle}>Forms ({group.variants.length})</Text>
         {!group.variants.some((v) => v.variantLabel === 'primary') ? (
           <Text style={styles.noPrimaryWarning}>
             ⚠️ No variant here is labeled &quot;Primary&quot; — the Phrasebook always reads the Primary variant
@@ -176,6 +180,9 @@ export default function AdminWordGroupDetail() {
           onCreated={handleVariantCreated}
           onSaved={handleVariantSaved}
         />
+
+        <Text style={styles.sectionTitle}>Words used</Text>
+        <PhraseWordsEditor phrase={group} />
       </ScrollView>
     </ScreenContainer>
   );
@@ -192,6 +199,8 @@ function VariantRow({
   onSaved: (variant: WordVariant) => void;
   onDeleted: (variantId: string) => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [variantLabel, setVariantLabel] = useState<VariantLabel>(variant.variantLabel);
   const [wordArabic, setWordArabic] = useState(variant.wordArabic);
   const [transliteration, setTransliteration] = useState(variant.transliteration);
@@ -255,14 +264,14 @@ function VariantRow({
         </View>
       ) : (
         <Text style={styles.notShownHint}>
-          Not shown in the Phrasebook — only the &quot;Primary&quot; variant is. (Used by lesson exercises if
+          Not shown in the Phrasebook — only the &quot;Primary&quot; form is. (Used by lesson exercises if
           paired with a matching Masculine/Feminine, or as an alternate pronunciation.)
         </Text>
       )}
       <View style={styles.variantHeaderRow}>
         <PillSelect label="Label" options={VARIANT_LABEL_OPTIONS} value={variantLabel} onChange={(v) => setVariantLabel(v as VariantLabel)} />
         <View style={styles.verifiedBox}>
-          <Text style={styles.fieldLabel}>Native verified</Text>
+          <Text style={styles.fieldLabel}>Text checked by a native speaker</Text>
           <Switch value={nativeVerified} onValueChange={setNativeVerified} trackColor={{ true: colors.success }} />
         </View>
       </View>
@@ -319,7 +328,7 @@ function VariantRow({
           <TextInput value={speakerName} onChangeText={setSpeakerName} style={styles.input} />
         </View>
         <View style={styles.verifiedBox}>
-          <Text style={styles.fieldLabel}>Native voice</Text>
+          <Text style={styles.fieldLabel}>Native recording</Text>
           <Switch value={isNativeVoice} onValueChange={setIsNativeVoice} trackColor={{ true: colors.success }} />
         </View>
       </View>
@@ -327,8 +336,8 @@ function VariantRow({
       <TextInput value={dialectNotes} onChangeText={setDialectNotes} style={styles.input} />
 
       <View style={styles.actionsRow}>
-        <Button label="Delete" variant="ghost" onPress={handleDelete} loading={isDeleting} style={{ flex: 1 }} />
-        <Button label="Save" onPress={handleSave} loading={isSaving} style={{ flex: 1 }} />
+        <Button themed label="Delete" variant="ghost" onPress={handleDelete} loading={isDeleting} style={{ flex: 1 }} />
+        <Button themed label="Save" onPress={handleSave} loading={isSaving} style={{ flex: 1 }} />
       </View>
     </View>
   );
@@ -360,6 +369,8 @@ function NewVariantForm({
   onCreated: (variant: WordVariant) => void;
   onSaved: (variant: WordVariant) => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [variantLabel, setVariantLabel] = useState<VariantLabel>('primary');
   const [wordArabic, setWordArabic] = useState('');
   const [transliteration, setTransliteration] = useState('');
@@ -424,7 +435,7 @@ function NewVariantForm({
       <TextInput value={notes} onChangeText={setNotes} style={styles.input} />
       <Text style={styles.fieldLabel}>Sort order</Text>
       <TextInput value={sortOrder} onChangeText={setSortOrder} style={styles.input} keyboardType="number-pad" />
-      <Button label="+ Add Variant" variant="secondary" onPress={handleCreate} loading={isSaving} style={{ marginTop: spacing.sm }} />
+      <Button themed label="+ Add Variant" variant="secondary" onPress={handleCreate} loading={isSaving} style={{ marginTop: spacing.sm }} />
 
       {createdVariant ? (
         <View style={styles.addRecordingBox}>
@@ -446,7 +457,7 @@ function NewVariantForm({
               repeatAfterMe={repeatAfterMeOptions(createdVariant, actorAccountId, handleCreatedSaved)}
             />
           ) : (
-            <Button label="Add recording" onPress={() => setIsRecordingCreated(true)} />
+            <Button themed label="Add recording" onPress={() => setIsRecordingCreated(true)} />
           )}
         </View>
       ) : null}
@@ -454,47 +465,48 @@ function NewVariantForm({
   );
 }
 
-const styles = StyleSheet.create({
-  scroll: { gap: spacing.sm, paddingBottom: spacing.xl },
-  title: { fontSize: 22, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md, marginBottom: spacing.sm },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md },
-  card: { backgroundColor: colors.surface, borderRadius: radii.lg, padding: spacing.md, gap: 4 },
-  errorText: { fontSize: 13, color: colors.error, marginBottom: spacing.xs },
-  helperText: { fontSize: 12, color: colors.textSecondary },
-  fieldLabel: { fontSize: 11, fontWeight: '700', color: colors.textSecondary, marginTop: spacing.sm, textTransform: 'uppercase' },
-  input: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.sm,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 6,
-    fontSize: 15,
-    color: colors.textPrimary,
-    backgroundColor: colors.background,
-  },
-  actionsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
-  addRecordingBox: { marginTop: spacing.md, gap: spacing.sm, padding: spacing.sm, borderRadius: radii.sm, backgroundColor: `${colors.primary}14` },
-  addRecordingText: { fontSize: 13, color: colors.textPrimary },
-  noPrimaryWarning: {
-    fontSize: 12,
-    color: colors.error,
-    backgroundColor: `${colors.error}14`,
-    borderRadius: radii.sm,
-    padding: spacing.sm,
-    lineHeight: 17,
-  },
-  shownBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: `${colors.success}1F`,
-    borderRadius: radii.pill,
-    paddingVertical: 2,
-    paddingHorizontal: spacing.sm,
-    marginBottom: spacing.xs,
-  },
-  shownBadgeText: { fontSize: 11, fontWeight: '700', color: colors.success },
-  notShownHint: { fontSize: 11, color: colors.textSecondary, lineHeight: 15, marginBottom: spacing.xs },
-  variantHeaderRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
-  verifiedBox: { alignItems: 'flex-start', marginTop: spacing.sm },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
-  centeredTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    scroll: { gap: spacing.sm, paddingBottom: spacing.xl },
+    title: { fontSize: 22, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md, marginBottom: spacing.sm },
+    sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md },
+    card: { backgroundColor: colors.surface, borderRadius: radii.lg, padding: spacing.md, gap: 4 },
+    errorText: { fontSize: 13, color: colors.error, marginBottom: spacing.xs },
+    helperText: { fontSize: 12, color: colors.textSecondary },
+    fieldLabel: { fontSize: 11, fontWeight: '700', color: colors.textSecondary, marginTop: spacing.sm, textTransform: 'uppercase' },
+    input: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: radii.sm,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 6,
+      fontSize: 15,
+      color: colors.textPrimary,
+      backgroundColor: colors.background,
+    },
+    actionsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
+    addRecordingBox: { marginTop: spacing.md, gap: spacing.sm, padding: spacing.sm, borderRadius: radii.sm, backgroundColor: `${colors.primary}14` },
+    addRecordingText: { fontSize: 13, color: colors.textPrimary },
+    noPrimaryWarning: {
+      fontSize: 12,
+      color: colors.error,
+      backgroundColor: `${colors.error}14`,
+      borderRadius: radii.sm,
+      padding: spacing.sm,
+      lineHeight: 17,
+    },
+    shownBadge: {
+      alignSelf: 'flex-start',
+      backgroundColor: `${colors.success}1F`,
+      borderRadius: radii.pill,
+      paddingVertical: 2,
+      paddingHorizontal: spacing.sm,
+      marginBottom: spacing.xs,
+    },
+    shownBadgeText: { fontSize: 11, fontWeight: '700', color: colors.success },
+    notShownHint: { fontSize: 11, color: colors.textSecondary, lineHeight: 15, marginBottom: spacing.xs },
+    variantHeaderRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+    verifiedBox: { alignItems: 'flex-start', marginTop: spacing.sm },
+    centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
+    centeredTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
+  });

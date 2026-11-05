@@ -1,15 +1,18 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
-import { colors, radii, spacing } from '@/constants/theme';
+import { radii, spacing, type ThemeColors } from '@/constants/theme';
 import { createWordGroup } from '@/data/admin/content';
 import { useAuth } from '@/lib/auth/AuthContext';
+import { useTheme } from '@/lib/theme/ThemeContext';
 
 export default function AdminNewWordGroup() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { unitId, lessonNumber } = useLocalSearchParams<{ unitId: string; lessonNumber: string }>();
   const { session } = useAuth();
   const actorAccountId = session?.user.id ?? '';
@@ -53,8 +56,8 @@ export default function AdminNewWordGroup() {
   };
 
   return (
-    <ScreenContainer>
-      <BackButton />
+    <ScreenContainer themed>
+      <BackButton themed />
       <ScrollView showsVerticalScrollIndicator={false}>
         <Text style={styles.title}>New Word Group</Text>
         <Text style={styles.subtitle}>
@@ -78,25 +81,26 @@ export default function AdminNewWordGroup() {
         <Text style={styles.fieldLabel}>Sort order</Text>
         <TextInput value={sortOrder} onChangeText={setSortOrder} style={styles.input} keyboardType="number-pad" />
 
-        <Button label="Create" onPress={handleCreate} loading={isSaving} style={{ marginTop: spacing.lg }} />
+        <Button themed label="Create" onPress={handleCreate} loading={isSaving} style={{ marginTop: spacing.lg }} />
       </ScrollView>
     </ScreenContainer>
   );
 }
 
-const styles = StyleSheet.create({
-  title: { fontSize: 22, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md },
-  subtitle: { fontSize: 13, color: colors.textSecondary, marginTop: spacing.xs, marginBottom: spacing.md },
-  errorText: { fontSize: 13, color: colors.error, marginBottom: spacing.sm },
-  fieldLabel: { fontSize: 11, fontWeight: '700', color: colors.textSecondary, marginTop: spacing.sm, textTransform: 'uppercase' },
-  input: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.sm,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 6,
-    fontSize: 15,
-    color: colors.textPrimary,
-    backgroundColor: colors.background,
-  },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    title: { fontSize: 22, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md },
+    subtitle: { fontSize: 13, color: colors.textSecondary, marginTop: spacing.xs, marginBottom: spacing.md },
+    errorText: { fontSize: 13, color: colors.error, marginBottom: spacing.sm },
+    fieldLabel: { fontSize: 11, fontWeight: '700', color: colors.textSecondary, marginTop: spacing.sm, textTransform: 'uppercase' },
+    input: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: radii.sm,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 6,
+      fontSize: 15,
+      color: colors.textPrimary,
+      backgroundColor: colors.background,
+    },
+  });

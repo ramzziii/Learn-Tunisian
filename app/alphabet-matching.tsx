@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AnimatedAnswerCard, type AnswerCardState } from '@/components/alphabet/AnimatedAnswerCard';
-import { PremiumBadge, PremiumGate } from '@/components/premium/Premium';
+import { AccessCheckProblem, AccessLimitScreen } from '@/components/access/AccessLimit';
 import { Button } from '@/components/ui/Button';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { ProgressBar } from '@/components/ui/ProgressBar';
@@ -11,11 +11,11 @@ import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { radii, shadows, spacing, type ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/lib/theme/ThemeContext';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
-import { usePremium } from '@/lib/premium/PremiumContext';
-import { ARABIC_LETTERS, buildMatchingGrid, getLetterById, type MatchingTile } from '@/lib/alphabet';
+import { MATCHING_MIN_LETTERS } from '@/lib/access/accessRules';
+import { useAccess } from '@/lib/access/AccessContext';
+import { useOpenLetterPool } from '@/lib/access/useOpenLetterPool';
+import { buildMatchingGrid, getLetterById, type MatchingTile } from '@/lib/alphabet';
 import { markLettersPracticed } from '@/lib/alphabetProgress';
-import { accessibleLetters, canStartSpeedMatchRound, speedMatchPairCount } from '@/lib/premium/access';
-import { hasUsedSpeedMatchSample, markSpeedMatchSampleUsed } from '@/lib/premium/freeAllowance';
 import { useAnswerFeedback } from '@/hooks/useAnswerFeedback';
 import { useColumnWidth } from '@/hooks/useColumnWidth';
 
@@ -29,12 +29,13 @@ export default function AlphabetMatchingScreen() {
   const { activeProfile } = useActiveProfile();
   const { playCorrect, playIncorrect } = useAnswerFeedback();
   const tileWidth = useColumnWidth(GRID_COLUMNS, spacing.lg, spacing.sm);
-  const { isPremium, isResolved } = usePremium();
-  // Free: one short sample round (fewer pairs, free letters only).
-  const pairCount = speedMatchPairCount(isPremium, PAIR_COUNT);
-  const letterPool = useMemo(() => accessibleLetters(isPremium, ARABIC_LETTERS), [isPremium]);
-  // null while checking — a round (and its timer) only starts once allowed,
-  // so a locked round is gated before it begins, never part-way through.
+  // Rounds use the open letters (all with Premium; at least MATCHING_MIN_LETTERS,
+  // topped up in teaching order) — resolved before the first round and its
+  // timer start, so a round is never cut off part-way. Rounds are unlimited.
+  const { tier } = useAccess();
+  const pool = useOpenLetterPool(MATCHING_MIN_LETTERS);
+  const letterPool = pool.letters;
+  const pairCount = Math.min(PAIR_COUNT, letterPool.length);
   const [roundAllowed, setRoundAllowed] = useState<boolean | null>(null);
   const [tiles, setTiles] = useState<MatchingTile[]>([]);
   const [selectedTileIds, setSelectedTileIds] = useState<string[]>([]);
@@ -73,31 +74,14 @@ export default function AlphabetMatchingScreen() {
   };
 
   useEffect(() => {
-    if (!activeProfile || !isResolved) return;
-    let cancelled = false;
-    (async () => {
-      const sampleUsed = isPremium ? false : await hasUsedSpeedMatchSample(activeProfile.id);
-      if (cancelled) return;
-      if (!canStartSpeedMatchRound(isPremium, sampleUsed)) {
-        setRoundAllowed(false);
-        return;
-      }
-      // Recorded as the round starts, so backing out can't replay the sample.
-      if (!isPremium) markSpeedMatchSampleUsed(activeProfile.id);
-      startRound();
-      setRoundAllowed(true);
-    })();
-    return () => {
-      cancelled = true;
-    };
-    // Runs once per profile/entitlement — startRound is recreated every render.
+    if (pool.status !== 'ready' || roundAllowed) return;
+    startRound();
+    setRoundAllowed(true);
+    // Starts the first round once the letters are known — startRound is recreated every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeProfile?.id, isPremium, isResolved]);
+  }, [pool.status]);
 
-  const handlePlayAgain = () => {
-    if (isPremium) startRound();
-    else setRoundAllowed(false);
-  };
+  const handlePlayAgain = () => startRound();
 
   const handleTilePress = (tile: MatchingTile) => {
     if (isLocked || matchedTileIds.includes(tile.tileId) || selectedTileIds.includes(tile.tileId)) return;
@@ -131,15 +115,8 @@ export default function AlphabetMatchingScreen() {
     }
   };
 
-  if (roundAllowed === false) {
-    return (
-      <PremiumGate
-        title="Keep playing with Premium"
-        message="You've played your free Speed Match sample round. Upgrade for unlimited rounds with all the letters."
-      />
-    );
-  }
-
+  if (pool.status === 'limit') return <AccessLimitScreen feature="alphabet_letter" />;
+  if (pool.status === 'error') return <AccessCheckProblem kind="error" />;
   if (roundAllowed === null) return <LoadingScreen themed />;
 
   return (
@@ -155,10 +132,9 @@ export default function AlphabetMatchingScreen() {
         <ProgressBar themed progress={matchedPairCount / pairCount} gradientColors={[colors.successLight, colors.success]} />
       </View>
 
-      {!isPremium ? (
+      {tier !== 'premium' ? (
         <View style={styles.sampleRow}>
-          <PremiumBadge />
-          <Text style={styles.sampleText}>Free sample round · {pairCount} pairs</Text>
+          <Text style={styles.sampleText}>Your open letters · {pairCount} pairs</Text>
         </View>
       ) : null}
 
@@ -196,7 +172,6 @@ export default function AlphabetMatchingScreen() {
         <CompleteCard
           seconds={elapsedMs / 1000}
           pairCount={pairCount}
-          isSample={!isPremium}
           onPlayAgain={handlePlayAgain}
           onDone={() => router.back()}
         />
@@ -208,13 +183,11 @@ export default function AlphabetMatchingScreen() {
 function CompleteCard({
   seconds,
   pairCount,
-  isSample,
   onPlayAgain,
   onDone,
 }: {
   seconds: number;
   pairCount: number;
-  isSample: boolean;
   onPlayAgain: () => void;
   onDone: () => void;
 }) {
@@ -240,13 +213,10 @@ function CompleteCard({
       <Text style={styles.completeEmoji}>🎉</Text>
       <Text style={styles.completeTitle}>Well done!</Text>
       <Text style={styles.completeBody}>Matched {pairCount} pairs in {seconds.toFixed(1)} seconds.</Text>
-      {isSample ? (
-        <Text style={styles.completeBody}>That was your free sample round — more rounds are part of Premium.</Text>
-      ) : null}
       <View style={styles.completeActions}>
         <Button
           themed
-          label={isSample ? 'Play again 🔒' : 'Play again'}
+          label="Play again"
           variant="secondary"
           onPress={onPlayAgain}
           style={styles.completeButton}

@@ -16,6 +16,10 @@ import { fetchLessonMap, fetchWordGroupsForLesson } from '@/data/content';
 import { fetchFavoriteWordGroups } from '@/data/favorites';
 import { fetchWeakestWordGroups } from '@/data/progress';
 import { useSlideInOnChange } from '@/hooks/useSlideInOnChange';
+import { GUEST_ITEM_ALLOWANCE } from '@/lib/access/accessRules';
+import { useAccess } from '@/lib/access/AccessContext';
+import { filterToPracticeScope, inPracticeScope } from '@/lib/access/practiceScope';
+import { usePracticeScope } from '@/lib/access/usePracticeScope';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
 import { markSpeakingCompletedToday } from '@/lib/dailyChallengeProgress';
 import { buildRevisitExercises, updateRevisitList } from '@/lib/speakingRevisit';
@@ -62,14 +66,22 @@ export default function SpeakingPracticeScreen() {
   const isDone = phase === 'done';
   const slideIn = useSlideInOnChange(`${phase}-${index}`);
 
+  // Practice isn't counted: only approved words from open lessons /
+  // categories (all with Premium); a guest drills at most 2 words.
+  const { tier } = useAccess();
+  const { scope } = usePracticeScope();
+
   useEffect(() => {
-    if (!activeProfile) return;
+    if (!activeProfile || !scope) return;
     let cancelled = false;
     (async () => {
-      let groups = await fetchWeakestWordGroups(activeProfile.id, POOL_SIZE).catch(() => [] as WordGroupWithVariants[]);
+      const inScope = (list: WordGroupWithVariants[]) => filterToPracticeScope(scope, list);
+      let groups = inScope(
+        await fetchWeakestWordGroups(activeProfile.id, POOL_SIZE).catch(() => [] as WordGroupWithVariants[])
+      );
 
       if (groups.length === 0) {
-        groups = await fetchFavoriteWordGroups(activeProfile.id).catch(() => [] as WordGroupWithVariants[]);
+        groups = inScope(await fetchFavoriteWordGroups(activeProfile.id).catch(() => [] as WordGroupWithVariants[]));
       }
 
       if (groups.length === 0) {
@@ -78,19 +90,23 @@ export default function SpeakingPracticeScreen() {
         // something here rather than a dead end.
         const unitsWithLessons = await fetchLessonMap(activeProfile.id).catch(() => []);
         const allLessons = unitsWithLessons.flatMap((u) => u.lessons);
-        const continueLesson = allLessons.find((l) => l.state === 'unlocked') ?? allLessons[0] ?? null;
+        // Only a lesson that's open — practice never opens one.
+        const isOpen = (l: (typeof allLessons)[number]) =>
+          inPracticeScope(scope, { unitId: l.unitId, lessonNumber: l.lessonNumber, contentStatus: 'approved' });
+        const openLessons = allLessons.filter(isOpen);
+        const continueLesson = openLessons.find((l) => l.state === 'unlocked') ?? openLessons[0] ?? null;
         if (continueLesson) {
-          groups = await fetchWordGroupsForLesson(continueLesson.id).catch(() => [] as WordGroupWithVariants[]);
+          groups = inScope(await fetchWordGroupsForLesson(continueLesson.id).catch(() => [] as WordGroupWithVariants[]));
         }
       }
 
       if (cancelled) return;
-      setQueue(buildSpeakingQueue(groups));
+      setQueue(buildSpeakingQueue(tier === 'guest' ? groups.slice(0, GUEST_ITEM_ALLOWANCE) : groups));
     })();
     return () => {
       cancelled = true;
     };
-  }, [activeProfile]);
+  }, [activeProfile, scope, tier]);
 
   const finish = () => {
     setPhase('done');

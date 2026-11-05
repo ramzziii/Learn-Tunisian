@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { StatusBadge } from '@/components/admin/StatusBadge';
@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
-import { colors, radii, shadows, spacing } from '@/constants/theme';
+import { radii, shadows, spacing, type ThemeColors } from '@/constants/theme';
 import {
   deleteLesson,
   getLessonAdmin,
@@ -17,8 +17,11 @@ import {
 } from '@/data/admin/content';
 import { useAuth } from '@/lib/auth/AuthContext';
 import type { ContentStatus, Lesson, WordGroupWithVariants } from '@/types/models';
+import { useTheme } from '@/lib/theme/ThemeContext';
 
 export default function AdminLessonDetail() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { lessonId } = useLocalSearchParams<{ lessonId: string }>();
   const { session } = useAuth();
   const actorAccountId = session?.user.id ?? '';
@@ -95,23 +98,23 @@ export default function AdminLessonDetail() {
 
   if (loadError) {
     return (
-      <ScreenContainer>
-        <BackButton />
+      <ScreenContainer themed>
+        <BackButton themed />
         <View style={styles.centered}>
           <Text style={styles.centeredTitle}>Couldn&apos;t load this lesson</Text>
-          <Button label="Try again" variant="secondary" onPress={load} />
+          <Button themed label="Try again" variant="secondary" onPress={load} />
         </View>
       </ScreenContainer>
     );
   }
 
-  if (lesson === null || wordGroups === null) return <LoadingScreen />;
+  if (lesson === null || wordGroups === null) return <LoadingScreen themed />;
 
   const blockDelete = wordGroups.length > 0;
 
   return (
-    <ScreenContainer>
-      <BackButton />
+    <ScreenContainer themed>
+      <BackButton themed />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         <Text style={styles.title}>Lesson #{lesson.lessonNumber}</Text>
 
@@ -123,7 +126,7 @@ export default function AdminLessonDetail() {
           <TextInput value={title} onChangeText={setTitle} style={styles.input} />
           <Text style={styles.fieldLabel}>Sort order</Text>
           <TextInput value={sortOrder} onChangeText={setSortOrder} style={styles.input} keyboardType="number-pad" />
-          <Button label="Save" onPress={handleSave} loading={isSaving} style={{ marginTop: spacing.sm }} />
+          <Button themed label="Save" onPress={handleSave} loading={isSaving} style={{ marginTop: spacing.sm }} />
         </View>
 
         <Text style={styles.sectionTitle}>Word Groups ({wordGroups.length})</Text>
@@ -142,6 +145,7 @@ export default function AdminLessonDetail() {
         ))}
 
         <Button
+          themed
           label="+ New Word Group"
           variant="secondary"
           onPress={() =>
@@ -158,42 +162,43 @@ export default function AdminLessonDetail() {
             back to clean up automatically).
           </Text>
         ) : (
-          <Button label="Delete Lesson" variant="ghost" onPress={handleDelete} style={styles.deleteButton} />
+          <Button themed label="Delete Lesson" variant="ghost" onPress={handleDelete} style={styles.deleteButton} />
         )}
       </ScrollView>
     </ScreenContainer>
   );
 }
 
-const styles = StyleSheet.create({
-  scroll: { gap: spacing.sm, paddingBottom: spacing.xl },
-  title: { fontSize: 22, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md, marginBottom: spacing.sm },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md },
-  card: { backgroundColor: colors.surface, borderRadius: radii.lg, padding: spacing.md, gap: 4 },
-  errorText: { fontSize: 13, color: colors.error, marginBottom: spacing.xs },
-  fieldLabel: { fontSize: 11, fontWeight: '700', color: colors.textSecondary, marginTop: spacing.sm, textTransform: 'uppercase' },
-  input: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.sm,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 6,
-    fontSize: 15,
-    color: colors.textPrimary,
-    backgroundColor: colors.background,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.surface,
-    borderRadius: radii.md,
-    padding: spacing.md,
-  },
-  rowTitle: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
-  rowMeta: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
-  blockedText: { fontSize: 12, color: colors.textSecondary, marginTop: spacing.sm, fontStyle: 'italic' },
-  deleteButton: { marginTop: spacing.lg },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
-  centeredTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    scroll: { gap: spacing.sm, paddingBottom: spacing.xl },
+    title: { fontSize: 22, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md, marginBottom: spacing.sm },
+    sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md },
+    card: { backgroundColor: colors.surface, borderRadius: radii.lg, padding: spacing.md, gap: 4 },
+    errorText: { fontSize: 13, color: colors.error, marginBottom: spacing.xs },
+    fieldLabel: { fontSize: 11, fontWeight: '700', color: colors.textSecondary, marginTop: spacing.sm, textTransform: 'uppercase' },
+    input: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: radii.sm,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 6,
+      fontSize: 15,
+      color: colors.textPrimary,
+      backgroundColor: colors.background,
+    },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      backgroundColor: colors.surface,
+      borderRadius: radii.md,
+      padding: spacing.md,
+    },
+    rowTitle: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
+    rowMeta: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+    blockedText: { fontSize: 12, color: colors.textSecondary, marginTop: spacing.sm, fontStyle: 'italic' },
+    deleteButton: { marginTop: spacing.lg },
+    centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
+    centeredTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
+  });

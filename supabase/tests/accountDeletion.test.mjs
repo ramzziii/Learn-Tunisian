@@ -50,6 +50,10 @@ async function seed(db) {
     insert into public.word_variants (word_group_id, variant_label, word_arabic, transliteration, created_by, updated_by, approved_by, recording_skipped_by)
       values ('wg_hello', 'primary', 'عسلامة', 'aslema', '${A}', '${A}', '${A}', '${A}');
 
+    -- A reviewed that word as the native reviewer (0026).
+    insert into public.content_review_events (word_variant_id, word_group_id, variant_label, verdict, reviewer_account_id, reviewer_name, reviewer_note, reviewed_arabic, reviewed_transliteration)
+      select id, 'wg_hello', 'primary', 'ok', '${A}', 'Reviewer A', 'fine', 'عسلامة', 'aslema' from public.word_variants where word_group_id = 'wg_hello';
+
     insert into public.progress (profile_id, word_group_id) values ('${PA}', 'wg_hello'), ('${PB}', 'wg_hello');
     insert into public.favorites (profile_id, word_group_id) values ('${PA}', 'wg_hello'), ('${PB}', 'wg_hello');
     insert into public.session_logs (profile_id, session_type, duration_seconds) values ('${PA}', 'lesson', 120), ('${PB}', 'review', 60);
@@ -66,6 +70,8 @@ async function seed(db) {
 
     insert into public.ai_daily_usage (account_id, usage_date, kind, count)
       values ('${A}', current_date, 'chat', 5), ('${B}', current_date, 'chat', 2);
+    insert into public.feature_item_claims (account_id, feature, item_key)
+      values ('${A}', 'lesson', 'l1'), ('${B}', 'lesson', 'l1');
   `);
 
   // AI cost records for A (and B), through the real budget functions.
@@ -140,6 +146,7 @@ describe('delete_account_data', () => {
     ['public.corrections', `profile_id = '${PA}'`],
     ['public.translation_requests', `account_id = '${A}'`],
     ['public.ai_daily_usage', `account_id = '${A}'`],
+    ['public.feature_item_claims', `account_id = '${A}'`],
     ['public.reviewers', `user_id = '${A}'`],
   ]) {
     it(`deletes: ${table}`, async () => {
@@ -177,6 +184,11 @@ describe('delete_account_data', () => {
     assert.equal(await count(db, `select count(*)::int as n from public.lessons where unit_id = '${UNIT}' and created_by is null and updated_by is null`), 1);
   });
 
+  it('keeps review history of words A reviewed, without A’s name or account', async () => {
+    const rows = (await db.query(`select reviewer_account_id, reviewer_name, verdict, reviewed_arabic from public.content_review_events`)).rows;
+    assert.deepEqual(rows, [{ reviewer_account_id: null, reviewer_name: null, verdict: 'ok', reviewed_arabic: 'عسلامة' }]);
+  });
+
   it('keeps the shared copy of A’s translation answer', async () => {
     assert.equal(await count(db, `select count(*)::int as n from public.word_groups where id like 'tr_%'`), 1);
   });
@@ -197,6 +209,7 @@ describe('delete_account_data', () => {
       ['public.session_logs', `profile_id = '${PB}'`],
       ['public.corrections', `profile_id = '${PB}'`],
       ['public.ai_daily_usage', `account_id = '${B}'`],
+      ['public.feature_item_claims', `account_id = '${B}'`],
       ['public.ai_usage_log', `account_id = '${B}' and profile_id = '${PB}'`],
     ]) {
       assert.equal(await count(db, `select count(*)::int as n from ${table} where ${where}`), 1, table);

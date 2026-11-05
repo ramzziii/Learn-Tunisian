@@ -3,9 +3,14 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { File } from 'expo-file-system';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { CreateAccountPrompt } from '@/components/guest/CreateAccountPrompt';
+import { PremiumGate } from '@/components/premium/Premium';
+import { canUseTalk } from '@/lib/access/accessRules';
+import { useAccess } from '@/lib/access/AccessContext';
 
 import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
+import { ComputerVoiceNote } from '@/components/ui/ComputerVoiceNote';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
@@ -43,7 +48,7 @@ const NOT_RETRYABLE = new Set(['daily_limit_reached', 'budget_exhausted']);
 // the mock AI provider, with typing as the only input.
 const VOICE_INPUT_AVAILABLE = !isUsingMockAiProvider;
 
-export default function TalkConversation() {
+function TalkConversation() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { scenarioId } = useLocalSearchParams<{ scenarioId: string }>();
@@ -313,6 +318,8 @@ function TutorBubble({
           )}
         </PressableScale>
       </View>
+      {/* The tutor's voice is AI text-to-speech, not a Tunisian speaker — say so, like word audio. */}
+      <ComputerVoiceNote style={{ textAlign: 'left' }} />
       <TunisianText arabic={response.tunisian} latin={response.transliteration} arabicStyle={styles.tunisianText} latinStyle={styles.transliterationText} />
       <Text style={styles.englishText}>{response.english}</Text>
 
@@ -642,3 +649,24 @@ const makeStyles = (colors: ThemeColors) =>
     centeredEmoji: { fontSize: 48 },
     centeredTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
   });
+
+/**
+ * Talk is Premium only. This gate sits in front of the conversation, so for a
+ * guest or a free account none of its hooks (conversation, tutor voice,
+ * recorder) ever run and no AI call is made. The server enforces the same
+ * rule (talk-to-a-tunisian / talk-tts return 403 for non-Premium).
+ */
+export default function TalkScreen() {
+  const { tier, isResolved } = useAccess();
+  if (!isResolved) return <LoadingScreen themed />;
+  if (tier === 'guest') return <CreateAccountPrompt reason="talk" />;
+  if (!canUseTalk(tier)) {
+    return (
+      <PremiumGate
+        title="Talk is part of Premium"
+        message="Practise real conversations with an AI partner. Your other lessons and practice stay free."
+      />
+    );
+  }
+  return <TalkConversation />;
+}

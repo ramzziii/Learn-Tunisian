@@ -17,7 +17,7 @@ const mockCreateDailyGoal = jest.fn();
 const mockRecordConsent = jest.fn();
 const mockSupabaseFrom = jest.fn();
 const mockSupabaseRpc = jest.fn();
-const mockSetItem = jest.fn(async () => undefined);
+const mockSetItem = jest.fn(async (..._a: unknown[]) => undefined);
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,
@@ -179,7 +179,10 @@ describe('age gate (signed out, before an account exists)', () => {
     expect(mockReplace).not.toHaveBeenCalled();
     expect(screen.getByText('state dob=none consent=false')).toBeOnTheScreen();
     expect(mockSignUp).not.toHaveBeenCalled();
-    expect(mockSetItem).not.toHaveBeenCalled();
+    // The only thing written: the device's retry-block flag — never the date.
+    expect(mockSetItem).toHaveBeenCalledTimes(1);
+    expect(mockSetItem.mock.calls[0][0]).toBe('learn-tunisian.age-retry-block');
+    expect(mockSetItem.mock.calls[0][1]).not.toContain(dob);
     expect(mockSupabaseFrom).not.toHaveBeenCalled();
     expect(mockSupabaseRpc).not.toHaveBeenCalled();
     for (const spy of logSpies) {

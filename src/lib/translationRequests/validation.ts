@@ -3,6 +3,11 @@
 export const MAX_REQUEST_LENGTH = 500;
 export const MAX_ANSWER_FIELD_LENGTH = 500;
 
+/** Text handed in from elsewhere (Dictionary's "Ask for this word"): trimmed and cut to the limit. Never submitted by itself. */
+export function prefillRequestText(raw: unknown): string {
+  return typeof raw === 'string' ? raw.trim().slice(0, MAX_REQUEST_LENGTH) : '';
+}
+
 export function validateRequestText(raw: string): { ok: true; text: string } | { ok: false; message: string } {
   const text = raw.trim();
   if (!text) return { ok: false, message: 'Type the English phrase or sentence you want translated.' };

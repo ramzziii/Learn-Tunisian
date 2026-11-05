@@ -32,7 +32,6 @@ export function RepeatAfterMeExercise({ item, maxAttempts, isReview, onFinish }:
         nativeVariant={item.variant}
         matchGroup={{ id: item.wordGroupId, variants: [item.variant] }}
         maxAttempts={maxAttempts}
-        allowFallbackVoice={false}
         outOfTriesMessage={isReview ? 'Good effort — it’ll come up again next session.' : undefined}
         onFinish={onFinish}
       >

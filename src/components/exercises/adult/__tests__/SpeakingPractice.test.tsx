@@ -64,7 +64,6 @@ it('uses the shared flow: the word’s variants for the check, its prompt record
       matchGroup: exercise.targetGroup,
       nativeVariant: promptVariant,
       maxAttempts: 3,
-      allowFallbackVoice: true,
     })
   );
   expect(screen.getByText('Listen, then record yourself saying it')).toBeOnTheScreen();

@@ -5,7 +5,7 @@
 // - Optional reminder: pick a time and "Set reminder" (notification
 //   permission is asked only then), or "Not now" — signup finishes either way.
 //   A denied permission is explained and signup can still finish.
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { useEffect } from 'react';
 
 const mockPush = jest.fn();
@@ -17,9 +17,13 @@ const mockCreateDailyGoal = jest.fn(async () => undefined);
 const mockPermission = jest.fn();
 const mockSchedule = jest.fn(async () => undefined);
 
+let mockGuestDataRaw: string | null = null;
 jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,
-  default: { getItem: jest.fn(async () => null), setItem: jest.fn(async () => undefined) },
+  default: {
+    getItem: jest.fn(async (k: string) => (k === 'learn-tunisian.guest-data' ? mockGuestDataRaw : null)),
+    setItem: jest.fn(async () => undefined),
+  },
 }));
 jest.mock('expo-router', () => ({
   router: { push: (...a: unknown[]) => mockPush(...a), replace: (...a: unknown[]) => mockReplace(...a), back: jest.fn(), canGoBack: () => true },
@@ -153,6 +157,18 @@ describe('optional reminder step', () => {
     expect(mockCreateDailyGoal).toHaveBeenCalledWith('p1', 15, '18:00:00', false);
     expect(mockSetActiveProfileId).toHaveBeenCalledWith('p1');
     expect(mockReplace).toHaveBeenCalledWith('/home');
+  });
+
+  it('with guest-preview data on this device, finishing goes to the carry-over step instead of Home', async () => {
+    mockGuestDataRaw = JSON.stringify({ claims: { lesson: ['l1'] }, results: {}, favorites: [] });
+    try {
+      await renderStep(<ReminderStep />, READY);
+      await fireEvent.press(screen.getByRole('button', { name: 'Not now' }));
+      await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/guest/carry-over'));
+      expect(mockReplace).not.toHaveBeenCalledWith('/home');
+    } finally {
+      mockGuestDataRaw = null;
+    }
   });
 
   it('Set reminder asks for permission once, saves the time and schedules it', async () => {

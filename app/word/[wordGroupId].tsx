@@ -5,8 +5,10 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ExerciseRenderer } from '@/components/exercises/shared/ExerciseRenderer';
 import { VariantCallout } from '@/components/exercises/shared/VariantCallout';
 import { WordPicture } from '@/components/exercises/shared/WordPicture';
+import { WordsUsedSection } from '@/components/phraseWords/WordsUsedSection';
 import { AudioPlayButton } from '@/components/ui/AudioPlayButton';
 import { BackButton } from '@/components/ui/BackButton';
+import { ComputerVoiceNote } from '@/components/ui/ComputerVoiceNote';
 import { ExplanationPlayButton } from '@/components/ui/ExplanationPlayButton';
 import { Button } from '@/components/ui/Button';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
@@ -19,6 +21,10 @@ import { fetchWordGroupWithSiblings } from '@/data/content';
 import { addFavorite, fetchFavoriteWordGroupIds, removeFavorite } from '@/data/favorites';
 import { fetchProgressForWordGroup, recordWordGroupResult } from '@/data/progress';
 import { useWordAudioPlayer } from '@/hooks/useWordAudioPlayer';
+import { AccessCheckProblem } from '@/components/access/AccessLimit';
+import { useAccess } from '@/lib/access/AccessContext';
+import { inPracticeScope } from '@/lib/access/practiceScope';
+import { usePracticeScope } from '@/lib/access/usePracticeScope';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
 import { getPromptVariant } from '@/lib/wordVariants';
 import { useDisplayPreferences } from '@/lib/display/useDisplayPreferences';
@@ -70,10 +76,31 @@ export default function WordDetail() {
     })();
   }, [activeProfile, wordGroupId]);
 
-  const displayVariant = group ? getPromptVariant(group, 0, display.form) : null;
-  const { play, hasAudio, isResolving, hasError, retry } = useWordAudioPlayer(displayVariant);
+  // A word from a lesson / category that isn't open shows a locked state —
+  // never its forms, meaning or audio.
+  const { scope, error: scopeError, reload } = usePracticeScope();
+  // A guest may also see the (at most 2) preview words they opened from search.
+  const { tier, claimed } = useAccess();
+  const openedFromSearch = tier === 'guest' && !!group && claimed('dictionary_result').has(group.id);
+  const isLocked = !!group && !!scope && !inPracticeScope(scope, group) && !openedFromSearch;
+  const displayVariant = group && !isLocked ? getPromptVariant(group, 0, display.form) : null;
+  const { play, hasAudio, isResolving, hasError, retry, source } = useWordAudioPlayer(displayVariant);
 
-  if (!activeProfile || !group || !displayVariant) return <LoadingScreen themed />;
+  if (scopeError) return <AccessCheckProblem kind="error" onRetry={reload} />;
+  if (isLocked) {
+    return (
+      <ScreenContainer themed>
+        <BackButton themed />
+        <View style={styles.lockedContainer}>
+          <Text style={styles.lockedEmoji}>🔒</Text>
+          <Text style={styles.lockedTitle}>This word is in a lesson you haven’t opened</Text>
+          <Text style={styles.lockedBody}>Open its lesson or category to see and practise it.</Text>
+        </View>
+      </ScreenContainer>
+    );
+  }
+
+  if (!activeProfile || !group || !scope || !displayVariant) return <LoadingScreen themed />;
 
   const toggleFavorite = async () => {
     setIsFavorite((prev) => !prev); // optimistic
@@ -151,6 +178,7 @@ export default function WordDetail() {
             onRetry={retry}
             style={{ marginTop: spacing.lg }}
           />
+          {source === 'computer' ? <ComputerVoiceNote style={{ marginTop: spacing.xs }} /> : null}
           <ExplanationPlayButton variant={displayVariant} style={{ marginTop: spacing.md }} />
           <Text style={[styles.verificationBadge, displayVariant.nativeVerified && styles.verificationBadgeVerified]}>
             {displayVariant.nativeVerified ? '✓ Native-speaker verified' : '⚠️ Draft — pending native review'}
@@ -160,6 +188,8 @@ export default function WordDetail() {
         <Reveal delay={60}>
           <VariantCallout group={group} />
         </Reveal>
+
+        <WordsUsedSection phraseId={group.id} />
 
         <Reveal delay={120}>
           <Text style={styles.sectionTitle}>Progress</Text>
@@ -189,6 +219,10 @@ export default function WordDetail() {
 
 const makeStyles = (colors: ThemeColors) =>
   StyleSheet.create({
+    lockedContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm, padding: spacing.lg },
+    lockedEmoji: { fontSize: 48 },
+    lockedTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
+    lockedBody: { fontSize: 15, color: colors.textSecondary, textAlign: 'center' },
     headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     favoriteButton: {
       width: 40,

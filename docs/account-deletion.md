@@ -81,6 +81,7 @@ Decided from the schema's actual foreign keys and verified in
 | Storage `translation-audio/<request id>/…` | The answer and explanation recordings for their requests. |
 | `ai_daily_usage` | Their daily AI counters. |
 | `learner_display_preferences` | Their script and default-form display settings (cascades with the profile). |
+| `feature_item_claims` | Which free sample items the account has used (cascades with the account row). |
 | `reviewers` | Their language-reviewer allowlist entry. |
 | Auth user | Sign-in identity and email (hard delete). |
 
@@ -91,6 +92,7 @@ Decided from the schema's actual foreign keys and verified in
 | `units`, `lessons`, `word_groups`, `word_variants` | The shared content | `created_by`, `updated_by`, `approved_by`, `recording_skipped_by` | Other learners use it. |
 | Shared copies of their translation answers (`word_groups` `tr_…`, `audio/tr_…/…`) | The shared content | No account link existed. | Shared content, possibly already approved. |
 | Other learners' `translation_requests` they handled as an admin | The request | `handled_by` | It belongs to the other learner. |
+| `content_review_events` (0026) — native reviews they did | Verdict, reviewed and corrected text, time | `reviewer_account_id`, `reviewer_name` | The record that a text was natively approved. |
 | `ai_usage_log` | Call type, model, tokens/characters/seconds, estimated cost, budget month, pricing used | `account_id`, `profile_id` | Accurate monthly AI cost totals (`docs/cost-controls.md`). |
 | `ai_budget_reservations` | Amount, call type, model, status | `account_id` | A still-held reservation must keep counting against the budget. |
 

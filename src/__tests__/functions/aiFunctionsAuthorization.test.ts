@@ -63,3 +63,20 @@ describe('translation-answered-email', () => {
     expect(code).not.toMatch(/\.from\('accounts'\)/);
   });
 });
+
+describe('Premium entitlement for Talk (chat + tutor voice) is read on the server', () => {
+  it.each(['talk-to-a-tunisian', 'talk-tts'])('%s: hasPremium reads accounts.is_admin and profiles.is_premium with the service role', (name) => {
+    const index = read(name);
+    expect(index).toMatch(/hasPremium: async/);
+    expect(index).toMatch(/service\.from\('accounts'\)\.select\('is_admin'\)\.eq\('id', accountId\)/);
+    expect(index).toMatch(/service\.from\('profiles'\)\.select\('id'\)\.eq\('account_id', accountId\)\.eq\('is_premium', true\)/);
+  });
+
+  it('talk-stt stays available to signed-in free accounts (pronunciation checks): no Premium check', () => {
+    expect(read('talk-stt') + read('talk-stt', 'handler.ts')).not.toMatch(/hasPremium|premium_required/);
+  });
+
+  it('talk-review stays reviewer-only (is_admin does not grant it)', () => {
+    expect(read('talk-review')).not.toMatch(/hasPremium/);
+  });
+});

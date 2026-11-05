@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
+import { RequireAccount } from '@/components/guest/RequireAccount';
 
 import { ExerciseRenderer } from '@/components/exercises/shared/ExerciseRenderer';
 import { RepeatAfterMeExercise } from '@/components/repeatAfterMe/RepeatAfterMeExercise';
@@ -17,8 +18,8 @@ import { useSlideInOnChange } from '@/hooks/useSlideInOnChange';
 import { recordSessionLog } from '@/data/sessionLogs';
 import { loadTodaysPractice } from '@/data/todaysPractice';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
-import { markFreeReviewStarted } from '@/lib/premium/freeAllowance';
-import { usePremium } from '@/lib/premium/PremiumContext';
+import { useAccess } from '@/lib/access/AccessContext';
+import { usePracticeScope } from '@/lib/access/usePracticeScope';
 import { recordRepeatAfterMeItemResult } from '@/lib/repeatAfterMe/progress';
 import { RAM_MAX_ATTEMPTS } from '@/lib/repeatAfterMe/session';
 import { sessionLogTypeFor, type TodaysPracticePlan, type TodaysPracticeStep } from '@/lib/todaysPractice';
@@ -37,11 +38,15 @@ type Phase = 'loading' | 'error' | 'empty' | 'active' | 'revisit-intro' | 'revis
  * learner leaves — never per step. Review/streak/challenge flags are left
  * to their own screens.
  */
-export default function TodaysPracticeScreen() {
+function TodaysPracticeScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { activeProfile } = useActiveProfile();
-  const { isPremium, isResolved } = usePremium();
+  // Review words come from the practice scope; new words start the current
+  // lesson (counted if not yet open); Repeat After Me only offers recordings
+  // already opened (all with Premium).
+  const { tier, isResolved, claimed, open } = useAccess();
+  const { scope, error: scopeError } = usePracticeScope();
 
   const [phase, setPhase] = useState<Phase>('loading');
   const [plan, setPlan] = useState<TodaysPracticePlan | null>(null);
@@ -55,10 +60,22 @@ export default function TodaysPracticeScreen() {
   const hasLoggedRef = useRef(false);
 
   const load = useCallback(async () => {
-    if (!activeProfile || !isResolved) return;
+    if (scopeError) {
+      setPhase('error');
+      return;
+    }
+    if (!activeProfile || !isResolved || !scope) return;
     setPhase('loading');
     try {
-      const next = await loadTodaysPractice({ profileId: activeProfile.id, isPremium });
+      const unlimited = tier === 'premium';
+      const next = await loadTodaysPractice({
+        profileId: activeProfile.id,
+        scope,
+        ramUnlimited: unlimited,
+        ramOpenIds: unlimited ? new Set<string>() : new Set(claimed('repeat_after_me')),
+        // Using the current lesson's new words starts that lesson (counted if it isn't open yet).
+        openLesson: (lessonId) => open('lesson', lessonId).catch(() => false),
+      });
       setPlan(next);
       setIndex(0);
       setRightCount(0);
@@ -68,14 +85,15 @@ export default function TodaysPracticeScreen() {
         setPhase('empty');
         return;
       }
-      if (next.usesFreeReview) markFreeReviewStarted(activeProfile.id).catch(() => {});
       startedAtRef.current = Date.now();
       hasLoggedRef.current = false;
       setPhase('active');
     } catch {
       setPhase('error');
     }
-  }, [activeProfile, isPremium, isResolved]);
+    // Loaded once per learner/scope — counts changing elsewhere mustn't restart a session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeProfile, tier, isResolved, scope, scopeError]);
 
   useEffect(() => {
     load();
@@ -276,3 +294,12 @@ const makeStyles = (colors: ThemeColors) =>
     centeredBody: { fontSize: 15, color: colors.textSecondary, textAlign: 'center', lineHeight: 21, marginBottom: spacing.md },
     fullWidth: { alignSelf: 'stretch' },
   });
+
+/** Account only: a guest gets the create-account explanation (src/components/guest/RequireAccount.tsx). */
+export default function TodaysPracticeRoute() {
+  return (
+    <RequireAccount>
+      <TodaysPracticeScreen />
+    </RequireAccount>
+  );
+}

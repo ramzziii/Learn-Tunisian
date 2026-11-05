@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { RequireAccount } from '@/components/guest/RequireAccount';
 
 import { TimeWheelPicker } from '@/components/onboarding/TimeWheelPicker';
 import { DisplaySettings } from '@/components/settings/DisplaySettings';
@@ -10,7 +11,6 @@ import { PressableScale } from '@/components/ui/PressableScale';
 import { Reveal } from '@/components/ui/Reveal';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { SelectableCard } from '@/components/ui/SelectableCard';
-import { TranslationRequestsEntry } from '@/components/translation/TranslationRequestsEntry';
 import { WHY_TUNISIAN_LINK } from '@/constants/appCopy';
 import { DAILY_GOAL_OPTIONS } from '@/constants/dailyGoal';
 import { radii, spacing, type ThemeColors } from '@/constants/theme';
@@ -21,7 +21,8 @@ import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
 import { useIsAdmin } from '@/lib/admin/AdminContext';
 import { useAuth } from '@/lib/auth/AuthContext';
 import { requestPasswordReset } from '@/lib/auth/passwordResetRequest';
-import { resetFreeAllowances } from '@/lib/premium/freeAllowance';
+import { useAccess } from '@/lib/access/AccessContext';
+import { FREE_ITEM_TOTAL } from '@/lib/access/accessRules';
 import { usePremium } from '@/lib/premium/PremiumContext';
 import { cancelDailyReminder, requestNotificationPermission, scheduleDailyReminder } from '@/lib/notifications/reminders';
 import { useTheme, type ThemePreference } from '@/lib/theme/ThemeContext';
@@ -46,7 +47,7 @@ interface ProgressStats extends ProfileProgressSummary {
  *
  * Fully converted to the live theme system.
  */
-export default function ProfileScreen() {
+function ProfileScreen() {
   const { activeProfile } = useActiveProfile();
   const { signOut, session, sendPasswordReset } = useAuth();
   // Change password reuses the existing reset flow: email the signed-in
@@ -57,6 +58,7 @@ export default function ProfileScreen() {
   const resetInFlightRef = useRef(false);
   const { isAdmin } = useIsAdmin();
   const { isPremium, adminPreview, setAdminPreview } = usePremium();
+  const { resetPreview, claimed } = useAccess();
   const { colors, preference, setPreference } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [goalSettings, setGoalSettings] = useState<DailyGoalSettings | null>(null);
@@ -202,21 +204,7 @@ export default function ProfileScreen() {
           </PressableScale>
         ) : null}
 
-        <Text style={styles.sectionTitle}>Appearance</Text>
-        {THEME_OPTIONS.map((option) => (
-          <SelectableCard
-            themed
-            key={option.value}
-            title={`${option.emoji} ${option.label}`}
-            selected={preference === option.value}
-            onPress={() => setPreference(option.value)}
-          />
-        ))}
-
-        <Text style={styles.sectionTitle}>Display</Text>
-        <DisplaySettings />
-
-        <Text style={styles.sectionTitle}>What they&apos;ve learned</Text>
+        <Text style={styles.sectionTitle} accessibilityRole="header">What they&apos;ve learned</Text>
         <Reveal style={styles.progressGrid}>
           <ProgressStat label="Learning" value={progressStats.wordsLearning} emoji="🌱" />
           <ProgressStat label="Mastered" value={progressStats.wordsMastered} emoji="⭐" />
@@ -225,13 +213,7 @@ export default function ProfileScreen() {
           <ProgressStat label="Lessons done" value={progressStats.lessonsCompleted} emoji="🏁" />
         </Reveal>
 
-        <Text style={styles.sectionTitle}>Translations</Text>
-        <TranslationRequestsEntry />
-
-        <Text style={styles.sectionTitle}>Vocabulary</Text>
-        <Button themed label="View favorites" variant="secondary" onPress={() => router.push('/favorites')} />
-
-        <Text style={styles.sectionTitle}>Daily goal</Text>
+        <Text style={styles.sectionTitle} accessibilityRole="header">Daily goal &amp; reminder</Text>
         {DAILY_GOAL_OPTIONS.map((minutes) => (
           <SelectableCard
             themed
@@ -243,7 +225,7 @@ export default function ProfileScreen() {
         ))}
 
         <View style={styles.reminderHeader}>
-          <Text style={styles.sectionTitle}>Daily reminder</Text>
+          <Text style={styles.subsectionTitle}>Daily reminder</Text>
           <Switch
             accessibilityLabel="Daily reminder"
             value={reminderEnabled}
@@ -277,16 +259,29 @@ export default function ProfileScreen() {
           style={{ marginTop: spacing.xl }}
         />
 
-        <Text style={styles.sectionTitle}>Premium</Text>
+        <Text style={styles.sectionTitle} accessibilityRole="header">Display</Text>
+        <Text style={styles.subsectionTitle}>Appearance</Text>
+        {THEME_OPTIONS.map((option) => (
+          <SelectableCard
+            themed
+            key={option.value}
+            title={`${option.emoji} ${option.label}`}
+            selected={preference === option.value}
+            onPress={() => setPreference(option.value)}
+          />
+        ))}
+        <DisplaySettings />
+
+        <Text style={styles.sectionTitle} accessibilityRole="header">Premium</Text>
         <Text style={styles.premiumStatus}>
           {isPremium ? '⭐ Premium — everything is unlocked.' : 'Free plan — some content is marked 🔒 Premium.'}
         </Text>
         <Button themed label="See plans & pricing" variant="secondary" onPress={() => router.push('/onboarding/plans')} />
 
-        <Text style={styles.sectionTitle}>About</Text>
+        <Text style={styles.sectionTitle} accessibilityRole="header">About</Text>
         <Button themed label={WHY_TUNISIAN_LINK} variant="secondary" onPress={() => router.push('/why-tunisian')} />
 
-        <Text style={styles.sectionTitle}>Account</Text>
+        <Text style={styles.sectionTitle} accessibilityRole="header">Account</Text>
         <Button
           themed
           label="Change password"
@@ -313,7 +308,7 @@ export default function ProfileScreen() {
 
         {isAdmin ? (
           <>
-            <Text style={styles.sectionTitle}>Admin</Text>
+            <Text style={styles.sectionTitle} accessibilityRole="header">Admin</Text>
 
             {/* Admins always have Premium; this only changes what *they* see,
                 to check the free experience. Nothing is written to Supabase. */}
@@ -330,16 +325,21 @@ export default function ProfileScreen() {
               <Text style={styles.previewBody}>
                 {adminPreview === 'premium'
                   ? 'Showing the full Premium app. Switch off to see exactly what free learners see.'
-                  : 'Previewing the free plan — locked items, gates, and daily limits apply to you now.'}
+                  : 'Viewing as a new free user. Free users can open any 5 lessons, and 5 each of phrasebook categories, proverbs, letters and Repeat After Me. After that the rest show 🔒 Premium. Grammar: only sentence order, present tense and questions are free. Practice uses only words from what’s open. Talk is Premium only. Counted on this device only; your own progress doesn’t unlock anything here.'}
               </Text>
+              {adminPreview === 'free' ? (
+                <Text style={styles.previewBody}>
+                  Lessons used in this preview: {Math.min(claimed('lesson').size, FREE_ITEM_TOTAL)} of {FREE_ITEM_TOTAL}
+                </Text>
+              ) : null}
               {adminPreview === 'free' ? (
                 <Button
                   themed
                   label="Reset free-plan limits"
                   variant="ghost"
                   onPress={async () => {
-                    await resetFreeAllowances(activeProfile.id);
-                    Alert.alert('Free-plan limits reset', 'The Speed Match sample round and today’s free review are available again.');
+                    await resetPreview();
+                    Alert.alert('Free-plan preview reset', 'Your preview counts are cleared. Your real account and its counts are unchanged.');
                   }}
                 />
               ) : null}
@@ -386,6 +386,7 @@ const makeStyles = (colors: ThemeColors) => {
       textTransform: 'uppercase',
       letterSpacing: 0.5,
     },
+    subsectionTitle: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md, marginBottom: spacing.sm },
     progressGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
     statCard: {
       width: '30%',
@@ -435,3 +436,12 @@ const makeStyles = (colors: ThemeColors) => {
     errorBody: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', marginBottom: spacing.md },
   });
 };
+
+/** Account only: a guest gets the create-account explanation (src/components/guest/RequireAccount.tsx). */
+export default function ProfileTab() {
+  return (
+    <RequireAccount>
+      <ProfileScreen />
+    </RequireAccount>
+  );
+}

@@ -1,12 +1,12 @@
 import { useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { AudioRecorderField } from '@/components/admin/AudioRecorderField';
 import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
-import { colors, radii, shadows, spacing } from '@/constants/theme';
+import { radii, shadows, spacing, type ThemeColors } from '@/constants/theme';
 import { listLessonsForUnit, listUnitsAdmin } from '@/data/admin/content';
 import {
   answerTranslationRequest,
@@ -23,6 +23,7 @@ import { useAuth } from '@/lib/auth/AuthContext';
 import { TRANSLATION_AUDIO_BUCKET } from '@/lib/translationRequests/constants';
 import { deadlineStatus, formatTunisDay } from '@/lib/translationRequests/deadline';
 import type { Lesson, Unit } from '@/types/models';
+import { useTheme } from '@/lib/theme/ThemeContext';
 
 const STATUS_LABEL: Record<AdminTranslationRequest['status'], string> = {
   submitted: 'Not started yet',
@@ -33,6 +34,8 @@ const STATUS_LABEL: Record<AdminTranslationRequest['status'], string> = {
 };
 
 function Checkbox({ label, checked, onToggle }: { label: string; checked: boolean; onToggle: () => void }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <Pressable
       accessibilityRole="checkbox"
@@ -72,6 +75,8 @@ function emailMessage(outcome: AnswerEmailOutcome): string {
  * as pending_review, through the existing Approval Queue.
  */
 export default function AdminTranslationRequestDetail() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { requestId } = useLocalSearchParams<{ requestId: string }>();
   const { session } = useAuth();
   const actorAccountId = session?.user.id ?? '';
@@ -120,25 +125,25 @@ export default function AdminTranslationRequestDetail() {
 
   if (loadError) {
     return (
-      <ScreenContainer>
-        <BackButton />
+      <ScreenContainer themed>
+        <BackButton themed />
         <Text style={styles.errorText}>Couldn&apos;t load this request ({loadError}).</Text>
-        <Button label="Retry" variant="secondary" onPress={load} />
+        <Button themed label="Retry" variant="secondary" onPress={load} />
       </ScreenContainer>
     );
   }
   if (request === undefined) {
     return (
-      <ScreenContainer>
-        <BackButton />
+      <ScreenContainer themed>
+        <BackButton themed />
         <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
       </ScreenContainer>
     );
   }
   if (request === null) {
     return (
-      <ScreenContainer>
-        <BackButton />
+      <ScreenContainer themed>
+        <BackButton themed />
         <Text style={styles.empty}>Request not found.</Text>
       </ScreenContainer>
     );
@@ -251,8 +256,8 @@ export default function AdminTranslationRequestDetail() {
   };
 
   return (
-    <ScreenContainer>
-      <BackButton />
+    <ScreenContainer themed>
+      <BackButton themed />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         <Text style={styles.eyebrow}>Translation request</Text>
         <Text style={styles.fieldLabel}>Learner’s question (private — never shared)</Text>
@@ -276,6 +281,7 @@ export default function AdminTranslationRequestDetail() {
             <View style={styles.row}>
               {request.status === 'submitted' ? (
                 <Button
+                  themed
                   label="Mark as being handled"
                   variant="secondary"
                   onPress={() => run('progress', () => markTranslationRequestInProgress(request.id), 'in_progress')}
@@ -283,14 +289,15 @@ export default function AdminTranslationRequestDetail() {
                   style={{ flex: 1 }}
                 />
               ) : null}
-              <Button label="Reject" variant="ghost" onPress={() => setConfirmingReject(true)} style={{ flex: 1 }} />
+              <Button themed label="Reject" variant="ghost" onPress={() => setConfirmingReject(true)} style={{ flex: 1 }} />
             </View>
             {confirmingReject ? (
               <View style={styles.card}>
                 <Text style={styles.cardTitle}>Reject this request? The learner will no longer see it.</Text>
                 <View style={styles.row}>
-                  <Button label="Keep it open" variant="ghost" onPress={() => setConfirmingReject(false)} style={{ flex: 1 }} />
+                  <Button themed label="Keep it open" variant="ghost" onPress={() => setConfirmingReject(false)} style={{ flex: 1 }} />
                   <Button
+                    themed
                     label="Yes, reject it"
                     onPress={() => run('reject', () => rejectTranslationRequest(request.id), 'rejected')}
                     loading={busy === 'reject'}
@@ -351,7 +358,7 @@ export default function AdminTranslationRequestDetail() {
                 }}
               />
 
-              <Button label="Send answer" onPress={sendAnswer} loading={busy === 'answer'} style={{ marginTop: spacing.sm }} />
+              <Button themed label="Send answer" onPress={sendAnswer} loading={busy === 'answer'} style={{ marginTop: spacing.sm }} />
             </View>
           </>
         ) : null}
@@ -372,7 +379,7 @@ export default function AdminTranslationRequestDetail() {
               <Text style={styles.note}>Added to app content for review (word group {request.sharedWordGroupId}).</Text>
             ) : null}
             {shareStep === 'shared' ? (
-              <Text style={styles.successText}>Added to the Approval Queue for review — it goes live once approved.</Text>
+              <Text style={styles.successText}>Added to Review — it goes live once approved.</Text>
             ) : null}
 
             {!request.sharedWordGroupId && shareStep === 'ask' ? (
@@ -380,12 +387,12 @@ export default function AdminTranslationRequestDetail() {
                 <Text style={styles.cardTitle}>Add this translation to the app&apos;s shared content?</Text>
                 <Text style={styles.note}>
                   It stays private to the learner unless you add it. Only the Tunisian Arabic, transliteration, Meaning and
-                  recording are shared — the learner’s question is never shared. Added content goes to the Approval Queue
+                  recording are shared — the learner’s question is never shared. Added content goes to Review
                   before anyone else can see it.
                 </Text>
                 <View style={styles.row}>
-                  <Button label="Keep it private" variant="ghost" onPress={() => setShareStep('private')} style={{ flex: 1 }} />
-                  <Button label="Add to app content" variant="secondary" onPress={startShare} style={{ flex: 1 }} />
+                  <Button themed label="Keep it private" variant="ghost" onPress={() => setShareStep('private')} style={{ flex: 1 }} />
+                  <Button themed label="Add to app content" variant="secondary" onPress={startShare} style={{ flex: 1 }} />
                 </View>
               </View>
             ) : null}
@@ -398,6 +405,7 @@ export default function AdminTranslationRequestDetail() {
                 <View style={styles.wrapRow}>
                   {(units ?? []).map((unit) => (
                     <Button
+                      themed
                       key={unit.id}
                       label={unit.name}
                       variant={unitId === unit.id ? 'primary' : 'ghost'}
@@ -413,6 +421,7 @@ export default function AdminTranslationRequestDetail() {
                     <View style={styles.wrapRow}>
                       {(lessons ?? []).map((lesson) => (
                         <Button
+                          themed
                           key={lesson.id}
                           label={`Lesson ${lesson.lessonNumber}${lesson.title ? ` — ${lesson.title}` : ''}`}
                           variant={lessonNumber === lesson.lessonNumber ? 'primary' : 'ghost'}
@@ -439,7 +448,7 @@ export default function AdminTranslationRequestDetail() {
                   <Text style={styles.note}>It will be listed under Native Recordings so a pronunciation can be added later.</Text>
                 ) : null}
                 {shareError ? <Text style={styles.errorText}>{shareError}</Text> : null}
-                <Button label="Add for review" onPress={share} loading={isSharing} />
+                <Button themed label="Add for review" onPress={share} loading={isSharing} />
               </View>
             ) : null}
           </View>
@@ -449,48 +458,49 @@ export default function AdminTranslationRequestDetail() {
   );
 }
 
-const styles = StyleSheet.create({
-  scroll: { paddingBottom: spacing.xxl, gap: spacing.sm },
-  eyebrow: { fontSize: 12, fontWeight: '700', color: colors.textSecondary, textTransform: 'uppercase', marginTop: spacing.md },
-  requestText: { fontSize: 22, fontWeight: '700', color: colors.textPrimary },
-  meta: { fontSize: 13, color: colors.textSecondary },
-  row: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center' },
-  wrapRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
-  status: { fontSize: 13, fontWeight: '700', color: colors.primary },
-  deadline: { fontSize: 13, fontWeight: '700', color: colors.success },
-  overdue: { color: colors.error },
-  card: { backgroundColor: colors.surface, borderRadius: radii.md, padding: spacing.md, gap: spacing.xs },
-  cardTitle: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
-  fieldLabel: { fontSize: 11, fontWeight: '700', color: colors.textSecondary, marginTop: spacing.sm, textTransform: 'uppercase' },
-  input: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.sm,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 6,
-    fontSize: 15,
-    color: colors.textPrimary,
-    backgroundColor: colors.background,
-  },
-  arabicInput: { fontSize: 20, textAlign: 'right' },
-  arabic: { fontSize: 26, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
-  transliteration: { fontSize: 16, fontStyle: 'italic', color: colors.textSecondary, textAlign: 'center' },
-  sharePrompt: { gap: spacing.xs, marginTop: spacing.sm },
-  note: { fontSize: 14, color: colors.textSecondary },
-  checkboxRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xs },
-  checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkboxChecked: { backgroundColor: colors.primary },
-  checkmark: { color: colors.textOnPrimary, fontSize: 14, fontWeight: '800' },
-  checkboxLabel: { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
-  successText: { fontSize: 14, fontWeight: '700', color: colors.success },
-  errorText: { fontSize: 13, color: colors.error },
-  empty: { fontSize: 15, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.xl },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    scroll: { paddingBottom: spacing.xxl, gap: spacing.sm },
+    eyebrow: { fontSize: 12, fontWeight: '700', color: colors.textSecondary, textTransform: 'uppercase', marginTop: spacing.md },
+    requestText: { fontSize: 22, fontWeight: '700', color: colors.textPrimary },
+    meta: { fontSize: 13, color: colors.textSecondary },
+    row: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center' },
+    wrapRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+    status: { fontSize: 13, fontWeight: '700', color: colors.primary },
+    deadline: { fontSize: 13, fontWeight: '700', color: colors.success },
+    overdue: { color: colors.error },
+    card: { backgroundColor: colors.surface, borderRadius: radii.md, padding: spacing.md, gap: spacing.xs },
+    cardTitle: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+    fieldLabel: { fontSize: 11, fontWeight: '700', color: colors.textSecondary, marginTop: spacing.sm, textTransform: 'uppercase' },
+    input: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: radii.sm,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 6,
+      fontSize: 15,
+      color: colors.textPrimary,
+      backgroundColor: colors.background,
+    },
+    arabicInput: { fontSize: 20, textAlign: 'right' },
+    arabic: { fontSize: 26, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
+    transliteration: { fontSize: 16, fontStyle: 'italic', color: colors.textSecondary, textAlign: 'center' },
+    sharePrompt: { gap: spacing.xs, marginTop: spacing.sm },
+    note: { fontSize: 14, color: colors.textSecondary },
+    checkboxRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xs },
+    checkbox: {
+      width: 22,
+      height: 22,
+      borderRadius: 6,
+      borderWidth: 2,
+      borderColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    checkboxChecked: { backgroundColor: colors.primary },
+    checkmark: { color: colors.textOnPrimary, fontSize: 14, fontWeight: '800' },
+    checkboxLabel: { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
+    successText: { fontSize: 14, fontWeight: '700', color: colors.success },
+    errorText: { fontSize: 13, color: colors.error },
+    empty: { fontSize: 15, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.xl },
+  });

@@ -13,7 +13,7 @@ export default function AdminLayout() {
   const { session, isLoading: authLoading } = useAuth();
   const { isAdmin, isLoading: adminLoading } = useIsAdmin();
 
-  if (authLoading || adminLoading) return <LoadingScreen />;
+  if (authLoading || adminLoading) return <LoadingScreen themed />;
   if (!session || !isAdmin) return <Redirect href="/" />;
 
   return <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right', animationDuration: 280 }} />;

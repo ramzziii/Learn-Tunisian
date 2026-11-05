@@ -39,9 +39,9 @@ describe('Practice tab', () => {
     expect(mockPush).toHaveBeenCalledWith('/speaking');
   });
 
-  it('the other Practice cards are still there', async () => {
+  it('the other practice activities are still there (reference features moved to Learn)', async () => {
     await themed(<PracticeTab />);
-    for (const title of ['Phrasebook', 'Flashcards', 'Grammar Notes', 'Listening Practice', 'Alphabet Practice', 'Review', 'Culture Corner']) {
+    for (const title of ['Flashcards', 'Listening Practice', 'Review']) {
       expect(screen.getByText(title)).toBeOnTheScreen();
     }
   });
