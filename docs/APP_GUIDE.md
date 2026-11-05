@@ -238,6 +238,11 @@ All learning content lives in Supabase:
   review); `is_native_voice` = the **recording** is native (set by an audio
   upload or the admin recorder). A word's audio is a native recording only
   with `is_native_voice`; otherwise it's a "computer voice" (placeholder).
+- **Words used** (0027, `phrase_word_links`): a phrase (any word group) can
+  link to the words in it — lesson words or Phrasebook entries — in a saved
+  order, with the word as it appears in the phrase ("Sakker", "el beb").
+  Content, not user data; learners read, only admins change it (through
+  `set_phrase_word_links`); guests read `guest_preview_phrase_word_links`.
 - Bulk content work (spreadsheet import, review CSV round trip, recording
   sheet, audio upload) is done with `scripts/*.mjs`; review history and
   import notes are kept privately (`content_review_events`,
@@ -334,6 +339,11 @@ logged once at the end. Needs an account.
 Categories of everyday phrases. Each category counts as one item when first
 opened (guest preview: Greetings + First Encounters; free: 5 in total). A
 category screen lists phrases with audio, a detail modal, and favorites.
+The phrase sheet (and the word page of a multi-word entry) shows **Words
+used**: a card per linked word, in the saved order, with the word as it
+appears in the phrase and its meaning; a card opens that word's page. Only
+approved words appear; a word from a lesson the learner can't open yet shows
+only the phrase's own form, locked, and follows the usual access rules.
 
 ### 6.8 Listening & speaking
 - **Listening Practice**: listening-quiz questions only, from the learner's
@@ -517,15 +527,21 @@ corrections are written only by `talk-review` with the service role.
 
 ## 9. Admin tools (`/admin`, admins only)
 
-Dashboard with metrics and **Content progress** (per unit and overall:
-words, % approved, % with native audio, awaiting review, and forms that
-need a recording), plus: **Content** (units → lessons → word groups;
-create/edit words and forms, statuses), **Review queue** (content awaiting
-approval), **Recordings** (record/upload native audio per form, mark forms as
-skipped, explanation audio), **Translation requests** (answer learners),
-**Corrections** (AI conversation turns flagged for review). Reached from a
-card at the top of Profile, visible only to admins.
+Five tabs, organised by the job at hand (reached from a card at the top of
+Profile, visible only to admins; every screen follows light/dark mode):
 
+| Tab | What's there |
+|---|---|
+| **Today** (`/admin`) | The pipeline at a glance — *waiting for review → live → with native audio* — and **Needs you now** (translation requests, words waiting for review, AI corrections for reviewers, forms needing a recording), most urgent first; "All caught up" when nothing waits. Also the *View app as Premium* switch. |
+| **Requests** | Learners' translation questions, soonest deadline first; answer with text and audio. |
+| **Review** | Words and phrases waiting for review (open one to approve, fix or reject); **AI corrections** for language reviewers only. |
+| **Audio** | The recording studio: *To record* (no recording, missing file, or a computer voice to replace), *Skipped*, *Explanations*, in course order. |
+| **Content** | Search every word and phrase; course units and Phrasebook categories listed separately (→ lessons → word editor: forms, audio, *Words used*, status); content progress and learner analytics. |
+
+Plain names: a *word or phrase* (word group) has *forms* (variants); *Live*
+= approved; *Text checked by a native speaker* = `native_verified`; *Native
+recording* = `is_native_voice`. The old addresses (`/admin/queue`,
+`/admin/recordings`, …) still open the same screens on their own.
 ---
 
 ## 10. Offline behaviour

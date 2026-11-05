@@ -10,6 +10,7 @@ import { useAccess } from '@/lib/access/AccessContext';
 
 import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
+import { ComputerVoiceNote } from '@/components/ui/ComputerVoiceNote';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
@@ -317,6 +318,8 @@ function TutorBubble({
           )}
         </PressableScale>
       </View>
+      {/* The tutor's voice is AI text-to-speech, not a Tunisian speaker — say so, like word audio. */}
+      <ComputerVoiceNote style={{ textAlign: 'left' }} />
       <TunisianText arabic={response.tunisian} latin={response.transliteration} arabicStyle={styles.tunisianText} latinStyle={styles.transliterationText} />
       <Text style={styles.englishText}>{response.english}</Text>
 

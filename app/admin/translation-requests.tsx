@@ -1,17 +1,20 @@
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { BackButton } from '@/components/ui/BackButton';
+import { AdminScreenTop } from '@/components/admin/AdminScreenTop';
 import { Button } from '@/components/ui/Button';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
-import { colors, radii, shadows, spacing } from '@/constants/theme';
+import { radii, shadows, spacing, type ThemeColors } from '@/constants/theme';
 import { listOpenTranslationRequests, type AdminTranslationRequest } from '@/data/admin/translationRequests';
 import { deadlineStatus, formatTunisDay } from '@/lib/translationRequests/deadline';
+import { useTheme } from '@/lib/theme/ThemeContext';
 
 /** Pending learner translation requests, soonest deadline first. */
 export default function AdminTranslationRequestsQueue() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [requests, setRequests] = useState<AdminTranslationRequest[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,10 +32,10 @@ export default function AdminTranslationRequestsQueue() {
   const overdueCount = (requests ?? []).filter((r) => deadlineStatus(new Date(r.dueAt), now).overdue).length;
 
   return (
-    <ScreenContainer>
-      <BackButton />
+    <ScreenContainer themed>
+      <AdminScreenTop />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-        <Text style={styles.title}>Translation Requests</Text>
+        <Text style={styles.title}>Translation requests</Text>
         <Text style={styles.subtitle}>
           Learners were promised an answer within 3 business days (Mon–Fri, Tunis time).
           {requests ? ` ${requests.length} pending · ${overdueCount} overdue.` : ''}
@@ -41,7 +44,7 @@ export default function AdminTranslationRequestsQueue() {
         {error ? (
           <View style={styles.card}>
             <Text style={styles.errorText}>Couldn&apos;t load requests ({error}).</Text>
-            <Button label="Retry" variant="secondary" onPress={load} />
+            <Button themed label="Retry" variant="secondary" onPress={load} />
           </View>
         ) : requests === null ? (
           <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
@@ -74,17 +77,18 @@ export default function AdminTranslationRequestsQueue() {
   );
 }
 
-const styles = StyleSheet.create({
-  scroll: { paddingBottom: spacing.xxl },
-  title: { fontSize: 26, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md },
-  subtitle: { fontSize: 14, color: colors.textSecondary, marginTop: spacing.xs, marginBottom: spacing.lg },
-  card: { backgroundColor: colors.surface, borderRadius: radii.md, padding: spacing.md, gap: spacing.xs, marginBottom: spacing.sm },
-  requestText: { fontSize: 16, fontWeight: '600', color: colors.textPrimary },
-  row: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm },
-  meta: { fontSize: 12, color: colors.textSecondary },
-  deadline: { fontSize: 12, fontWeight: '700', color: colors.success },
-  overdue: { color: colors.error },
-  handled: { fontSize: 12, fontWeight: '700', color: colors.primary },
-  empty: { fontSize: 15, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.xl },
-  errorText: { fontSize: 13, color: colors.error },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    scroll: { paddingBottom: spacing.xxl },
+    title: { fontSize: 26, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md },
+    subtitle: { fontSize: 14, color: colors.textSecondary, marginTop: spacing.xs, marginBottom: spacing.lg },
+    card: { backgroundColor: colors.surface, borderRadius: radii.md, padding: spacing.md, gap: spacing.xs, marginBottom: spacing.sm },
+    requestText: { fontSize: 16, fontWeight: '600', color: colors.textPrimary },
+    row: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm },
+    meta: { fontSize: 12, color: colors.textSecondary },
+    deadline: { fontSize: 12, fontWeight: '700', color: colors.success },
+    overdue: { color: colors.error },
+    handled: { fontSize: 12, fontWeight: '700', color: colors.primary },
+    empty: { fontSize: 15, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.xl },
+    errorText: { fontSize: 13, color: colors.error },
+  });

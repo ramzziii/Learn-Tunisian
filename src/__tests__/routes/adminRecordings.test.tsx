@@ -1,5 +1,5 @@
 // Admin Native Recordings + Skipped Recordings screens.
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 const mockFetchQueue = jest.fn();
 const mockFetchSkipped = jest.fn();
@@ -7,6 +7,9 @@ const mockSkip = jest.fn();
 const mockRestore = jest.fn();
 const mockFetchMissingExplanations = jest.fn();
 const mockPush = jest.fn();
+// Screens' focus effects; refocus() runs them again (coming back from the editor).
+const mockFocusEffects = new Set<() => void>();
+const refocus = () => act(async () => mockFocusEffects.forEach((effect) => effect()));
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,
@@ -14,6 +17,13 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 jest.mock('expo-router', () => ({
   router: { back: jest.fn(), push: (...a: unknown[]) => mockPush(...a), replace: jest.fn(), canGoBack: () => true },
+  useFocusEffect: (effect: () => void) =>
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    require('react').useEffect(() => {
+      mockFocusEffects.add(effect);
+      effect();
+      return () => void mockFocusEffects.delete(effect);
+    }, [effect]),
 }));
 jest.mock('@/lib/auth/AuthContext', () => ({ useAuth: () => ({ session: { user: { id: 'admin-1' } } }) }));
 jest.mock('@/data/admin/recordingQueue', () => ({
@@ -30,12 +40,19 @@ jest.mock('@/components/admin/RecordingStation', () => ({
     mode?: string;
     onSaved: (v: unknown) => void;
     onSkip?: () => void;
+    onEdit?: () => void;
   }) => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { Text, Pressable } = require('react-native');
     return (
       <>
         <Text>{`Recording ${props.item.variant.id}${props.onSkip ? '' : ' (no skip)'}${props.mode ? ` mode=${props.mode}` : ''}`}</Text>
+        <Text>{`word: ${(props.item as unknown as { englishMeaning: string }).englishMeaning}`}</Text>
+        {props.onEdit ? (
+          <Pressable onPress={props.onEdit}>
+            <Text>Stub edit</Text>
+          </Pressable>
+        ) : null}
         <Pressable onPress={() => props.onSaved({ id: props.item.variant.id })}>
           <Text>Stub save</Text>
         </Pressable>
@@ -114,6 +131,36 @@ describe('Native Recordings', () => {
     await fireEvent.press(screen.getByText('Stub save'));
 
     expect(await screen.findByText('Recording a')).toBeOnTheScreen();
+  });
+
+  it('Edit word opens the word editor; coming back shows the edited word, still on its card', async () => {
+    mockFetchQueue.mockResolvedValue([item('a'), item('b')]);
+    await render(
+      <ThemeProvider>
+        <Recordings />
+      </ThemeProvider>
+    );
+    await fireEvent.press(await screen.findByText('meaning b'));
+    await fireEvent.press(screen.getByText('Stub edit'));
+    expect(mockPush).toHaveBeenCalledWith({ pathname: '/admin/word-groups/[wordGroupId]', params: { wordGroupId: 'g1' } });
+
+    mockFetchQueue.mockResolvedValue([item('a'), { ...item('b'), englishMeaning: 'edited b' }]);
+    await refocus();
+    expect(await screen.findByText('word: edited b')).toBeOnTheScreen();
+    expect(screen.getByText('Recording b')).toBeOnTheScreen();
+    expect(mockFetchQueue).toHaveBeenCalledTimes(2);
+  });
+
+  it('coming back to the screen without editing reloads nothing', async () => {
+    mockFetchQueue.mockResolvedValue([item('a')]);
+    await render(
+      <ThemeProvider>
+        <Recordings />
+      </ThemeProvider>
+    );
+    await screen.findByText('meaning a');
+    await refocus();
+    expect(mockFetchQueue).toHaveBeenCalledTimes(1);
   });
 
   it('Skip skips permanently (saved, by this admin) and moves to the next word', async () => {
@@ -242,7 +289,7 @@ describe('Missing Explanations', () => {
       </ThemeProvider>
     );
 
-    await fireEvent.press(await screen.findByText('Missing Explanations ›'));
+    await fireEvent.press(await screen.findByText('Missing explanations ›'));
     expect(mockPush).toHaveBeenCalledWith('/admin/recordings-explanations');
   });
 

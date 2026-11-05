@@ -29,7 +29,10 @@
 - One access table: `src/lib/access/accessRules.ts`; screens ask
   `useAccess()` (`decide` / `open`), never `isPremium` + their own lists.
   Details: docs/access-and-guest-preview.md.
-- Counted items (lesson, phrasebook category, grammar note, proverb, letter,
+- Grammar notes aren't counted: guests get sentence order; free accounts
+  add present tense and questions; the rest is Premium
+  (`FIXED_FREE_ITEMS` in accessRules.ts).
+- Counted items (lesson, phrasebook category, proverb, letter,
   Repeat After Me recording): guest 2, free 5 in total (guest use included),
   Premium all. Count on first open/start, never twice; completed lessons
   always reopen; nothing counted while Premium. Open an item through
@@ -126,3 +129,9 @@
   native recording. A text review never sets `is_native_voice`.
 - Lessons with no approved words are hidden from learners (and left out of
   the unlock order) in `fetchLessonMap` / `guestLessonMap`.
+- "Words used" links (`phrase_word_links`, 0027) are suggestions until an
+  admin saves them (`set_phrase_word_links`, admins only). Matching uses
+  `searchKeys.ts` only (`src/lib/phraseWords/suggestWordLinks.ts`): changed
+  forms are "possible match", never ticked; never merge differing sounds.
+  Learners see approved linked words only; locked words follow the practice
+  scope (`WordsUsedSection`).

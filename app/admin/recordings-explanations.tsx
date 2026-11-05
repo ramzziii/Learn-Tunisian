@@ -1,13 +1,15 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { AdminScreenTop } from '@/components/admin/AdminScreenTop';
 import { RecordingStation } from '@/components/admin/RecordingStation';
-import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
-import { colors, radii, shadows, spacing } from '@/constants/theme';
+import { radii, shadows, spacing, type ThemeColors } from '@/constants/theme';
 import { fetchMissingExplanations, type ExplanationQueueItem } from '@/data/admin/recordingQueue';
+import { useEditWordFromQueue } from '@/lib/admin/useEditWordFromQueue';
 import { useAuth } from '@/lib/auth/AuthContext';
+import { useTheme } from '@/lib/theme/ThemeContext';
 
 /** The item at `index` after one was removed, wrapping to the start; null if none left. */
 function nextAt(items: ExplanationQueueItem[], index: number): ExplanationQueueItem | null {
@@ -22,6 +24,8 @@ function nextAt(items: ExplanationQueueItem[], index: number): ExplanationQueueI
  * Skip only moves on — explanations are optional, so nothing is stored.
  */
 export default function AdminMissingExplanations() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { session } = useAuth();
   const actorAccountId = session?.user.id ?? '';
   const [items, setItems] = useState<ExplanationQueueItem[] | null>(null);
@@ -42,6 +46,8 @@ export default function AdminMissingExplanations() {
     load();
   }, [load]);
 
+  const editWord = useEditWordFromQueue(fetchMissingExplanations, setItems);
+
   const advance = (dropCurrent: boolean) => {
     if (!items || !currentId) return;
     const index = items.findIndex((i) => i.variant.id === currentId);
@@ -56,11 +62,11 @@ export default function AdminMissingExplanations() {
 
   if (loadError) {
     return (
-      <ScreenContainer>
-        <BackButton />
+      <ScreenContainer themed>
+        <AdminScreenTop />
         <View style={styles.centered}>
           <Text style={styles.centeredTitle}>Couldn&apos;t load the list</Text>
-          <Button label="Try again" variant="secondary" onPress={load} />
+          <Button themed label="Try again" variant="secondary" onPress={load} />
         </View>
       </ScreenContainer>
     );
@@ -68,8 +74,8 @@ export default function AdminMissingExplanations() {
 
   if (!items) {
     return (
-      <ScreenContainer>
-        <BackButton />
+      <ScreenContainer themed>
+        <AdminScreenTop />
         <ActivityIndicator style={{ marginTop: spacing.xl }} color={colors.primary} />
       </ScreenContainer>
     );
@@ -77,8 +83,8 @@ export default function AdminMissingExplanations() {
 
   if (items.length === 0) {
     return (
-      <ScreenContainer>
-        <BackButton />
+      <ScreenContainer themed>
+        <AdminScreenTop />
         <View style={styles.centered}>
           <Text style={styles.centeredEmoji}>🎉</Text>
           <Text style={styles.centeredTitle}>Every recorded word has an explanation</Text>
@@ -91,7 +97,7 @@ export default function AdminMissingExplanations() {
 
   if (current) {
     return (
-      <ScreenContainer>
+      <ScreenContainer themed>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           <View style={styles.stationHeader}>
             <Pressable onPress={() => setCurrentId(null)} hitSlop={8}>
@@ -106,6 +112,7 @@ export default function AdminMissingExplanations() {
             actorAccountId={actorAccountId}
             onSaved={() => advance(true)}
             onSkip={() => advance(false)}
+            onEdit={() => editWord(current.variant.wordGroupId)}
           />
         </ScrollView>
       </ScreenContainer>
@@ -113,9 +120,9 @@ export default function AdminMissingExplanations() {
   }
 
   return (
-    <ScreenContainer>
-      <BackButton />
-      <Text style={styles.title}>Missing Explanations</Text>
+    <ScreenContainer themed>
+      <AdminScreenTop />
+      <Text style={styles.title}>Missing explanations</Text>
       <Text style={styles.subtitle}>
         {items.length} {items.length === 1 ? 'word has' : 'words have'} no explanation recording yet. Explanations are
         optional — a native speaker explaining the word in English, Arabic, or both.
@@ -142,37 +149,38 @@ export default function AdminMissingExplanations() {
   );
 }
 
-const styles = StyleSheet.create({
-  title: { fontSize: 26, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md },
-  subtitle: { fontSize: 14, color: colors.textSecondary, marginTop: spacing.xs, marginBottom: spacing.sm },
-  link: { fontSize: 14, fontWeight: '700', color: colors.primary },
-  list: { gap: spacing.sm, paddingVertical: spacing.md, paddingBottom: spacing.xxl },
-  scroll: { gap: spacing.md, paddingBottom: spacing.xxl },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.surface,
-    borderRadius: radii.md,
-    padding: spacing.md,
-  },
-  rowPressed: { opacity: 0.7 },
-  rowMeaning: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
-  rowSub: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
-  rowArabic: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
-  reason: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: colors.textSecondary,
-    backgroundColor: `${colors.textSecondary}14`,
-    borderRadius: radii.pill,
-    paddingVertical: 2,
-    paddingHorizontal: spacing.xs,
-    overflow: 'hidden',
-  },
-  stationHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.md },
-  leftCount: { fontSize: 13, fontWeight: '700', color: colors.textSecondary },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm, padding: spacing.lg },
-  centeredEmoji: { fontSize: 48 },
-  centeredTitle: { fontSize: 20, fontWeight: '800', color: colors.textPrimary, textAlign: 'center' },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    title: { fontSize: 26, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md },
+    subtitle: { fontSize: 14, color: colors.textSecondary, marginTop: spacing.xs, marginBottom: spacing.sm },
+    link: { fontSize: 14, fontWeight: '700', color: colors.primary },
+    list: { gap: spacing.sm, paddingVertical: spacing.md, paddingBottom: spacing.xxl },
+    scroll: { gap: spacing.md, paddingBottom: spacing.xxl },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      backgroundColor: colors.surface,
+      borderRadius: radii.md,
+      padding: spacing.md,
+    },
+    rowPressed: { opacity: 0.7 },
+    rowMeaning: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
+    rowSub: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+    rowArabic: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
+    reason: {
+      fontSize: 10,
+      fontWeight: '700',
+      color: colors.textSecondary,
+      backgroundColor: `${colors.textSecondary}14`,
+      borderRadius: radii.pill,
+      paddingVertical: 2,
+      paddingHorizontal: spacing.xs,
+      overflow: 'hidden',
+    },
+    stationHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.md },
+    leftCount: { fontSize: 13, fontWeight: '700', color: colors.textSecondary },
+    centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm, padding: spacing.lg },
+    centeredEmoji: { fontSize: 48 },
+    centeredTitle: { fontSize: 20, fontWeight: '800', color: colors.textPrimary, textAlign: 'center' },
+  });

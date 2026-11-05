@@ -1,9 +1,9 @@
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '@/components/ui/Button';
-import { colors, radii, shadows, spacing } from '@/constants/theme';
+import { radii, shadows, spacing, type ThemeColors } from '@/constants/theme';
 import {
   saveQueueExplanation,
   saveQueueRecording,
@@ -15,6 +15,7 @@ import { useAdminAudioRecorder } from '@/hooks/useAdminAudioRecorder';
 import { pickAudioFile, type PickedAudioFile } from '@/lib/admin/audioFile';
 import { getAudioUrl } from '@/lib/supabase/client';
 import type { VariantLabel, WordVariant } from '@/types/models';
+import { useTheme } from '@/lib/theme/ThemeContext';
 
 const FORM_LABEL: Record<VariantLabel, string> = {
   primary: 'Primary',
@@ -43,6 +44,8 @@ type StationProps = {
   onSkip?: () => void;
   /** Disables Skip while the screen is saving the skip. */
   isSkipping?: boolean;
+  /** "Edit word": opens the word in the editor. Hidden while a take is unsaved. */
+  onEdit?: () => void;
 } & (
   | { mode?: 'pronunciation'; item: RecordingQueueItem }
   /** Missing Explanations: the pronunciation exists; record only the explanation. */
@@ -63,7 +66,9 @@ type StationProps = {
  * error and stays on the word with both takes kept.
  */
 export function RecordingStation(props: StationProps) {
-  const { item, actorAccountId, onSaved, onSkip, isSkipping = false } = props;
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { item, actorAccountId, onSaved, onSkip, isSkipping = false, onEdit } = props;
   const explanationOnly = props.mode === 'explanation';
   const { variant } = item;
   const hasExistingExplanation = !!variant.explanationAudioPath;
@@ -218,13 +223,14 @@ export function RecordingStation(props: StationProps) {
           <View style={styles.row}>
             <View style={styles.cell}>
               <Button
+                themed
                 label="▶ Play explanation"
                 variant="secondary"
                 onPress={() => playUri(explanationTake.uri, "Couldn't play the explanation back.")}
               />
             </View>
             <View style={styles.cell}>
-              <Button label="Redo explanation" variant="ghost" onPress={() => setExplanationTake(null)} disabled={isSaving} />
+              <Button themed label="Redo explanation" variant="ghost" onPress={() => setExplanationTake(null)} disabled={isSaving} />
             </View>
           </View>
         </>
@@ -234,6 +240,7 @@ export function RecordingStation(props: StationProps) {
             <Text style={styles.errorText}>Microphone access is off — upload the explanation as a file instead.</Text>
           ) : (
             <Button
+              themed
               label={
                 recordingExplanation
                   ? `■ Stop explanation (${Math.floor(recorder.durationMillis / 1000)}s)`
@@ -244,7 +251,7 @@ export function RecordingStation(props: StationProps) {
               disabled={recordingPronunciation}
             />
           )}
-          {recorder.isRecording ? null : <Button label="Upload explanation" variant="ghost" onPress={uploadExplanation} />}
+          {recorder.isRecording ? null : <Button themed label="Upload explanation" variant="ghost" onPress={uploadExplanation} />}
         </>
       )}
     </View>
@@ -274,12 +281,18 @@ export function RecordingStation(props: StationProps) {
       <Text style={styles.context}>
         {item.unitName} · Lesson {item.lessonNumber}
       </Text>
+      {onEdit && !recorder.isRecording && !recordedUri && !explanationTake && !isSaving ? (
+        <Pressable onPress={onEdit} hitSlop={8} accessibilityRole="button" style={styles.editLink}>
+          <Text style={styles.editLinkText}>✏️ Edit word</Text>
+        </Pressable>
+      ) : null}
 
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
       {explanationOnly ? (
         <>
           <Button
+            themed
             label="▶ Play pronunciation"
             variant="ghost"
             onPress={() => playUri(getAudioUrl(variant.audioPath, variant.updatedAt), "Couldn't play the pronunciation.")}
@@ -287,7 +300,7 @@ export function RecordingStation(props: StationProps) {
           <Text style={styles.sectionLabel}>Explanation recording</Text>
           <Text style={styles.context}>A native speaker explaining it — in English, Arabic, or both.</Text>
           {explanationControls}
-          <Button label="Save explanation & next" onPress={saveExplanationOnly} loading={isSaving} />
+          <Button themed label="Save explanation & next" onPress={saveExplanationOnly} loading={isSaving} />
         </>
       ) : recordedUri && !recordingPronunciation ? (
         <>
@@ -296,6 +309,7 @@ export function RecordingStation(props: StationProps) {
           <View style={styles.row}>
             <View style={styles.cell}>
               <Button
+                themed
                 label={playerStatus.playing ? '⏸ Playing…' : pickedFile ? '▶ Play file' : '▶ Play recording'}
                 variant="secondary"
                 onPress={() => playUri(recordedUri, "Couldn't play the recording back.")}
@@ -303,6 +317,7 @@ export function RecordingStation(props: StationProps) {
             </View>
             <View style={styles.cell}>
               <Button
+                themed
                 label={pickedFile ? 'Choose another file' : 'Record again'}
                 variant="ghost"
                 onPress={discardTake}
@@ -348,7 +363,7 @@ export function RecordingStation(props: StationProps) {
             </>
           ) : null}
 
-          <Button label="Save & next" onPress={save} loading={isSaving} disabled={recorder.isRecording} />
+          <Button themed label="Save & next" onPress={save} loading={isSaving} disabled={recorder.isRecording} />
         </>
       ) : (
         <>
@@ -358,58 +373,62 @@ export function RecordingStation(props: StationProps) {
             </Text>
           ) : (
             <Button
+              themed
               label={recordingPronunciation ? `■ Stop (${Math.floor(recorder.durationMillis / 1000)}s)` : '● Record'}
               variant={recordingPronunciation ? 'primary' : 'secondary'}
               onPress={() => toggleRecording('pronunciation')}
             />
           )}
-          {recorder.isRecording ? null : <Button label="Upload audio" variant="ghost" onPress={uploadFile} />}
+          {recorder.isRecording ? null : <Button themed label="Upload audio" variant="ghost" onPress={uploadFile} />}
         </>
       )}
 
       {onSkip ? (
-        <Button label="Skip" variant="ghost" onPress={onSkip} disabled={isSaving || isSkipping || recorder.isRecording} />
+        <Button themed label="Skip" variant="ghost" onPress={onSkip} disabled={isSaving || isSkipping || recorder.isRecording} />
       ) : null}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  card: { backgroundColor: colors.surface, borderRadius: radii.lg, padding: spacing.lg, gap: spacing.sm },
-  badges: { flexDirection: 'row', gap: spacing.xs, flexWrap: 'wrap' },
-  formNote: { fontSize: 13, color: colors.textSecondary },
-  badge: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.primary,
-    backgroundColor: `${colors.primary}14`,
-    borderRadius: radii.pill,
-    paddingVertical: 2,
-    paddingHorizontal: spacing.sm,
-    overflow: 'hidden',
-  },
-  needBadge: { color: colors.error, backgroundColor: `${colors.error}14` },
-  mutedBadge: { color: colors.textSecondary, backgroundColor: `${colors.textSecondary}14` },
-  sectionLabel: { fontSize: 12, fontWeight: '800', color: colors.textSecondary, textTransform: 'uppercase', marginTop: spacing.xs },
-  explanationBox: { gap: spacing.xs },
-  meaning: { fontSize: 22, fontWeight: '800', color: colors.textPrimary, marginTop: spacing.xs },
-  arabic: { fontSize: 32, fontWeight: '700', color: colors.textPrimary, textAlign: 'center', marginTop: spacing.sm },
-  transliteration: { fontSize: 17, color: colors.textSecondary, textAlign: 'center', fontStyle: 'italic' },
-  context: { fontSize: 12, color: colors.textSecondary, textAlign: 'center', marginBottom: spacing.sm },
-  errorText: { fontSize: 13, color: colors.error, textAlign: 'center' },
-  row: { flexDirection: 'row', gap: spacing.sm },
-  cell: { flex: 1, minWidth: 0 },
-  checkboxRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xs },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkboxChecked: { backgroundColor: colors.primary },
-  checkmark: { color: colors.textOnPrimary, fontSize: 15, fontWeight: '800' },
-  checkboxLabel: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    card: { backgroundColor: colors.surface, borderRadius: radii.lg, padding: spacing.lg, gap: spacing.sm },
+    badges: { flexDirection: 'row', gap: spacing.xs, flexWrap: 'wrap' },
+    formNote: { fontSize: 13, color: colors.textSecondary },
+    editLink: { alignSelf: 'center', paddingVertical: spacing.xs },
+    editLinkText: { fontSize: 15, fontWeight: '700', color: colors.primary },
+    badge: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: colors.primary,
+      backgroundColor: `${colors.primary}14`,
+      borderRadius: radii.pill,
+      paddingVertical: 2,
+      paddingHorizontal: spacing.sm,
+      overflow: 'hidden',
+    },
+    needBadge: { color: colors.error, backgroundColor: `${colors.error}14` },
+    mutedBadge: { color: colors.textSecondary, backgroundColor: `${colors.textSecondary}14` },
+    sectionLabel: { fontSize: 12, fontWeight: '800', color: colors.textSecondary, textTransform: 'uppercase', marginTop: spacing.xs },
+    explanationBox: { gap: spacing.xs },
+    meaning: { fontSize: 22, fontWeight: '800', color: colors.textPrimary, marginTop: spacing.xs },
+    arabic: { fontSize: 32, fontWeight: '700', color: colors.textPrimary, textAlign: 'center', marginTop: spacing.sm },
+    transliteration: { fontSize: 17, color: colors.textSecondary, textAlign: 'center', fontStyle: 'italic' },
+    context: { fontSize: 12, color: colors.textSecondary, textAlign: 'center', marginBottom: spacing.sm },
+    errorText: { fontSize: 13, color: colors.error, textAlign: 'center' },
+    row: { flexDirection: 'row', gap: spacing.sm },
+    cell: { flex: 1, minWidth: 0 },
+    checkboxRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xs },
+    checkbox: {
+      width: 24,
+      height: 24,
+      borderRadius: 6,
+      borderWidth: 2,
+      borderColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    checkboxChecked: { backgroundColor: colors.primary },
+    checkmark: { color: colors.textOnPrimary, fontSize: 15, fontWeight: '800' },
+    checkboxLabel: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
+  });

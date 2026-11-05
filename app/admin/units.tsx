@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { PillSelect } from '@/components/admin/PillSelect';
@@ -8,10 +8,11 @@ import { Button } from '@/components/ui/Button';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
-import { colors, radii, shadows, spacing } from '@/constants/theme';
+import { radii, shadows, spacing, type ThemeColors } from '@/constants/theme';
 import { createUnit, listUnitsAdmin } from '@/data/admin/content';
 import { useAuth } from '@/lib/auth/AuthContext';
 import type { Unit } from '@/types/models';
+import { useTheme } from '@/lib/theme/ThemeContext';
 
 const CURRICULUM_OPTIONS = [
   { value: 'true', label: 'Curriculum' },
@@ -19,6 +20,8 @@ const CURRICULUM_OPTIONS = [
 ];
 
 export default function AdminUnitsList() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { session } = useAuth();
   const actorAccountId = session?.user.id ?? '';
 
@@ -70,21 +73,21 @@ export default function AdminUnitsList() {
 
   if (loadError) {
     return (
-      <ScreenContainer>
-        <BackButton />
+      <ScreenContainer themed>
+        <BackButton themed />
         <View style={styles.centered}>
           <Text style={styles.centeredTitle}>Couldn&apos;t load units</Text>
-          <Button label="Try again" variant="secondary" onPress={load} />
+          <Button themed label="Try again" variant="secondary" onPress={load} />
         </View>
       </ScreenContainer>
     );
   }
 
-  if (units === null) return <LoadingScreen />;
+  if (units === null) return <LoadingScreen themed />;
 
   return (
-    <ScreenContainer>
-      <BackButton />
+    <ScreenContainer themed>
+      <BackButton themed />
       <Text style={styles.title}>Units</Text>
       <Text style={styles.subtitle}>{units.length} units — tap one to manage its lessons.</Text>
 
@@ -119,46 +122,47 @@ export default function AdminUnitsList() {
             />
             <PillSelect label="Type" options={CURRICULUM_OPTIONS} value={isCurriculum} onChange={setIsCurriculum} />
             <View style={styles.actionsRow}>
-              <Button label="Cancel" variant="secondary" onPress={() => setIsCreating(false)} style={{ flex: 1 }} />
-              <Button label="Create" onPress={handleCreate} loading={isSaving} style={{ flex: 1 }} />
+              <Button themed label="Cancel" variant="secondary" onPress={() => setIsCreating(false)} style={{ flex: 1 }} />
+              <Button themed label="Create" onPress={handleCreate} loading={isSaving} style={{ flex: 1 }} />
             </View>
           </View>
         ) : (
-          <Button label="+ New Unit" variant="secondary" onPress={() => setIsCreating(true)} />
+          <Button themed label="+ New Unit" variant="secondary" onPress={() => setIsCreating(true)} />
         )}
       </ScrollView>
     </ScreenContainer>
   );
 }
 
-const styles = StyleSheet.create({
-  title: { fontSize: 22, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md },
-  subtitle: { fontSize: 13, color: colors.textSecondary, marginTop: spacing.xs, marginBottom: spacing.md },
-  list: { gap: spacing.sm, paddingBottom: spacing.xl },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: radii.md,
-    padding: spacing.md,
-  },
-  rowTitle: { fontSize: 16, fontWeight: '600', color: colors.textPrimary },
-  rowMeta: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
-  chevron: { fontSize: 18, color: colors.textSecondary },
-  card: { backgroundColor: colors.surface, borderRadius: radii.lg, padding: spacing.md, gap: 4 },
-  errorText: { fontSize: 13, color: colors.error, marginBottom: spacing.xs },
-  fieldLabel: { fontSize: 11, fontWeight: '700', color: colors.textSecondary, marginTop: spacing.sm, textTransform: 'uppercase' },
-  input: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.sm,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 6,
-    fontSize: 15,
-    color: colors.textPrimary,
-    backgroundColor: colors.background,
-  },
-  actionsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
-  centeredTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    title: { fontSize: 22, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md },
+    subtitle: { fontSize: 13, color: colors.textSecondary, marginTop: spacing.xs, marginBottom: spacing.md },
+    list: { gap: spacing.sm, paddingBottom: spacing.xl },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderRadius: radii.md,
+      padding: spacing.md,
+    },
+    rowTitle: { fontSize: 16, fontWeight: '600', color: colors.textPrimary },
+    rowMeta: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+    chevron: { fontSize: 18, color: colors.textSecondary },
+    card: { backgroundColor: colors.surface, borderRadius: radii.lg, padding: spacing.md, gap: 4 },
+    errorText: { fontSize: 13, color: colors.error, marginBottom: spacing.xs },
+    fieldLabel: { fontSize: 11, fontWeight: '700', color: colors.textSecondary, marginTop: spacing.sm, textTransform: 'uppercase' },
+    input: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: radii.sm,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 6,
+      fontSize: 15,
+      color: colors.textPrimary,
+      backgroundColor: colors.background,
+    },
+    actionsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
+    centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
+    centeredTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
+  });

@@ -15,7 +15,11 @@ locally.
 
 An admin previewing the free plan is counted on the device only
 (`learn-tunisian.preview-claims.<profileId>`). This never touches their real
-counts or entitlement. Profile → "Reset free-plan limits" clears it.
+counts or entitlement. Profile → "Reset free-plan limits" clears it. The
+preview acts like a new free account: the admin's own completed lessons
+don't reopen for free there. While it's on, every screen shows a "Viewing as
+a free user" banner (`FreePreviewBanner`, in `ScreenContainer`) that opens
+Profile.
 
 ## The access table
 
@@ -23,7 +27,7 @@ counts or entitlement. Profile → "Reset free-plan limits" clears it.
 |---|---|---|---|---|
 | Learn | lesson | the first 2 lessons in course order (the preview) | 5 lessons | all (lessons still unlock in order) |
 | Phrasebook | category | Greetings + First Encounters (the preview) | 5 | all |
-| Grammar Notes | note | any 2 | 5 | all |
+| Grammar Notes | note | Basic sentence order only (fixed, not counted) | Basic sentence order, Present tense, Questions; every other note is Premium | all |
 | Culture Corner | proverb | any 2 | 5 | all |
 | Alphabet | letter | any 2 | 5 | all letters |
 | Repeat After Me | recording | 2 preview recordings (if 2 qualify) | 5 | all |
@@ -205,7 +209,10 @@ in this order, and only after review:
    `guest_preview_word_groups`, `guest_preview_word_variants`) with
    `security_barrier`, explicit columns and approved content only. Grants are
    SELECT-only to `anon` and `authenticated`. It selects nothing by itself,
-   and no grants or policies on existing tables change.
+   and no grants or policies on existing tables change. (Later,
+   `0027_phrase_word_links.sql` adds a fifth view in the same style,
+   `guest_preview_phrase_word_links`: "Words used" links of preview phrases
+   to approved words only.)
 2. **`scripts/select-guest-preview.sql`** (run by hand after 0024) chooses
    the preview content by id. It checks that there are exactly 2 + 2
    lessons, that they are the first two in course order, that the two

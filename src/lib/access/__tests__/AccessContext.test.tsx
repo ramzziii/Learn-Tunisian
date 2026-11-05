@@ -139,11 +139,11 @@ describe('guest (device only)', () => {
     const { result } = await renderAccess();
     expect(result.current.tier).toBe('guest');
     await act(async () => {
-      expect(await result.current.open('grammar_note', 'a')).toBe(true);
-      expect(await result.current.open('grammar_note', 'b')).toBe(true);
-      expect(await result.current.open('grammar_note', 'c')).toBe(false);
+      expect(await result.current.open('proverb', 'a')).toBe(true);
+      expect(await result.current.open('proverb', 'b')).toBe(true);
+      expect(await result.current.open('proverb', 'c')).toBe(false);
     });
-    expect(result.current.decide('grammar_note', 'a')).toBe('open');
+    expect(result.current.decide('proverb', 'a')).toBe('open');
     expect(mockFetchClaims).not.toHaveBeenCalled();
     expect(mockClaimItem).not.toHaveBeenCalled();
   });
@@ -180,6 +180,20 @@ describe('admin previewing the free plan', () => {
     });
     expect(mockFetchClaims).not.toHaveBeenCalled();
     expect(mockClaimItem).not.toHaveBeenCalled();
+  });
+
+  it('acts like a new free account: the admin’s own completed lessons don’t reopen for free', async () => {
+    const { result } = await renderAccess();
+    expect(result.current.decide('lesson', 'done', { completed: true })).toBe('claim');
+    await act(async () => {
+      for (const k of ['a', 'b', 'c', 'd', 'e']) await result.current.open('lesson', k);
+    });
+    expect(result.current.decide('lesson', 'done', { completed: true })).toBe('limit');
+    let allowed: boolean | undefined;
+    await act(async () => {
+      allowed = await result.current.open('lesson', 'done', { completed: true });
+    });
+    expect(allowed).toBe(false);
   });
 
   it('the admin can reset the preview counts — only the local preview, never the server', async () => {

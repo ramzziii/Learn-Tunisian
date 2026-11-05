@@ -14,6 +14,9 @@
  * while Premium, so when Premium ends, what was opened stays open and new
  * items count toward the free total. Only approved content is ever eligible.
  *
+ * Grammar notes aren't counted: fixed free sets per tier (FIXED_FREE_ITEMS),
+ * the rest is Premium.
+ *
  * Practice (Review, Flashcards, Listening, Speaking, Favorites) isn't counted:
  * it uses only words from unlocked lessons/categories, approved only.
  */
@@ -53,6 +56,19 @@ const FEATURE_ALLOWANCE: Partial<Record<CountedFeature, Record<Tier, number>>> =
   dictionary_result: { guest: GUEST_ITEM_ALLOWANCE, free: Infinity, premium: Infinity },
 };
 
+/**
+ * Features with fixed free sets instead of a count: guests and free accounts
+ * may open exactly their tier's items (never counted, nothing claimed); every
+ * other item is Premium. Grammar notes (ids in src/constants/grammarNotes.ts):
+ * guests get sentence order; a free account adds present tense and questions.
+ */
+export const FIXED_FREE_ITEMS: Partial<Record<CountedFeature, Record<'guest' | 'free', ReadonlySet<string>>>> = {
+  grammar_note: {
+    guest: new Set(['sentence_order']),
+    free: new Set(['sentence_order', 'present_verbs', 'questions']),
+  },
+};
+
 export function itemAllowance(tier: Tier, feature?: CountedFeature): number {
   const special = feature ? FEATURE_ALLOWANCE[feature] : undefined;
   if (special) return special[tier];
@@ -65,7 +81,8 @@ export function itemAllowance(tier: Tier, feature?: CountedFeature): number {
  * imported from the guest preview at sign-up. Features unlimited for
  * accounts are counted on the device only, for guests, and never sent.
  */
-export const isServerCounted = (feature: CountedFeature): boolean => itemAllowance('free', feature) !== Infinity;
+export const isServerCounted = (feature: CountedFeature): boolean =>
+  !FIXED_FREE_ITEMS[feature] && itemAllowance('free', feature) !== Infinity;
 
 /** Talk (AI conversation and tutor voice) is Premium only; the server enforces it too. */
 export const canUseTalk = (tier: Tier): boolean => tier === 'premium';
@@ -95,6 +112,8 @@ export function decideItemAccess({
   completed?: boolean;
   feature?: CountedFeature;
 }): ItemDecision {
+  const fixedFree = feature ? FIXED_FREE_ITEMS[feature] : undefined;
+  if (fixedFree) return tier === 'premium' || fixedFree[tier].has(itemKey) ? 'open' : 'limit';
   const allowance = itemAllowance(tier, feature);
   if (allowance === Infinity || completed || claimed.has(itemKey)) return 'open';
   return claimed.size < allowance ? 'claim' : 'limit';

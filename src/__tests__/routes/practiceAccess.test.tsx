@@ -31,6 +31,13 @@ let mockFavorites: unknown[] = [];
 let mockReviewQueue: unknown[] = [];
 let mockWordId = 'in1';
 
+jest.mock('@/components/phraseWords/WordsUsedSection', () => ({
+  WordsUsedSection: ({ phraseId }: { phraseId: string }) => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { Text } = require('react-native');
+    return <Text>{`[words used for ${phraseId}]`}</Text>;
+  },
+}));
 jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,
   default: { getItem: jest.fn(async () => null), setItem: jest.fn(async () => undefined) },
@@ -139,9 +146,10 @@ describe('Word detail', () => {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const WordDetail = require('../../../app/word/[wordGroupId]').default;
 
-  it('a word in the scope shows normally', async () => {
+  it('a word in the scope shows normally, with its "Words used" cards', async () => {
     await themed(<WordDetail />);
     expect(await screen.findByText('meaning in1')).toBeOnTheScreen();
+    expect(screen.getByText('[words used for in1]')).toBeOnTheScreen();
   });
 
   it('guest: a preview word opened from search shows, even outside the lessons opened', async () => {

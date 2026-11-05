@@ -1,14 +1,15 @@
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '@/components/ui/Button';
-import { colors, radii, spacing } from '@/constants/theme';
+import { radii, spacing, type ThemeColors } from '@/constants/theme';
 import { saveRecordedWordVariantAudio } from '@/data/admin/audioUpload';
 import { useAdminAudioRecorder } from '@/hooks/useAdminAudioRecorder';
 import { pickAudioFile, type PickedAudioFile } from '@/lib/admin/audioFile';
 import { getAudioUrl, supabase } from '@/lib/supabase/client';
 import { invalidateCachedAudio } from '@/lib/offline/audioCache';
+import { useTheme } from '@/lib/theme/ThemeContext';
 
 interface AudioRecorderFieldProps {
   wordGroupId: string;
@@ -54,6 +55,8 @@ export function AudioRecorderField({
   repeatAfterMe,
   audioBucket,
 }: AudioRecorderFieldProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const recorder = useAdminAudioRecorder();
   // The audio waiting to be saved — a recording's URI or a picked file's.
   const [recordedUri, setRecordedUri] = useState<string | null>(null);
@@ -231,6 +234,7 @@ export function AudioRecorderField({
           {repeatAfterMeError ? <Text style={styles.errorText}>{repeatAfterMeError}</Text> : null}
           <View style={styles.row}>
             <Button
+              themed
               label={repeatAfterMe.isIncluded ? 'Remove from Repeat After Me' : 'Not now'}
               variant="ghost"
               onPress={() => decideRepeatAfterMe(false)}
@@ -239,6 +243,7 @@ export function AudioRecorderField({
               style={{ flex: 1 }}
             />
             <Button
+              themed
               label="Add to Repeat After Me"
               onPress={() => decideRepeatAfterMe(true)}
               loading={repeatAfterMeDeciding === true}
@@ -260,6 +265,7 @@ export function AudioRecorderField({
       <View style={styles.row}>
         {micDenied ? null : (
           <Button
+            themed
             label={recorder.isRecording ? `Stop (${Math.floor(recorder.durationMillis / 1000)}s)` : 'Record'}
             variant={recorder.isRecording ? 'primary' : 'secondary'}
             onPress={handleRecordPress}
@@ -267,6 +273,7 @@ export function AudioRecorderField({
           />
         )}
         <Button
+          themed
           label="Upload audio"
           variant="secondary"
           onPress={handleUploadPress}
@@ -274,6 +281,7 @@ export function AudioRecorderField({
           style={{ flex: 1 }}
         />
         <Button
+          themed
           label={previewStatus.playing ? 'Playing…' : '▶ Preview'}
           variant="ghost"
           disabled={!previewSource || previewStatus.playing}
@@ -284,6 +292,7 @@ export function AudioRecorderField({
 
       {recordedUri ? (
         <Button
+          themed
           label={pickedFile ? 'Save uploaded audio' : 'Save Recording'}
           onPress={handleSave}
           loading={isUploading}
@@ -294,25 +303,26 @@ export function AudioRecorderField({
   );
 }
 
-const styles = StyleSheet.create({
-  container: { marginTop: spacing.sm, gap: spacing.xs },
-  row: { flexDirection: 'row', gap: spacing.sm },
-  currentPath: { fontSize: 11, color: colors.textSecondary },
-  successText: { fontSize: 12, color: colors.success },
-  repeatAfterMePrompt: {
-    gap: spacing.xs,
-    padding: spacing.sm,
-    borderRadius: radii.sm,
-    backgroundColor: `${colors.primary}14`,
-  },
-  repeatAfterMeQuestion: { fontSize: 13, fontWeight: '700', color: colors.textPrimary },
-  errorText: { fontSize: 12, color: colors.error },
-  deniedText: {
-    fontSize: 12,
-    color: colors.error,
-    backgroundColor: `${colors.error}14`,
-    borderRadius: radii.sm,
-    padding: spacing.sm,
-    marginTop: spacing.sm,
-  },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    container: { marginTop: spacing.sm, gap: spacing.xs },
+    row: { flexDirection: 'row', gap: spacing.sm },
+    currentPath: { fontSize: 11, color: colors.textSecondary },
+    successText: { fontSize: 12, color: colors.success },
+    repeatAfterMePrompt: {
+      gap: spacing.xs,
+      padding: spacing.sm,
+      borderRadius: radii.sm,
+      backgroundColor: `${colors.primary}14`,
+    },
+    repeatAfterMeQuestion: { fontSize: 13, fontWeight: '700', color: colors.textPrimary },
+    errorText: { fontSize: 12, color: colors.error },
+    deniedText: {
+      fontSize: 12,
+      color: colors.error,
+      backgroundColor: `${colors.error}14`,
+      borderRadius: radii.sm,
+      padding: spacing.sm,
+      marginTop: spacing.sm,
+    },
+  });

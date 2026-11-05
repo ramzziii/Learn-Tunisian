@@ -1,13 +1,15 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { AdminScreenTop } from '@/components/admin/AdminScreenTop';
 import { RecordingStation } from '@/components/admin/RecordingStation';
-import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
-import { colors, radii, shadows, spacing } from '@/constants/theme';
+import { radii, shadows, spacing, type ThemeColors } from '@/constants/theme';
 import { fetchSkippedRecordings, restoreSkippedRecording, type RecordingQueueItem } from '@/data/admin/recordingQueue';
+import { useEditWordFromQueue } from '@/lib/admin/useEditWordFromQueue';
 import { useAuth } from '@/lib/auth/AuthContext';
+import { useTheme } from '@/lib/theme/ThemeContext';
 
 /**
  * Admin: word forms that were skipped in Native Recordings and still have no
@@ -15,6 +17,8 @@ import { useAuth } from '@/lib/auth/AuthContext';
  * skipped word comes up), or put it back on the Native Recordings list.
  */
 export default function AdminSkippedRecordings() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { session } = useAuth();
   const actorAccountId = session?.user.id ?? '';
   const [items, setItems] = useState<RecordingQueueItem[] | null>(null);
@@ -36,6 +40,8 @@ export default function AdminSkippedRecordings() {
   useEffect(() => {
     load();
   }, [load]);
+
+  const editWord = useEditWordFromQueue(fetchSkippedRecordings, setItems);
 
   const remove = (id: string) => {
     if (!items) return;
@@ -60,11 +66,11 @@ export default function AdminSkippedRecordings() {
 
   if (loadError) {
     return (
-      <ScreenContainer>
-        <BackButton />
+      <ScreenContainer themed>
+        <AdminScreenTop />
         <View style={styles.centered}>
           <Text style={styles.centeredTitle}>Couldn&apos;t load skipped recordings</Text>
-          <Button label="Try again" variant="secondary" onPress={load} />
+          <Button themed label="Try again" variant="secondary" onPress={load} />
         </View>
       </ScreenContainer>
     );
@@ -72,8 +78,8 @@ export default function AdminSkippedRecordings() {
 
   if (!items) {
     return (
-      <ScreenContainer>
-        <BackButton />
+      <ScreenContainer themed>
+        <AdminScreenTop />
         <ActivityIndicator style={{ marginTop: spacing.xl }} color={colors.primary} />
       </ScreenContainer>
     );
@@ -83,7 +89,7 @@ export default function AdminSkippedRecordings() {
 
   if (current) {
     return (
-      <ScreenContainer>
+      <ScreenContainer themed>
         <ScrollView contentContainerStyle={styles.scroll}>
           <View style={styles.stationHeader}>
             <Pressable onPress={() => setCurrentId(null)} hitSlop={8}>
@@ -96,6 +102,7 @@ export default function AdminSkippedRecordings() {
             item={current}
             actorAccountId={actorAccountId}
             onSaved={() => setCurrentId(remove(current.variant.id)?.variant.id ?? null)}
+            onEdit={() => editWord(current.variant.wordGroupId)}
           />
         </ScrollView>
       </ScreenContainer>
@@ -103,13 +110,13 @@ export default function AdminSkippedRecordings() {
   }
 
   return (
-    <ScreenContainer>
-      <BackButton />
-      <Text style={styles.title}>Skipped Recordings</Text>
+    <ScreenContainer themed>
+      <AdminScreenTop />
+      <Text style={styles.title}>Skipped</Text>
       {items.length === 0 ? (
         <View style={styles.centered}>
           <Text style={styles.centeredTitle}>No skipped words</Text>
-          <Text style={styles.centeredBody}>Words you skip in Native Recordings show up here.</Text>
+          <Text style={styles.centeredBody}>Words you skip in Words to record show up here.</Text>
         </View>
       ) : (
         <>
@@ -132,6 +139,7 @@ export default function AdminSkippedRecordings() {
                 <View style={styles.actions}>
                   <View style={styles.cell}>
                     <Button
+                      themed
                       label="Put back"
                       variant="ghost"
                       onPress={() => putBack(item.variant.id)}
@@ -139,7 +147,7 @@ export default function AdminSkippedRecordings() {
                     />
                   </View>
                   <View style={styles.cell}>
-                    <Button label="Record" variant="secondary" onPress={() => setCurrentId(item.variant.id)} />
+                    <Button themed label="Record" variant="secondary" onPress={() => setCurrentId(item.variant.id)} />
                   </View>
                 </View>
               </View>
@@ -151,23 +159,24 @@ export default function AdminSkippedRecordings() {
   );
 }
 
-const styles = StyleSheet.create({
-  title: { fontSize: 26, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md },
-  subtitle: { fontSize: 14, color: colors.textSecondary, marginTop: spacing.xs, marginBottom: spacing.sm },
-  link: { fontSize: 14, fontWeight: '700', color: colors.primary },
-  list: { gap: spacing.sm, paddingVertical: spacing.md, paddingBottom: spacing.xxl },
-  scroll: { gap: spacing.md, paddingBottom: spacing.xxl },
-  row: { backgroundColor: colors.surface, borderRadius: radii.md, padding: spacing.md, gap: spacing.sm },
-  rowHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  rowMeaning: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
-  rowSub: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
-  rowArabic: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
-  actions: { flexDirection: 'row', gap: spacing.sm },
-  cell: { flex: 1, minWidth: 0 },
-  stationHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.md },
-  leftCount: { fontSize: 13, fontWeight: '700', color: colors.textSecondary },
-  errorText: { fontSize: 13, color: colors.error, textAlign: 'center' },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm, padding: spacing.lg },
-  centeredTitle: { fontSize: 20, fontWeight: '800', color: colors.textPrimary, textAlign: 'center' },
-  centeredBody: { fontSize: 14, color: colors.textSecondary, textAlign: 'center' },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    title: { fontSize: 26, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md },
+    subtitle: { fontSize: 14, color: colors.textSecondary, marginTop: spacing.xs, marginBottom: spacing.sm },
+    link: { fontSize: 14, fontWeight: '700', color: colors.primary },
+    list: { gap: spacing.sm, paddingVertical: spacing.md, paddingBottom: spacing.xxl },
+    scroll: { gap: spacing.md, paddingBottom: spacing.xxl },
+    row: { backgroundColor: colors.surface, borderRadius: radii.md, padding: spacing.md, gap: spacing.sm },
+    rowHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+    rowMeaning: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
+    rowSub: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+    rowArabic: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
+    actions: { flexDirection: 'row', gap: spacing.sm },
+    cell: { flex: 1, minWidth: 0 },
+    stationHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.md },
+    leftCount: { fontSize: 13, fontWeight: '700', color: colors.textSecondary },
+    errorText: { fontSize: 13, color: colors.error, textAlign: 'center' },
+    centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm, padding: spacing.lg },
+    centeredTitle: { fontSize: 20, fontWeight: '800', color: colors.textPrimary, textAlign: 'center' },
+    centeredBody: { fontSize: 14, color: colors.textSecondary, textAlign: 'center' },
+  });

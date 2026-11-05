@@ -5,6 +5,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ExerciseRenderer } from '@/components/exercises/shared/ExerciseRenderer';
 import { VariantCallout } from '@/components/exercises/shared/VariantCallout';
 import { WordPicture } from '@/components/exercises/shared/WordPicture';
+import { WordsUsedSection } from '@/components/phraseWords/WordsUsedSection';
 import { AudioPlayButton } from '@/components/ui/AudioPlayButton';
 import { BackButton } from '@/components/ui/BackButton';
 import { ComputerVoiceNote } from '@/components/ui/ComputerVoiceNote';
@@ -187,6 +188,8 @@ export default function WordDetail() {
         <Reveal delay={60}>
           <VariantCallout group={group} />
         </Reveal>
+
+        <WordsUsedSection phraseId={group.id} />
 
         <Reveal delay={120}>
           <Text style={styles.sectionTitle}>Progress</Text>

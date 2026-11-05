@@ -13,8 +13,8 @@ const STATUS_COLOR: Record<ContentStatus, string> = {
 
 const STATUS_LABEL: Record<ContentStatus, string> = {
   draft: 'Draft',
-  pending_review: 'Pending review',
-  approved: 'Approved',
+  pending_review: 'Waiting for review',
+  approved: 'Live',
   rejected: 'Rejected',
   archived: 'Archived',
 };

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { PillSelect } from '@/components/admin/PillSelect';
@@ -6,7 +6,7 @@ import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
-import { colors, radii, shadows, spacing } from '@/constants/theme';
+import { radii, shadows, spacing, type ThemeColors } from '@/constants/theme';
 import {
   fetchPendingCorrections,
   fetchReviewedCorrections,
@@ -16,6 +16,7 @@ import {
   type ReviewedCorrection,
 } from '@/data/corrections';
 import { fetchIsReviewer } from '@/data/reviewers';
+import { useTheme } from '@/lib/theme/ThemeContext';
 
 // Reached through app/admin/_layout.tsx (admin-only), but reviewing language
 // content needs more than admin: the account must be an allowlisted
@@ -49,6 +50,8 @@ interface DraftFields {
 }
 
 export default function CorrectionsReview() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [access, setAccess] = useState<'checking' | 'reviewer' | 'denied' | 'error'>('checking');
   const [view, setView] = useState<'pending' | 'history'>('pending');
 
@@ -155,19 +158,19 @@ export default function CorrectionsReview() {
   if (access === 'checking') {
     return (
       <View testID="reviewer-check-loading" style={{ flex: 1 }}>
-        <LoadingScreen />
+        <LoadingScreen themed />
       </View>
     );
   }
 
   if (access === 'error') {
     return (
-      <ScreenContainer>
-        <BackButton />
+      <ScreenContainer themed>
+        <BackButton themed />
         <View style={styles.centered}>
           <Text style={styles.centeredTitle}>Couldn&apos;t check your reviewer access</Text>
           <Text style={styles.centeredBody}>Check your connection and try again.</Text>
-          <Button label="Try again" variant="secondary" onPress={checkAccess} />
+          <Button themed label="Try again" variant="secondary" onPress={checkAccess} />
         </View>
       </ScreenContainer>
     );
@@ -175,8 +178,8 @@ export default function CorrectionsReview() {
 
   if (access === 'denied') {
     return (
-      <ScreenContainer>
-        <BackButton />
+      <ScreenContainer themed>
+        <BackButton themed />
         <View style={styles.centered}>
           <Text style={styles.centeredTitle}>Reviewer access needed</Text>
           <Text style={styles.centeredBody}>
@@ -190,31 +193,33 @@ export default function CorrectionsReview() {
 
   if (loadError) {
     return (
-      <ScreenContainer>
-        <BackButton />
+      <ScreenContainer themed>
+        <BackButton themed />
         <View style={styles.centered}>
           <Text style={styles.centeredTitle}>Couldn&apos;t load corrections</Text>
-          <Button label="Try again" variant="secondary" onPress={load} />
+          <Button themed label="Try again" variant="secondary" onPress={load} />
         </View>
       </ScreenContainer>
     );
   }
 
-  if (pending === null) return <LoadingScreen />;
+  if (pending === null) return <LoadingScreen themed />;
 
   return (
-    <ScreenContainer>
-      <BackButton />
+    <ScreenContainer themed>
+      <BackButton themed />
       <Text style={styles.title}>Correction Review</Text>
 
       <View style={styles.tabRow}>
         <Button
+          themed
           label={`Pending (${pending.length})`}
           variant={view === 'pending' ? 'primary' : 'secondary'}
           onPress={() => setView('pending')}
           style={{ flex: 1 }}
         />
         <Button
+          themed
           label="History"
           variant={view === 'history' ? 'primary' : 'secondary'}
           onPress={() => setView('history')}
@@ -292,6 +297,7 @@ export default function CorrectionsReview() {
 
                   <View style={styles.actionsRow}>
                     <Button
+                      themed
                       label="❌ Save correction"
                       variant="secondary"
                       onPress={() => handleReview(correction, 'reject')}
@@ -299,6 +305,7 @@ export default function CorrectionsReview() {
                       style={{ flex: 1 }}
                     />
                     <Button
+                      themed
                       label="✅ Correct as shown"
                       onPress={() => handleReview(correction, 'approve')}
                       loading={isSubmitting}
@@ -326,15 +333,17 @@ function HistoryView({
   error: boolean;
   onRetry: () => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   if (error) {
     return (
       <View style={styles.centered}>
         <Text style={styles.centeredTitle}>Couldn&apos;t load history</Text>
-        <Button label="Try again" variant="secondary" onPress={onRetry} />
+        <Button themed label="Try again" variant="secondary" onPress={onRetry} />
       </View>
     );
   }
-  if (history === null) return <LoadingScreen />;
+  if (history === null) return <LoadingScreen themed />;
 
   return (
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.list}>
@@ -374,49 +383,50 @@ function HistoryView({
   );
 }
 
-const styles = StyleSheet.create({
-  title: { fontSize: 22, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md },
-  subtitle: { fontSize: 13, color: colors.textSecondary, marginTop: spacing.xs, marginBottom: spacing.md },
-  tabRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm, marginBottom: spacing.sm },
-  reviewerInput: {
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: radii.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    fontSize: 14,
-    color: colors.textPrimary,
-    backgroundColor: colors.surface,
-    marginBottom: spacing.sm,
-  },
-  errorText: { fontSize: 13, color: colors.error, marginBottom: spacing.sm },
-  list: { gap: spacing.md, paddingBottom: spacing.xl },
-  emptyText: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.xl },
-  card: { backgroundColor: colors.surface, borderRadius: radii.lg, padding: spacing.md, gap: 4 },
-  cardMeta: { fontSize: 11, color: colors.textSecondary, marginBottom: spacing.xs },
-  fieldLabel: { fontSize: 11, fontWeight: '700', color: colors.textSecondary, marginTop: spacing.sm, textTransform: 'uppercase' },
-  input: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.sm,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 6,
-    fontSize: 15,
-    color: colors.textPrimary,
-    backgroundColor: colors.background,
-  },
-  historyText: { fontSize: 14, color: colors.textPrimary },
-  reasonBadge: {
-    backgroundColor: `${colors.accent}26`,
-    borderRadius: radii.pill,
-    paddingVertical: 2,
-    paddingHorizontal: spacing.sm,
-    alignSelf: 'flex-start',
-    marginTop: spacing.xs,
-  },
-  reasonBadgeText: { fontSize: 11, fontWeight: '700', color: colors.primaryDark },
-  actionsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
-  centeredTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
-  centeredBody: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', paddingHorizontal: spacing.lg },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    title: { fontSize: 22, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md },
+    subtitle: { fontSize: 13, color: colors.textSecondary, marginTop: spacing.xs, marginBottom: spacing.md },
+    tabRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm, marginBottom: spacing.sm },
+    reviewerInput: {
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      borderRadius: radii.md,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      fontSize: 14,
+      color: colors.textPrimary,
+      backgroundColor: colors.surface,
+      marginBottom: spacing.sm,
+    },
+    errorText: { fontSize: 13, color: colors.error, marginBottom: spacing.sm },
+    list: { gap: spacing.md, paddingBottom: spacing.xl },
+    emptyText: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.xl },
+    card: { backgroundColor: colors.surface, borderRadius: radii.lg, padding: spacing.md, gap: 4 },
+    cardMeta: { fontSize: 11, color: colors.textSecondary, marginBottom: spacing.xs },
+    fieldLabel: { fontSize: 11, fontWeight: '700', color: colors.textSecondary, marginTop: spacing.sm, textTransform: 'uppercase' },
+    input: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: radii.sm,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 6,
+      fontSize: 15,
+      color: colors.textPrimary,
+      backgroundColor: colors.background,
+    },
+    historyText: { fontSize: 14, color: colors.textPrimary },
+    reasonBadge: {
+      backgroundColor: `${colors.accent}26`,
+      borderRadius: radii.pill,
+      paddingVertical: 2,
+      paddingHorizontal: spacing.sm,
+      alignSelf: 'flex-start',
+      marginTop: spacing.xs,
+    },
+    reasonBadgeText: { fontSize: 11, fontWeight: '700', color: colors.primaryDark },
+    actionsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
+    centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
+    centeredTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
+    centeredBody: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', paddingHorizontal: spacing.lg },
+  });

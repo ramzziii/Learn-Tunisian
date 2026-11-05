@@ -65,6 +65,38 @@ describe('Dictionary / Search', () => {
   });
 });
 
+describe('Grammar notes: a fixed free set', () => {
+  const grammar = (tier: 'guest' | 'free' | 'premium', key: string, claimed: string[] = []) =>
+    access.decideItemAccess({ tier, claimed: new Set(claimed), itemKey: key, feature: 'grammar_note' });
+
+  it('guests: only sentence order', () => {
+    expect(grammar('guest', 'sentence_order')).toBe('open');
+    for (const id of ['present_verbs', 'questions', 'past_tense', 'negation']) expect(grammar('guest', id)).toBe('limit');
+  });
+
+  it('free accounts: sentence order, present tense and questions; nothing else', () => {
+    for (const id of ['sentence_order', 'present_verbs', 'questions']) expect(grammar('free', id)).toBe('open');
+    for (const id of ['everyday_pronouns', 'past_tense', 'negation', 'possession', 'small_words']) expect(grammar('free', id)).toBe('limit');
+  });
+
+  it('never counted: no claim, and an old claim doesn’t open a Premium note', () => {
+    expect(grammar('free', 'past_tense', ['past_tense'])).toBe('limit');
+    expect(access.isServerCounted('grammar_note')).toBe(false);
+  });
+
+  it('Premium: every note open', () => {
+    expect(grammar('premium', 'past_tense')).toBe('open');
+  });
+
+  it('every free id is a real grammar note', () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const ids = new Set(require('@/constants/grammarNotes').GRAMMAR_NOTES.map((n: { id: string }) => n.id));
+    const { guest, free } = access.FIXED_FREE_ITEMS.grammar_note!;
+    for (const id of [...guest, ...free]) expect(ids.has(id)).toBe(true);
+    for (const id of guest) expect(free.has(id)).toBe(true); // signing up never loses a note
+  });
+});
+
 describe('decideItemAccess', () => {
   const decide = (tier: string, claimed: Set<string>, key: string, extra: object = {}) =>
     access.decideItemAccess({ tier, claimed, itemKey: key, ...extra });

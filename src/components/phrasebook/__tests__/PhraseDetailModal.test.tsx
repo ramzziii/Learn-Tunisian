@@ -5,6 +5,13 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 const mockPracticeProps = jest.fn();
 let mockPracticeMounts = 0;
 
+jest.mock('@/components/phraseWords/WordsUsedSection', () => ({
+  WordsUsedSection: ({ phraseId }: { phraseId: string }) => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { Text } = require('react-native');
+    return <Text>{`[words used for ${phraseId}]`}</Text>;
+  },
+}));
 jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,
   default: { getItem: jest.fn(async () => null), setItem: jest.fn(async () => undefined) },
@@ -129,4 +136,9 @@ it('offers the explanation for a phrase that has one, next to the pronunciation'
 it('no explanation: no explanation control', async () => {
   await renderModal();
   expect(screen.queryByText(/\[explanation/)).toBeNull();
+});
+
+it('shows the phrase’s "Words used" cards', async () => {
+  await renderModal();
+  expect(screen.getByText('[words used for pb1]')).toBeOnTheScreen();
 });

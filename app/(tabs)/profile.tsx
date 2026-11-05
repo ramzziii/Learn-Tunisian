@@ -22,6 +22,7 @@ import { useIsAdmin } from '@/lib/admin/AdminContext';
 import { useAuth } from '@/lib/auth/AuthContext';
 import { requestPasswordReset } from '@/lib/auth/passwordResetRequest';
 import { useAccess } from '@/lib/access/AccessContext';
+import { FREE_ITEM_TOTAL } from '@/lib/access/accessRules';
 import { usePremium } from '@/lib/premium/PremiumContext';
 import { cancelDailyReminder, requestNotificationPermission, scheduleDailyReminder } from '@/lib/notifications/reminders';
 import { useTheme, type ThemePreference } from '@/lib/theme/ThemeContext';
@@ -57,7 +58,7 @@ function ProfileScreen() {
   const resetInFlightRef = useRef(false);
   const { isAdmin } = useIsAdmin();
   const { isPremium, adminPreview, setAdminPreview } = usePremium();
-  const { resetPreview } = useAccess();
+  const { resetPreview, claimed } = useAccess();
   const { colors, preference, setPreference } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [goalSettings, setGoalSettings] = useState<DailyGoalSettings | null>(null);
@@ -324,8 +325,13 @@ function ProfileScreen() {
               <Text style={styles.previewBody}>
                 {adminPreview === 'premium'
                   ? 'Showing the full Premium app. Switch off to see exactly what free learners see.'
-                  : 'Previewing the free plan — its item limits apply to you now, counted only on this device.'}
+                  : 'Viewing as a new free user. Free users can open any 5 lessons, and 5 each of phrasebook categories, proverbs, letters and Repeat After Me. After that the rest show 🔒 Premium. Grammar: only sentence order, present tense and questions are free. Practice uses only words from what’s open. Talk is Premium only. Counted on this device only; your own progress doesn’t unlock anything here.'}
               </Text>
+              {adminPreview === 'free' ? (
+                <Text style={styles.previewBody}>
+                  Lessons used in this preview: {Math.min(claimed('lesson').size, FREE_ITEM_TOTAL)} of {FREE_ITEM_TOTAL}
+                </Text>
+              ) : null}
               {adminPreview === 'free' ? (
                 <Button
                   themed

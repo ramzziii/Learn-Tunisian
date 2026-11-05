@@ -1,7 +1,7 @@
-// Grammar Notes and Culture Corner: guests and free accounts pick any notes /
-// proverbs (2 / 5 in total); each counts when first opened. Past the limit an
-// unopened item shows the lock and its content is never rendered; tapping it
-// → upgrade (free) or the create-account prompt (guest). Premium opens all.
+// Grammar Notes: guests get sentence order; free accounts add present tense
+// and questions; never counted. Every other note is Premium — locked, never rendered, tapping → upgrade (free) or the
+// create-account prompt (guest). Culture Corner: guests and free accounts pick
+// any proverbs (2 / 5 in total); each counts when first opened. Premium opens all.
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import { GRAMMAR_NOTES } from '@/constants/grammarNotes';
@@ -11,9 +11,9 @@ const mockPush = jest.fn();
 let mockTier: 'guest' | 'free' | 'premium' = 'free';
 let mockClaimed: string[] = [];
 const mockOpen = jest.fn(async () => true);
-const mockDecide = (_f: string, key: string) =>
+const mockDecide = (feature: string, key: string) =>
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  require('@/lib/access/accessRules').decideItemAccess({ tier: mockTier, claimed: new Set(mockClaimed), itemKey: key });
+  require('@/lib/access/accessRules').decideItemAccess({ tier: mockTier, claimed: new Set(mockClaimed), itemKey: key, feature });
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,
@@ -49,45 +49,51 @@ beforeEach(() => {
 describe('Grammar Notes', () => {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const Grammar = require('../../../app/grammar').default;
-  const [first, second] = GRAMMAR_NOTES;
+  const note = (id: string) => GRAMMAR_NOTES.find((n) => n.id === id)!;
+  const FREE = ['sentence_order', 'present_verbs', 'questions'];
+  const premiumOnly = GRAMMAR_NOTES.filter((n) => !FREE.includes(n.id));
 
-  it('nothing is counted just by opening the screen', async () => {
+  it('free: only sentence order, present tense and questions are open; the rest show Premium', async () => {
     await themed(<Grammar />);
-    expect(mockOpen).not.toHaveBeenCalled();
-    expect(screen.queryByText(first.explanation)).toBeNull();
+    expect(screen.getAllByLabelText('Premium').length).toBe(premiumOnly.length);
+    expect(screen.getByText(note('sentence_order').explanation)).toBeOnTheScreen();
+    await fireEvent.press(screen.getByText(note('questions').title));
+    expect(await screen.findByText(note('questions').explanation)).toBeOnTheScreen();
   });
 
-  it('any note can be picked; opening it counts it, then shows it', async () => {
-    await themed(<Grammar />);
-    await fireEvent.press(screen.getByText(second.title));
-    expect(mockOpen).toHaveBeenCalledWith('grammar_note', second.id);
-    expect(await screen.findByText(second.explanation)).toBeOnTheScreen();
-  });
-
-  it('past the limit: an unopened note is locked, never rendered, and tapping → upgrade', async () => {
-    mockClaimed = GRAMMAR_NOTES.slice(2, 7).map((n) => n.id);
-    mockOpen.mockResolvedValue(false);
-    await themed(<Grammar />);
-    expect(screen.getAllByLabelText('Premium').length).toBe(GRAMMAR_NOTES.length - 5);
-    await fireEvent.press(screen.getByText(first.title));
-    expect(screen.queryByText(first.explanation)).toBeNull();
-    expect(mockPush).toHaveBeenCalledWith({ pathname: '/onboarding/plans', params: { source: 'premium' } });
-  });
-
-  it('guest at the limit: tapping explains a free account', async () => {
+  it('guest: only sentence order is open; present tense and questions are locked → create a free account', async () => {
     mockTier = 'guest';
-    mockClaimed = [GRAMMAR_NOTES[3].id, GRAMMAR_NOTES[4].id];
-    mockOpen.mockResolvedValue(false);
     await themed(<Grammar />);
-    await fireEvent.press(screen.getByText(first.title));
+    expect(screen.getAllByLabelText('Premium').length).toBe(GRAMMAR_NOTES.length - 1);
+    expect(screen.getByText(note('sentence_order').explanation)).toBeOnTheScreen();
+    await fireEvent.press(screen.getByText(note('present_verbs').title));
+    expect(screen.queryByText(note('present_verbs').explanation)).toBeNull();
     expect(mockPush).toHaveBeenCalledWith({ pathname: '/guest/create-account', params: { reason: 'keep-learning' } });
   });
 
-  it('Premium: the first note starts open, no locks', async () => {
+  it('free: a Premium note is never rendered; tapping it → upgrade, without trying to open it', async () => {
+    await themed(<Grammar />);
+    const locked = note('past_tense');
+    await fireEvent.press(screen.getByText(locked.title));
+    expect(screen.queryByText(locked.explanation)).toBeNull();
+    expect(mockOpen).not.toHaveBeenCalledWith('grammar_note', locked.id);
+    expect(mockPush).toHaveBeenCalledWith({ pathname: '/onboarding/plans', params: { source: 'premium' } });
+  });
+
+  it('guest: tapping a Premium note explains a free account', async () => {
+    mockTier = 'guest';
+    await themed(<Grammar />);
+    await fireEvent.press(screen.getByText(note('negation').title));
+    expect(mockPush).toHaveBeenCalledWith({ pathname: '/guest/create-account', params: { reason: 'keep-learning' } });
+  });
+
+  it('Premium: every note is open, no locks', async () => {
     mockTier = 'premium';
     await themed(<Grammar />);
-    expect(screen.getByText(first.explanation)).toBeOnTheScreen();
+    expect(screen.getByText(GRAMMAR_NOTES[0].explanation)).toBeOnTheScreen();
     expect(screen.queryByLabelText('Premium')).toBeNull();
+    await fireEvent.press(screen.getByText(note('past_tense').title));
+    expect(await screen.findByText(note('past_tense').explanation)).toBeOnTheScreen();
   });
 });
 

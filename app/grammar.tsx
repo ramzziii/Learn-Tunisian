@@ -49,8 +49,8 @@ export default function GrammarScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const groupedNotes = useMemo(() => groupGrammarNotes(), []);
-  // Any note can be picked; each counts when first opened (src/lib/access).
-  // Only an already-open note starts expanded, so visiting counts nothing.
+  // The basics are free; the rest are Premium (FIXED_FREE_ITEMS in
+  // src/lib/access/accessRules.ts). Nothing is counted.
   const { decide, open } = useAccess();
   const onLockedPress = useLockedItemAction();
   const [expandedId, setExpandedId] = useState<string | null>(

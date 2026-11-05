@@ -11,6 +11,7 @@ import { useWordAudioPlayer } from '@/hooks/useWordAudioPlayer';
 import { useTheme } from '@/lib/theme/ThemeContext';
 import { hasTwoForms, preferredVariant } from '@/lib/display/displayRules';
 import { useDisplayPreferences } from '@/lib/display/useDisplayPreferences';
+import { WordsUsedSection } from '@/components/phraseWords/WordsUsedSection';
 import { FormDisplay } from '@/components/tunisian/FormDisplay';
 import { TunisianText } from '@/components/tunisian/TunisianText';
 import type { WordGroupWithVariants } from '@/types/models';
@@ -111,6 +112,8 @@ export function PhraseDetailModal({ phrase, onClose }: PhraseDetailModalProps) {
               )}
               <ExplanationPlayButton variant={variant} style={{ marginTop: 8 }} />
             </Animated.View>
+
+            <WordsUsedSection phraseId={phrase.id} />
 
             {variant.notes ? (
               <>

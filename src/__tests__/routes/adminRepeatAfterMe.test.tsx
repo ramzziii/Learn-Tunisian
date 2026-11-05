@@ -32,6 +32,7 @@ const variant = (id: string, overrides: Record<string, unknown> = {}) => ({
 
 let mockGroup: Record<string, unknown>;
 
+jest.mock('@/components/admin/PhraseWordsEditor', () => ({ PhraseWordsEditor: () => null }));
 jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,
   default: { getItem: jest.fn(async () => null), setItem: jest.fn(async () => undefined) },

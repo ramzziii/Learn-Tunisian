@@ -100,16 +100,27 @@ export function AccessProvider({ children }: { children: ReactNode }) {
 
   const claimed = useCallback((feature: CountedFeature) => new Set(claims[feature] ?? []), [claims]);
 
+  // The admin's free-plan preview shows what a new free account sees: the
+  // admin's own completed lessons don't reopen for free there — only the
+  // preview's own counts do.
+  const countsCompleted = source !== 'preview';
+
   const decide = useCallback(
     (feature: CountedFeature, itemKey: string, opts?: { completed?: boolean }) =>
-      decideItemAccess({ tier, claimed: claimed(feature), itemKey, completed: opts?.completed, feature }),
-    [tier, claimed]
+      decideItemAccess({ tier, claimed: claimed(feature), itemKey, completed: countsCompleted && opts?.completed, feature }),
+    [tier, claimed, countsCompleted]
   );
 
   const open = useCallback(
     async (feature: CountedFeature, itemKey: string, opts?: { completed?: boolean }): Promise<boolean> => {
       const current = claimsRef.current;
-      const decision = decideItemAccess({ tier, claimed: new Set(current[feature] ?? []), itemKey, completed: opts?.completed, feature });
+      const decision = decideItemAccess({
+        tier,
+        claimed: new Set(current[feature] ?? []),
+        itemKey,
+        completed: countsCompleted && opts?.completed,
+        feature,
+      });
       if (decision === 'open') return true;
       if (decision === 'limit') return false;
 
@@ -125,7 +136,7 @@ export function AccessProvider({ children }: { children: ReactNode }) {
       if (allowed) setClaims({ ...claimsRef.current, [feature]: next[feature] });
       return allowed;
     },
-    [tier, source, profileId, setClaims]
+    [tier, source, profileId, setClaims, countsCompleted]
   );
 
   const resetPreview = useCallback(async () => {

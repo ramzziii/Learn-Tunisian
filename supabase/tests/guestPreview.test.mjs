@@ -15,6 +15,10 @@ import { as, fullSchemaDb } from './harness.mjs';
 const root = join(import.meta.dirname, '..', '..');
 const SELECTION = readFileSync(join(root, 'scripts', 'select-guest-preview.sql'), 'utf8');
 const ROLLBACK = readFileSync(join(root, 'supabase', 'rollbacks', '0024_guest_preview.rollback.sql'), 'utf8');
+// Later migrations that build on 0024, rolled back first (newest first).
+const LATER_ROLLBACKS = ['0028_review_rules_and_import_log', '0027_phrase_word_links']
+  .map((name) => readFileSync(join(root, 'supabase', 'rollbacks', `${name}.rollback.sql`), 'utf8'))
+  .join('\n');
 
 const U = (n) => `aaaaaaaa-0000-0000-0000-00000000000${n}`;
 const L = (n) => `bbbbbbbb-0000-0000-0000-00000000000${n}`;
@@ -99,7 +103,8 @@ describe('guest preview views, as the signed-out role', () => {
     assert.ok(!variants.some((v) => v.word_group_id === 'dp_ok2' && v.variant_label === 'feminine'), 'draft form hidden');
 
     assert.deepEqual(Object.keys(groups[0]).sort(), ['content_status', 'english_meaning', 'id', 'image_keyword', 'image_path', 'lesson_number', 'sort_order', 'unit_id']);
-    assert.deepEqual(Object.keys(variants[0]).sort(), ['audio_path', 'content_status', 'id', 'in_repeat_after_me', 'is_native_voice', 'native_verified', 'notes', 'sort_order', 'transliteration', 'updated_at', 'variant_label', 'word_arabic', 'word_group_id']);
+    // audio_needs_recheck: added by 0028.
+    assert.deepEqual(Object.keys(variants[0]).sort(), ['audio_needs_recheck', 'audio_path', 'content_status', 'id', 'in_repeat_after_me', 'is_native_voice', 'native_verified', 'notes', 'sort_order', 'transliteration', 'updated_at', 'variant_label', 'word_arabic', 'word_group_id']);
     assert.ok((await anon(db, `select created_by from public.guest_preview_word_groups`)).error);
     assert.ok((await anon(db, `select speaker_name from public.guest_preview_word_variants`)).error);
   });
@@ -171,7 +176,9 @@ describe('0024 rollback', () => {
       (await db.query(`select tablename, policyname, cmd, roles::text, qual, with_check from pg_policies where tablename in ('units','lessons','word_groups','word_variants') order by 1, 2`)).rows,
     ]);
     // "Before" = every migration except 0024, i.e. the full schema with 0024 rolled back.
+    // Rollbacks run newest first: 0027's and 0028's guest views build on 0024's.
     const db = await fullSchemaDb();
+    await db.exec(LATER_ROLLBACKS);
     await db.exec(ROLLBACK);
     const after = await snapshot(db);
     const views = await db.query(`select count(*)::int n from pg_views where viewname like 'guest_preview_%'`);
