@@ -142,7 +142,9 @@ export default function PhrasebookFlashcardsScreen() {
                   ? '🔊 Playing…'
                   : wordPlayer.hasAudio
                     ? '▶ Tap to hear it'
-                    : 'No recording yet'}
+                    : variant?.audioNeedsRecheck
+                      ? 'Recording being re-checked'
+                      : 'No recording yet'}
             </Text>
           </View>
           {wordPlayer.source === 'computer' ? <ComputerVoiceNote style={{ marginTop: spacing.sm }} /> : null}

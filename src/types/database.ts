@@ -107,6 +107,8 @@ export interface WordVariantRow {
   recording_skipped_by: string | null;
   /** 0016_explanation_audio.sql — optional spoken explanation, separate from audio_path. */
   explanation_audio_path?: string | null;
+  /** 0028 — the spelling changed under this recording; it waits for an admin/reviewer to confirm it. */
+  audio_needs_recheck?: boolean;
   approved_by: string | null;
   approved_at: string | null;
 }

@@ -136,6 +136,12 @@ export interface WordVariant {
   /** Stamped automatically when nativeVerified flips to true — see src/data/admin/content.ts. */
   approvedBy: string | null;
   approvedAt: string | null;
+  /**
+   * 0028: the spelling changed after this was recorded, so it waits for an
+   * admin or reviewer to confirm it still matches. Learners never hear it:
+   * learner data (mapLearnerWordVariant) drops its audioPath meanwhile.
+   */
+  audioNeedsRecheck?: boolean;
 }
 
 /**

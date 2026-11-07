@@ -83,7 +83,13 @@ export function FormDisplay({ group, size = 'md', showAudio = true, arabicStyle,
 
 function FormAudio({ variant, name, autoPlay, colors }: { variant: WordVariant; name: string; autoPlay: boolean; colors: ThemeColors }) {
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  if (!variant.audioPath) return <Text style={styles.noAudio}>No recording for this form yet</Text>;
+  if (!variant.audioPath) {
+    return (
+      <Text style={styles.noAudio}>
+        {variant.audioNeedsRecheck ? 'Recording being re-checked' : 'No recording for this form yet'}
+      </Text>
+    );
+  }
   return <FormAudioButton variant={variant} name={name} autoPlay={autoPlay} colors={colors} />;
 }
 

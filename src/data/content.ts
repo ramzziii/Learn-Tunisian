@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase/client';
 import { isGuestSessionActive } from '@/lib/guest/guestSession';
-import { mapLesson, mapUnit, mapWordGroup, mapWordVariant } from '@/data/mappers';
+import { mapLesson, mapUnit, mapWordGroup, mapLearnerWordVariant } from '@/data/mappers';
 import { computeLessonStates } from '@/lib/lessonCompletion';
 import type { LessonRow, UnitRow, WordGroupRow, WordVariantRow } from '@/types/database';
 import type { LessonWithState, WordGroupWithVariants } from '@/types/models';
@@ -230,7 +230,7 @@ export async function fetchWordGroupsForLesson(lessonId: string): Promise<WordGr
 
   return groups.map((group) => ({
     ...mapWordGroup(group),
-    variants: (variantsByGroup.get(group.id) ?? []).map(mapWordVariant),
+    variants: (variantsByGroup.get(group.id) ?? []).map(mapLearnerWordVariant),
   }));
 }
 
@@ -283,7 +283,7 @@ export async function fetchWordGroupWithSiblings(
   }
   const toWithVariants = (row: WordGroupRow): WordGroupWithVariants => ({
     ...mapWordGroup(row),
-    variants: (variantsByGroup.get(row.id) ?? []).map(mapWordVariant),
+    variants: (variantsByGroup.get(row.id) ?? []).map(mapLearnerWordVariant),
   });
 
   return { group: toWithVariants(groupRow), siblings: siblings.map(toWithVariants) };

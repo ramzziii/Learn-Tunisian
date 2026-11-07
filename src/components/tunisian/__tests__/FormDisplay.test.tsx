@@ -91,6 +91,18 @@ it('a form without a recording says so — never the other form’s audio, never
   expect(mockSpeak).not.toHaveBeenCalled();
 });
 
+it('a recording waiting for re-check (0028) is never played to learners — it says so instead', async () => {
+  // As learner data delivers it: mapLearnerWordVariant drops the file.
+  const recheckFeminine = makeVariant('tired', {
+    variantLabel: 'feminine', wordArabic: 'تعبانة', transliteration: 'ta3bana', audioPath: null, audioNeedsRecheck: true,
+  });
+  await renderWith('feminine', makeGroup('tired', { variants: [masculine, recheckFeminine] }));
+
+  expect(screen.getByText('Recording being re-checked')).toBeOnTheScreen();
+  expect(screen.queryByRole('button', { name: 'Play feminine form' })).toBeNull();
+  expect(mockSpeak).not.toHaveBeenCalled();
+});
+
 it('a one-form word: just that form, no form label, no toggle', async () => {
   const single = makeGroup('hello', { variants: [makeVariant('hello', { wordArabic: 'عسلامة', transliteration: 'aslema', audioPath: 'hello/p.m4a' })] });
   await renderWith('feminine', single);
