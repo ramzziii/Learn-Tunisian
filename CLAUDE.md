@@ -127,6 +127,17 @@
   approved yourself; never correct a reviewer's sheet.
 - `native_verified` = text checked by a native speaker; `is_native_voice` =
   native recording. A text review never sets `is_native_voice`.
+- Only accounts in `public.reviewers` approve or reject content (0028
+  trigger, `review_word_variant`; Admin → Review → one at a time). Admins who
+  aren't reviewers can edit, send back to draft or archive.
+- A spelling change under a recording sets `audio_needs_recheck` (0028): the
+  file and `is_native_voice` stay; learners never hear it (learner data uses
+  `mapLearnerWordVariant`, which drops the audio) until an admin/reviewer
+  confirms it (`confirm_audio_matches`, Admin → Audio → Re-check) or a new
+  file replaces it. The flag can't be cleared by editing the column; scripts
+  never set `is_native_voice = false` for a spelling change.
+- Imports run with `--execute` are logged in `content_import_runs` (dry runs
+  never); Admin → Imports shows them, and "Mark as seen" clears Today.
 - Lessons with no approved words are hidden from learners (and left out of
   the unlock order) in `fetchLessonMap` / `guestLessonMap`.
 - "Words used" links (`phrase_word_links`, 0027) are suggestions until an

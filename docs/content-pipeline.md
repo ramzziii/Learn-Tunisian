@@ -89,8 +89,15 @@ forms), the same Arabic twice in a word, a word spread over two lessons, one
 lesson number used by two units, and ids that already exist elsewhere.
 
 **Running it again** with the same sheet changes nothing. A changed row
-updates that form and sends it back to unreviewed draft (and a recording it
-had no longer counts as native, since it may not match the new text).
+updates that form and sends it back to unreviewed draft. A recording it has
+is kept, still marked native: the database (0028) flags it **needs re-check**,
+so learners don't hear it until an admin or reviewer confirms it in Admin →
+Audio → Re-check, or records a new one.
+
+**Import log** (needs migration 0028): every run started with `--execute` is
+recorded — *imported*, *refused* (with its problems) or *failed* — with the
+file name, counts and row numbers only, and shows in Admin. Dry runs and
+`--validate-only` are never logged: they write nothing at all.
 
 ### 2. Export for review
 
@@ -111,8 +118,13 @@ node scripts/import-review.mjs content-work/review.csv --reviewer-account <accou
 node scripts/import-review.mjs content-work/review.csv --reviewer-account <account id> --reviewer-name "<name>" --execute --confirm-host <project-ref>.supabase.co
 ```
 
+- The `--reviewer-account` must be in `public.reviewers`. The script checks
+  this **first**, before reading the sheet or the database, and stops if not.
+  (The script uses the service role, which the database's reviewer rule from
+  0028 doesn't check — so this check is the guard.)
 - `ok` → approved, text verified. `fix` → the corrections are applied, then
-  approved. `reject` → rejected. An empty verdict leaves the row as it is.
+  approved; a form with a recording keeps it, flagged for re-check (the report
+  warns). `reject` → rejected. An empty verdict leaves the row as it is.
 - A word becomes approved (visible) once **all** its remaining forms are
   approved and still make a valid set; a word whose forms are all rejected is
   rejected. If a rejection breaks a masculine/feminine pair, the word stays

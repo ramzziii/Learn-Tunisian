@@ -11,13 +11,17 @@ const groupBy = (items, key) => {
   return map;
 };
 
-/** What a changed form becomes: unreviewed draft text, and any recording no longer counts as native for it. */
+/**
+ * What a changed form becomes: unreviewed draft text. Its recording is kept
+ * as it is — the database (0028) marks it "needs re-check" when the spelling
+ * changes, so learners don't hear it until an admin or reviewer confirms it
+ * or records a new one. is_native_voice is never touched here.
+ */
 export const CHANGED_VARIANT_RESET = {
   content_status: 'draft',
   native_verified: false,
   approved_by: null,
   approved_at: null,
-  is_native_voice: false,
 };
 
 /**
