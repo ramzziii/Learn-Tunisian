@@ -10,9 +10,10 @@ import { fetchIsReviewer } from '@/data/reviewers';
 import { useTheme } from '@/lib/theme/ThemeContext';
 
 /**
- * Admin → Review: words and phrases waiting for review (open one to approve,
- * fix or reject it), and — for language reviewers only — the AI corrections
- * from learners' conversations. Being an admin doesn't include language review.
+ * Admin → Review: words and phrases waiting for review, and — for language
+ * reviewers only — "Review one at a time" (correct / fix / reject each form)
+ * and the AI corrections from learners' conversations. Being an admin
+ * doesn't include language review.
  */
 export default function AdminReviewTab() {
   const { colors } = useTheme();
@@ -25,16 +26,28 @@ export default function AdminReviewTab() {
       .catch(() => setIsReviewer(false));
   }, []);
 
+  // Reviewers only: approving and rejecting is theirs (0028 enforces it).
   const header = isReviewer ? (
-    <PressableScale
-      accessibilityRole="button"
-      accessibilityLabel="AI corrections to check"
-      onPress={() => router.push('/admin/corrections')}
-      style={[styles.card, shadows.card]}
-    >
-      <Text style={styles.cardTitle}>🧠 AI corrections</Text>
-      <Text style={styles.cardBody}>Check phrases from learners’ conversations ›</Text>
-    </PressableScale>
+    <>
+      <PressableScale
+        accessibilityRole="button"
+        accessibilityLabel="Review one at a time"
+        onPress={() => router.push('/admin/review-session')}
+        style={[styles.card, shadows.card]}
+      >
+        <Text style={styles.cardTitle}>✅ Review one at a time</Text>
+        <Text style={styles.cardBody}>Correct, fix or reject each waiting form ›</Text>
+      </PressableScale>
+      <PressableScale
+        accessibilityRole="button"
+        accessibilityLabel="AI corrections to check"
+        onPress={() => router.push('/admin/corrections')}
+        style={[styles.card, shadows.card]}
+      >
+        <Text style={styles.cardTitle}>🧠 AI corrections</Text>
+        <Text style={styles.cardBody}>Check phrases from learners’ conversations ›</Text>
+      </PressableScale>
+    </>
   ) : null;
 
   return (

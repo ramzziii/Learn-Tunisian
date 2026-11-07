@@ -229,13 +229,16 @@ describe('Review', () => {
     expect(await screen.findByText('Waiting for review')).toBeOnTheScreen();
     await fireEvent.press(await screen.findByRole('button', { name: 'AI corrections to check' }));
     expect(mockPush).toHaveBeenCalledWith('/admin/corrections');
+    await fireEvent.press(screen.getByRole('button', { name: 'Review one at a time' }));
+    expect(mockPush).toHaveBeenCalledWith('/admin/review-session');
   });
 
-  it('no AI corrections for an admin who isn’t a reviewer', async () => {
+  it('no "Review one at a time" or AI corrections for an admin who isn’t a reviewer', async () => {
     mockIsReviewer = false;
     await themed(<Review />);
     await screen.findByText('Waiting for review');
     await waitFor(() => expect(screen.queryByRole('button', { name: 'AI corrections to check' })).toBeNull());
+    expect(screen.queryByRole('button', { name: 'Review one at a time' })).toBeNull();
   });
 });
 
