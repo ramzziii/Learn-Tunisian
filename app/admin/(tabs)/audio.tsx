@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import AdminMissingExplanations from '../recordings-explanations';
 import AdminRecordings from '../recordings';
+import AdminRecheckRecordings from '../recordings-recheck';
 import AdminSkippedRecordings from '../recordings-skipped';
 import { AdminTabProvider } from '@/components/admin/AdminScreenTop';
 import { radii, spacing, type ThemeColors } from '@/constants/theme';
@@ -11,15 +12,16 @@ import { useTheme } from '@/lib/theme/ThemeContext';
 const PARTS = [
   { key: 'record', label: 'To record' },
   { key: 'skipped', label: 'Skipped' },
-  { key: 'explanations', label: 'Explanations' },
+  { key: 'explanations', label: 'Explain' },
+  { key: 'recheck', label: 'Re-check' },
 ] as const;
 type Part = (typeof PARTS)[number]['key'];
 
 /**
  * Admin → Audio, the recording studio: every form that still needs a native
  * recording (none yet, a missing file, or a computer voice to replace), the
- * ones you skipped, and optional explanation recordings — one place, in
- * course order (unit, lesson, word, form).
+ * ones you skipped, optional explanation recordings, and recordings to
+ * re-check after a spelling change — one place, in course order.
  */
 export default function AdminAudioTab() {
   const { colors } = useTheme();
@@ -47,7 +49,15 @@ export default function AdminAudioTab() {
 
   return (
     <AdminTabProvider header={switcher}>
-      {part === 'record' ? <AdminRecordings /> : part === 'skipped' ? <AdminSkippedRecordings /> : <AdminMissingExplanations />}
+      {part === 'record' ? (
+        <AdminRecordings />
+      ) : part === 'skipped' ? (
+        <AdminSkippedRecordings />
+      ) : part === 'explanations' ? (
+        <AdminMissingExplanations />
+      ) : (
+        <AdminRecheckRecordings />
+      )}
     </AdminTabProvider>
   );
 }

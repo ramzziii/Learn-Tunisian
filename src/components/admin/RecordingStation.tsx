@@ -28,6 +28,7 @@ const NEED_LABEL: Record<RecordingNeed, string> = {
   no_audio: 'No recording yet',
   missing_file: 'Recording file is missing',
   not_native: 'Not a native voice yet',
+  needs_recheck: 'Spelling changed — re-check',
 };
 
 /** A take waiting to be saved: a recording's URI, or a picked file. */

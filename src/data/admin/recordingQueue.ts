@@ -10,8 +10,8 @@ const AUDIO_BUCKET = 'audio';
 // Within a word: the main form first, alternates last.
 const LABEL_RANK: Record<string, number> = { primary: 0, masculine: 1, feminine: 2, also_heard: 3 };
 
-/** Why a form is listed as needing a native voice. */
-export type RecordingNeed = 'no_audio' | 'missing_file' | 'not_native';
+/** Why a form is listed as needing a native voice (or, for needs_recheck, a listen). */
+export type RecordingNeed = 'no_audio' | 'missing_file' | 'not_native' | 'needs_recheck';
 
 export interface RecordingQueueItem {
   variant: WordVariant;
@@ -99,7 +99,7 @@ async function loadNeedingRecording(): Promise<{ item: RecordingQueueItem; skipp
           : !v.is_native_voice
             ? 'not_native'
             : null;
-      return { row: v, reason };
+      return { row: v, reason: reason as RecordingNeed | null };
     })
     .filter((x): x is { row: WordVariantRow; reason: RecordingNeed } => x.reason !== null)
     .sort((a, b) => compareRows(context, a.row, b.row))
@@ -116,6 +116,33 @@ export async function fetchMissingExplanations(): Promise<ExplanationQueueItem[]
     .filter((v) => !!v.audio_path && !v.explanation_audio_path)
     .sort((a, b) => compareRows(context, a, b))
     .map((row) => toItem(context, row));
+}
+
+/**
+ * Audio → Re-check (0028): recordings whose spelling changed after they were
+ * recorded. Learners don't hear them until an admin or reviewer listens and
+ * confirms (confirmAudioMatches) or records a new one (a new file clears it).
+ */
+export async function fetchRecheckQueue(): Promise<RecordingQueueItem[]> {
+  const context = await loadVariantContext();
+  return context.variants
+    .filter((v) => !!v.audio_path && v.audio_needs_recheck === true)
+    .sort((a, b) => compareRows(context, a, b))
+    .map((row) => ({ ...toItem(context, row), reason: 'needs_recheck' as const }));
+}
+
+/** "Still matches": clears the re-check flag (0028's confirm_audio_matches; admins and reviewers only). */
+export async function confirmAudioMatches(variantId: string): Promise<void> {
+  const { error } = await supabase.rpc('confirm_audio_matches', { p_variant_id: variantId });
+  if (error) throw error;
+}
+
+/** Plain words for confirm_audio_matches' refusals. */
+export function confirmErrorMessage(err: unknown): string {
+  const message = err instanceof Error ? err.message : String((err as { message?: string })?.message ?? '');
+  if (message.includes('nothing_to_confirm')) return 'Already confirmed or replaced — refresh the list.';
+  if (message.includes('permission denied')) return 'Only admins or language reviewers can confirm a recording.';
+  return `Couldn't confirm — ${message || 'unknown error'}`;
 }
 
 /**
