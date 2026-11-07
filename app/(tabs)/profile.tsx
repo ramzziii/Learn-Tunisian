@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { RequireAccount } from '@/components/guest/RequireAccount';
 
 import { TimeWheelPicker } from '@/components/onboarding/TimeWheelPicker';
@@ -15,13 +15,14 @@ import { WHY_TUNISIAN_LINK } from '@/constants/appCopy';
 import { DAILY_GOAL_OPTIONS } from '@/constants/dailyGoal';
 import { radii, spacing, type ThemeColors } from '@/constants/theme';
 import { countCompletedLessons } from '@/data/content';
-import { fetchDailyGoalSettings, updateDailyGoalSettings } from '@/data/profiles';
+import { createDailyGoalSettings, fetchDailyGoalSettings, updateDailyGoalSettings } from '@/data/profiles';
 import { fetchProgressSummary, type ProfileProgressSummary } from '@/data/progress';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
 import { useIsAdmin } from '@/lib/admin/AdminContext';
 import { useAuth } from '@/lib/auth/AuthContext';
 import { requestPasswordReset } from '@/lib/auth/passwordResetRequest';
 import { useAccess } from '@/lib/access/AccessContext';
+import { confirmAction, showNotice } from '@/lib/confirmAction';
 import { FREE_ITEM_TOTAL } from '@/lib/access/accessRules';
 import { usePremium } from '@/lib/premium/PremiumContext';
 import { cancelDailyReminder, requestNotificationPermission, scheduleDailyReminder } from '@/lib/notifications/reminders';
@@ -97,6 +98,9 @@ function ProfileScreen() {
 
     setGoalSettings(settings);
     setProgressStats({ ...summary, lessonsCompleted });
+    // No settings yet (sign-up stopped before the daily-goal step): show the
+    // defaults with the reminder off; saving creates them.
+    if (!settings) setReminderEnabled(false);
     if (settings) {
       setDailyGoalMinutes(settings.dailyGoalMinutes);
       setReminderEnabled(settings.reminderEnabled);
@@ -116,11 +120,11 @@ function ProfileScreen() {
     setSaved(false);
     setNotificationsDenied(false);
     const reminderTime = `${String(reminderHour).padStart(2, '0')}:${String(reminderMinute).padStart(2, '0')}:00`;
-    await updateDailyGoalSettings(activeProfile.id, {
-      dailyGoalMinutes,
-      reminderTime,
-      reminderEnabled,
-    });
+    setGoalSettings(
+      goalSettings
+        ? await updateDailyGoalSettings(activeProfile.id, { dailyGoalMinutes, reminderTime, reminderEnabled })
+        : await createDailyGoalSettings(activeProfile.id, dailyGoalMinutes, reminderTime, reminderEnabled)
+    );
 
     if (reminderEnabled) {
       const granted = await requestNotificationPermission();
@@ -150,17 +154,16 @@ function ProfileScreen() {
   };
 
   const handleSignOut = () => {
-    Alert.alert('Sign out?', "You'll need to sign back in with your email and password.", [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Sign out',
-        style: 'destructive',
-        onPress: async () => {
-          await signOut();
-          router.replace('/');
-        },
+    confirmAction({
+      title: 'Sign out?',
+      message: "You'll need to sign back in with your email and password.",
+      confirmLabel: 'Sign out',
+      destructive: true,
+      onConfirm: async () => {
+        await signOut();
+        router.replace('/');
       },
-    ]);
+    });
   };
 
   if (!activeProfile) return <LoadingScreen themed />;
@@ -178,7 +181,7 @@ function ProfileScreen() {
     );
   }
 
-  if (!goalSettings || !progressStats) return <LoadingScreen themed />;
+  if (!progressStats) return <LoadingScreen themed />;
 
   return (
     <ScreenContainer themed>
@@ -339,7 +342,7 @@ function ProfileScreen() {
                   variant="ghost"
                   onPress={async () => {
                     await resetPreview();
-                    Alert.alert('Free-plan preview reset', 'Your preview counts are cleared. Your real account and its counts are unchanged.');
+                    showNotice('Free-plan preview reset', 'Your preview counts are cleared. Your real account and its counts are unchanged.');
                   }}
                 />
               ) : null}

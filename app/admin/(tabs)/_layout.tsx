@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Text, type ColorValue } from 'react-native';
+import { Platform, Text, type ColorValue } from 'react-native';
 
 import { useTheme } from '@/lib/theme/ThemeContext';
 
@@ -22,8 +22,10 @@ export default function AdminTabsLayout() {
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textSecondary,
-        tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+        // On the web the bar is 48px: a fixed 28px icon slot and 5px padding
+        // left the label 10px and clipped it. 56px leaves it the 14px it needs.
+        tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border, ...(Platform.OS === 'web' ? { height: 56 } : null) },
+        tabBarLabelStyle: { fontSize: 11, lineHeight: 14, fontWeight: '600' },
       }}
     >
       <Tabs.Screen name="index" options={{ title: 'Today', tabBarIcon: icon('🏠') }} />

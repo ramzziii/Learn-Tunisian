@@ -97,6 +97,23 @@ describe('Grammar notes: a fixed free set', () => {
   });
 });
 
+describe('lockKind: what a lock asks for', () => {
+  it('guests: "sign up" for anything a free account opens', () => {
+    expect(access.lockKind('guest', 'proverb', 'any')).toBe('signup');
+    expect(access.lockKind('guest', 'lesson', 'any')).toBe('signup');
+    expect(access.lockKind('guest', 'grammar_note', 'present_verbs')).toBe('signup');
+  });
+
+  it('guests: Premium for what only Premium opens', () => {
+    expect(access.lockKind('guest', 'grammar_note', 'past_tense')).toBe('premium');
+  });
+
+  it('free accounts: always Premium', () => {
+    expect(access.lockKind('free', 'proverb', 'any')).toBe('premium');
+    expect(access.lockKind('free', 'grammar_note', 'past_tense')).toBe('premium');
+  });
+});
+
 describe('decideItemAccess', () => {
   const decide = (tier: string, claimed: Set<string>, key: string, extra: object = {}) =>
     access.decideItemAccess({ tier, claimed, itemKey: key, ...extra });

@@ -5,19 +5,22 @@ import { StyleSheet, Text, View } from 'react-native';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { radii, spacing, type ThemeColors } from '@/constants/theme';
 import { fetchMyTranslationRequests } from '@/data/translationRequests';
+import { useAuth } from '@/lib/auth/AuthContext';
 import { useTheme } from '@/lib/theme/ThemeContext';
 
 /**
  * How many of the learner's translation requests have a new answer — checked
  * on focus. Drives the in-app "your translation is ready" notice, which is
  * deliberately generic (never the request or answer text). A failed check
- * just counts as none.
+ * just counts as none. Guests have no requests and never call the server.
  */
 export function useNewTranslationAnswers(): number {
   const [newAnswers, setNewAnswers] = useState(0);
+  const signedIn = !!useAuth().session;
 
   useFocusEffect(
     useCallback(() => {
+      if (!signedIn) return;
       let isCurrent = true;
       fetchMyTranslationRequests()
         .then((requests) => {
@@ -27,9 +30,9 @@ export function useNewTranslationAnswers(): number {
       return () => {
         isCurrent = false;
       };
-    }, [])
+    }, [signedIn])
   );
-  return newAnswers;
+  return signedIn ? newAnswers : 0;
 }
 
 /** The notice line itself, e.g. "🔔 Your translation is ready". */

@@ -50,6 +50,12 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "c0e02657-0a2e-4ccc-a09e-fdbe2da7e096"
+      }
+    },
+    "owner": "ramzikarkoub"
   }
 }

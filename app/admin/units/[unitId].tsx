@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { PillSelect } from '@/components/admin/PillSelect';
 import { BackButton } from '@/components/ui/BackButton';
@@ -19,6 +19,7 @@ import {
 import { useAuth } from '@/lib/auth/AuthContext';
 import type { Lesson, Unit } from '@/types/models';
 import { useTheme } from '@/lib/theme/ThemeContext';
+import { confirmAction } from '@/lib/confirmAction';
 
 const CURRICULUM_OPTIONS = [
   { value: 'true', label: 'Curriculum' },
@@ -92,21 +93,17 @@ export default function AdminUnitDetail() {
   };
 
   const handleDelete = () => {
-    Alert.alert(
-      'Delete this unit?',
-      'This cascades to its lessons, word groups, variants, and any learner progress/favorites referencing them. This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            await deleteUnit(unitId);
-            router.back();
-          },
-        },
-      ]
-    );
+    confirmAction({
+      title: 'Delete this unit?',
+      message:
+        'This cascades to its lessons, word groups, variants, and any learner progress/favorites referencing them. This cannot be undone.',
+      confirmLabel: 'Delete',
+      destructive: true,
+      onConfirm: async () => {
+        await deleteUnit(unitId);
+        router.back();
+      },
+    });
   };
 
   const handleAddLesson = async () => {

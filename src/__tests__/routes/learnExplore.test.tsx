@@ -37,6 +37,7 @@ jest.mock('@/lib/access/AccessContext', () => ({
   }),
 }));
 jest.mock('@/data/content', () => ({ fetchLessonMap: jest.fn(async () => mockUnits) }));
+jest.mock('@/lib/auth/AuthContext', () => ({ useAuth: () => ({ session: { user: { id: 'acc-1' } } }) }));
 let mockTranslationRequests: { isNewAnswer: boolean }[] = [];
 jest.mock('@/data/translationRequests', () => ({
   fetchMyTranslationRequests: jest.fn(async () => mockTranslationRequests),

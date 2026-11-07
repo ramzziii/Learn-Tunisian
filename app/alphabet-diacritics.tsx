@@ -56,7 +56,7 @@ export default function AlphabetDiacriticsScreen() {
   return (
     <ScreenContainer themed style={styles.screen}>
       <View style={styles.headerRow}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
+        <Pressable onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Go back" style={styles.backButton}>
           <Text style={styles.backIcon}>‹</Text>
         </Pressable>
         <Text style={styles.title}>Diacritics</Text>

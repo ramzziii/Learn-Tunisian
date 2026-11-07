@@ -120,3 +120,14 @@ export function decideItemAccess({
 }
 
 export const isItemOpen = (decision: ItemDecision): boolean => decision !== 'limit';
+
+/**
+ * What a lock on this item asks for: guests are asked to sign up for anything
+ * a free account would open; everything else (and everything locked for a
+ * free account) is Premium.
+ */
+export function lockKind(tier: Tier, feature: CountedFeature, itemKey: string): 'signup' | 'premium' {
+  if (tier !== 'guest') return 'premium';
+  const fixedFree = FIXED_FREE_ITEMS[feature];
+  return !fixedFree || fixedFree.free.has(itemKey) ? 'signup' : 'premium';
+}

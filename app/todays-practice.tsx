@@ -212,7 +212,7 @@ function TodaysPracticeScreen() {
   return (
     <ScreenContainer themed>
       <View style={styles.header}>
-        <PressableScale haptic onPress={exit} accessibilityLabel="Exit practice" style={styles.closeButton}>
+        <PressableScale haptic onPress={exit} accessibilityRole="button" accessibilityLabel="Exit practice" style={styles.closeButton}>
           <Text style={styles.closeIcon}>✕</Text>
         </PressableScale>
         <View style={{ flex: 1 }}>

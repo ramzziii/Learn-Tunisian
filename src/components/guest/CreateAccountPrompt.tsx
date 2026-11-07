@@ -36,7 +36,6 @@ export function CreateAccountPrompt({ reason = 'account' }: { reason?: CreateAcc
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const copy = COPY[reason];
-  const isKeepLearning = reason === 'keep-learning';
 
   return (
     <ScreenContainer themed>
@@ -46,7 +45,6 @@ export function CreateAccountPrompt({ reason = 'account' }: { reason?: CreateAcc
           {copy.title}
         </Text>
         <Text style={styles.body}>{copy.body}</Text>
-        {!isKeepLearning ? <Text style={styles.cta}>Create a free account to keep learning.</Text> : null}
         <Button themed label="Create a free account" onPress={() => router.push('/onboarding/age')} style={styles.button} />
         <Button themed label="Sign in" variant="secondary" onPress={() => router.push('/auth/sign-in')} style={styles.button} />
         <Button
@@ -67,6 +65,5 @@ const makeStyles = (colors: ThemeColors) =>
     emoji: { fontSize: 48, textAlign: 'center' },
     title: { fontSize: 22, fontWeight: '800', color: colors.textPrimary, textAlign: 'center' },
     body: { fontSize: 15, color: colors.textSecondary, textAlign: 'center', lineHeight: 21 },
-    cta: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.xs },
     button: { marginTop: spacing.xs, borderRadius: radii.md },
   });

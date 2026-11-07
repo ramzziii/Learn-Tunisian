@@ -1,6 +1,6 @@
 import { router, type Href } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Animated, StyleSheet, Text, View } from 'react-native';
+import { Animated, StyleSheet, Text, View } from 'react-native';
 
 import { ExerciseRenderer } from '@/components/exercises/shared/ExerciseRenderer';
 import { RevisitIntro } from '@/components/session/RevisitIntro';
@@ -11,6 +11,7 @@ import { ProgressBar } from '@/components/ui/ProgressBar';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { radii, spacing, type ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/lib/theme/ThemeContext';
+import { confirmAction } from '@/lib/confirmAction';
 import { fetchLessonMap } from '@/data/content';
 import { recordWordGroupResult } from '@/data/progress';
 import { recordSessionLog } from '@/data/sessionLogs';
@@ -205,10 +206,14 @@ export function SessionRunner({
       logAndExit();
       return;
     }
-    Alert.alert('Leave this session?', "Your progress so far is saved, but you'll need to start a new session.", [
-      { text: 'Keep going', style: 'cancel' },
-      { text: 'Leave', style: 'destructive', onPress: () => logAndExit() },
-    ]);
+    confirmAction({
+      title: 'Leave this session?',
+      message: "Your progress so far is saved, but you'll need to start a new session.",
+      confirmLabel: 'Leave',
+      cancelLabel: 'Keep going',
+      destructive: true,
+      onConfirm: () => logAndExit(),
+    });
   };
 
   if (groups.length === 0) {
@@ -222,7 +227,7 @@ export function SessionRunner({
   return (
     <ScreenContainer themed>
       <View style={styles.header}>
-        <PressableScale haptic onPress={handleExitPress} accessibilityLabel="Exit session" style={styles.closeButton}>
+        <PressableScale haptic onPress={handleExitPress} accessibilityRole="button" accessibilityLabel="Exit session" style={styles.closeButton}>
           <Text style={styles.closeIcon}>✕</Text>
         </PressableScale>
         <View style={{ flex: 1 }}>

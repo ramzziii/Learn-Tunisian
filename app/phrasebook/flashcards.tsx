@@ -31,7 +31,7 @@ export default function PhrasebookFlashcardsScreen() {
   const { colors } = useTheme();
   const { preferences: display } = useDisplayPreferences();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const { decide } = useAccess();
+  const { tier, decide } = useAccess();
   const [cards, setCards] = useState<WordGroupWithVariants[] | null>(null);
   // Practice isn't counted: the deck uses only categories already opened (all
   // with Premium). The rest are counted from the category list so the deck can
@@ -110,7 +110,7 @@ export default function PhrasebookFlashcardsScreen() {
   return (
     <ScreenContainer themed style={styles.screen}>
       <View style={styles.topbar}>
-        <Pressable onPress={() => router.back()} style={styles.closeButton}>
+        <Pressable onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Close" style={styles.closeButton}>
           <Text style={styles.closeIcon}>✕</Text>
         </Pressable>
         <View style={styles.progressTrack}>
@@ -164,7 +164,7 @@ export default function PhrasebookFlashcardsScreen() {
 
       {lockedPhraseCount > 0 ? (
         <PressableScale haptic onPress={() => router.push('/phrasebook')} style={[styles.lockedRow, styles.shadowCard]}>
-          <PremiumBadge />
+          <PremiumBadge signUp={tier === 'guest'} />
           <Text style={styles.lockedText}>
             {lockedPhraseCount} more {lockedPhraseCount === 1 ? 'phrase' : 'phrases'} in categories you haven’t opened
           </Text>

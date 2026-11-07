@@ -64,7 +64,9 @@ describe('Grammar Notes', () => {
   it('guest: only sentence order is open; present tense and questions are locked → create a free account', async () => {
     mockTier = 'guest';
     await themed(<Grammar />);
-    expect(screen.getAllByLabelText('Premium').length).toBe(GRAMMAR_NOTES.length - 1);
+    // Present tense and questions open with a free account ("Sign up"); the rest are Premium.
+    expect(screen.getAllByLabelText('Sign up to unlock').length).toBe(2);
+    expect(screen.getAllByLabelText('Premium').length).toBe(GRAMMAR_NOTES.length - 3);
     expect(screen.getByText(note('sentence_order').explanation)).toBeOnTheScreen();
     await fireEvent.press(screen.getByText(note('present_verbs').title));
     expect(screen.queryByText(note('present_verbs').explanation)).toBeNull();

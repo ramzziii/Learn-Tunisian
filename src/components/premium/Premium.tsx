@@ -22,14 +22,25 @@ export function openUpgradeFlow(): void {
 }
 
 /** Small "Premium" pill marking a locked item. */
-export function PremiumBadge({ style, compact = false }: { style?: StyleProp<ViewStyle>; compact?: boolean }) {
+export function PremiumBadge({
+  style,
+  compact = false,
+  signUp = false,
+}: {
+  style?: StyleProp<ViewStyle>;
+  compact?: boolean;
+  /** A guest's lock on something a free account opens: "🔒 Sign up". */
+  signUp?: boolean;
+}) {
   return (
     <View
       style={[styles.badge, compact && styles.badgeCompact, style]}
-      accessibilityLabel="Premium"
+      accessibilityLabel={signUp ? 'Sign up to unlock' : 'Premium'}
       accessibilityRole="text"
     >
-      <Text style={[styles.badgeText, compact && styles.badgeTextCompact]}>{compact ? '🔒' : '🔒 Premium'}</Text>
+      <Text style={[styles.badgeText, compact && styles.badgeTextCompact]}>
+        {compact ? '🔒' : signUp ? '🔒 Sign up' : '🔒 Premium'}
+      </Text>
     </View>
   );
 }

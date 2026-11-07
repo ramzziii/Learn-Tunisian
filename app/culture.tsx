@@ -45,7 +45,7 @@ export default function CultureScreen() {
   );
 
   // Any proverb can be picked; each counts when first opened (src/lib/access).
-  const { decide, open } = useAccess();
+  const { tier, decide, open } = useAccess();
   const onLockedPress = useLockedItemAction();
 
   const selectProverb = async (proverb: Proverb) => {
@@ -64,7 +64,7 @@ export default function CultureScreen() {
     <ScreenContainer themed style={styles.screen}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <View style={styles.headerRow}>
-          <Pressable onPress={() => router.back()} style={styles.backButton}>
+          <Pressable onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Go back" style={styles.backButton}>
             <Text style={styles.backIcon}>‹</Text>
           </Pressable>
           <Text style={styles.title}>Culture Corner</Text>
@@ -94,7 +94,7 @@ export default function CultureScreen() {
                   onPress={() => selectProverb(proverb)}
                   style={[styles.card, { width: cardWidth }, isViewed && styles.cardViewed]}
                 >
-                  {isLocked ? <PremiumBadge style={styles.cardBadge} /> : null}
+                  {isLocked ? <PremiumBadge style={styles.cardBadge} signUp={tier === 'guest'} /> : null}
                   <Text style={styles.cardEmoji}>{proverb.emoji}</Text>
                   <TunisianText arabic={proverb.arabic} latin={proverb.transliteration} size="sm" numberOfLines={2} arabicStyle={styles.cardTransliteration} latinStyle={styles.cardTransliteration} />
                 </PressableScale>
