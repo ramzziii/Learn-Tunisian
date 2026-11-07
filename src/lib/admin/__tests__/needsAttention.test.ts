@@ -6,6 +6,15 @@ import { buildNeedsAttention } from '@/lib/admin/needsAttention';
 const none = { requestsOpen: 0, requestsOverdue: 0, wordsWaitingForReview: 0, recordingsNeeded: 0, correctionsWaiting: 0, isReviewer: true };
 
 describe('buildNeedsAttention', () => {
+  it('0028: refused/failed imports and recordings to re-check, before new recordings', () => {
+    const rows = buildNeedsAttention({ ...none, recordingsNeeded: 5, recordingsToRecheck: 2, importsNeedingALook: 1 });
+    expect(rows.map((r) => [r.key, r.title, r.href])).toEqual([
+      ['imports', '1 import needs a look', '/admin/imports'],
+      ['recheck', '2 recordings to re-check', '/admin/audio'],
+      ['recordings', '5 live forms need a native recording', '/admin/audio'],
+    ]);
+  });
+
   it('nothing waiting: an empty list (the screen says "All caught up")', () => {
     expect(buildNeedsAttention(none)).toEqual([]);
   });

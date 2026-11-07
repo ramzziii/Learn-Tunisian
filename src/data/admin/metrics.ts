@@ -8,6 +8,10 @@ export interface AdminMetrics {
   wordVariantCount: number;
   wordGroupsByStatus: Record<ContentStatus, number>;
   pendingCorrectionsCount: number;
+  /** 0028: recordings waiting for re-check after a spelling change. */
+  recordingsToRecheckCount: number;
+  /** 0028: refused or failed imports nobody has marked as seen. */
+  importsNeedingALookCount: number;
 }
 
 const EMPTY_STATUS_COUNTS: Record<ContentStatus, number> = {
@@ -27,6 +31,16 @@ export async function fetchAdminMetrics(): Promise<AdminMetrics> {
     supabase.from('word_variants').select('*', { count: 'exact', head: true }),
     supabase.from('corrections').select('*', { count: 'exact', head: true }).is('is_correct', null),
   ]);
+  const [recheck, imports] = await Promise.all([
+    supabase.from('word_variants').select('*', { count: 'exact', head: true }).eq('audio_needs_recheck', true).not('audio_path', 'is', null),
+    supabase
+      .from('content_import_runs')
+      .select('*', { count: 'exact', head: true })
+      .is('acknowledged_at', null)
+      .in('outcome', ['refused', 'failed']),
+  ]);
+  if (recheck.error) throw recheck.error;
+  if (imports.error) throw imports.error;
   if (units.error) throw units.error;
   if (lessons.error) throw lessons.error;
   if (groupStatuses.error) throw groupStatuses.error;
@@ -47,5 +61,7 @@ export async function fetchAdminMetrics(): Promise<AdminMetrics> {
     wordVariantCount: variants.count ?? 0,
     wordGroupsByStatus,
     pendingCorrectionsCount: pendingCorrections.count ?? 0,
+    recordingsToRecheckCount: recheck.count ?? 0,
+    importsNeedingALookCount: imports.count ?? 0,
   };
 }

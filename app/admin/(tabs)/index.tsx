@@ -43,6 +43,8 @@ async function loadToday(): Promise<TodayData> {
       wordsWaitingForReview: waiting,
       recordingsNeeded: progress.needsRecording.length,
       correctionsWaiting: metrics.pendingCorrectionsCount,
+      recordingsToRecheck: metrics.recordingsToRecheckCount,
+      importsNeedingALook: metrics.importsNeedingALookCount,
       isReviewer,
     }),
   };
