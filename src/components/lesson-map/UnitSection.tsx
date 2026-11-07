@@ -70,7 +70,8 @@ export function UnitSection({
         </View>
       )}
       <View style={{ flex: 1 }}>
-        <Text style={[styles.unitLabel, { color: allAhead ? colors.textSecondary : accent }]}>Unit {unitNumber}</Text>
+        {/* The unit colour stays on the number tile; as small text it was too faint to read. */}
+        <Text style={[styles.unitLabel, { color: colors.textSecondary }]}>Unit {unitNumber}</Text>
         <Text style={[styles.unitTitle, allAhead && { color: colors.textSecondary }]} accessibilityRole="header">
           {unit.name}
         </Text>

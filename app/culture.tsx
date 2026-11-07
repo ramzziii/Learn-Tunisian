@@ -92,6 +92,8 @@ export default function CultureScreen() {
               <Reveal key={proverb.id} delay={Math.min(index * 40, 400)}>
                 <PressableScale
                   onPress={() => selectProverb(proverb)}
+                  accessibilityRole="button"
+                  accessibilityLabel={isLocked ? `${proverb.transliteration} (locked)` : proverb.transliteration}
                   style={[styles.card, { width: cardWidth }, isViewed && styles.cardViewed]}
                 >
                   {isLocked ? <PremiumBadge style={styles.cardBadge} signUp={tier === 'guest'} /> : null}

@@ -412,7 +412,7 @@ const makeStyles = (colors: ThemeColors) =>
       borderColor: `${colors.accent}80`,
       marginBottom: spacing.lg,
     },
-    startHereEyebrow: { fontSize: 11, fontWeight: '800', color: colors.accent, letterSpacing: 0.5, textTransform: 'uppercase' },
+    startHereEyebrow: { fontSize: 11, fontWeight: '800', color: colors.accentText, letterSpacing: 0.5, textTransform: 'uppercase' },
     sectionHeader: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginTop: spacing.sm, marginBottom: spacing.md },
     sectionHeading: { fontSize: 22, fontWeight: '800', color: colors.textPrimary, letterSpacing: -0.3 },
     sectionCount: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },

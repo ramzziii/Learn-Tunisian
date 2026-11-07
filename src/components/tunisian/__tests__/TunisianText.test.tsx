@@ -5,6 +5,11 @@
 import { render, screen } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  __esModule: true,
+  default: { getItem: jest.fn(async () => null), setItem: jest.fn(async () => undefined) },
+}));
+
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { TunisianText } = require('@/components/tunisian/TunisianText');
 // eslint-disable-next-line @typescript-eslint/no-var-requires

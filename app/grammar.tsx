@@ -232,7 +232,7 @@ const makeStyles = (colors: ThemeColors) =>
     example: { flex: 1, fontSize: 13, color: colors.textSecondary, lineHeight: 19 },
     exampleTransliteration: { color: colors.textPrimary, fontWeight: '600' },
     termsBox: {
-      backgroundColor: `${colors.error}14`,
+      backgroundColor: `${colors.error}0D`, // light tint: the red labels on it must stay readable (4.5:1)
       borderRadius: radii.md,
       padding: spacing.md,
       marginTop: spacing.sm,

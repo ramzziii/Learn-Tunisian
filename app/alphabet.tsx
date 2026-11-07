@@ -261,7 +261,7 @@ const makeStyles = (colors: ThemeColors) =>
       position: 'absolute',
       top: 6,
       right: 6,
-      backgroundColor: colors.primary,
+      backgroundColor: colors.primaryDark,
       borderRadius: radii.sm,
       paddingHorizontal: 5,
       paddingVertical: 1,

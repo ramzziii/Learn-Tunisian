@@ -5,8 +5,8 @@ import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-na
 import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
-import { radii, spacing, type ThemeColors } from '@/constants/theme';
-import { useTheme } from '@/lib/theme/ThemeContext';
+import { lightColors, radii, spacing, type ThemeColors } from '@/constants/theme';
+import { useOptionalTheme, useTheme } from '@/lib/theme/ThemeContext';
 
 // Fixed gold, not theme-derived — the Premium marker should read identically
 // in both themes, same reasoning as the celebration gradient.
@@ -32,13 +32,14 @@ export function PremiumBadge({
   /** A guest's lock on something a free account opens: "🔒 Sign up". */
   signUp?: boolean;
 }) {
+  const textColor = (useOptionalTheme()?.colors ?? lightColors).premiumText;
   return (
     <View
       style={[styles.badge, compact && styles.badgeCompact, style]}
       accessibilityLabel={signUp ? 'Sign up to unlock' : 'Premium'}
       accessibilityRole="text"
     >
-      <Text style={[styles.badgeText, compact && styles.badgeTextCompact]}>
+      <Text style={[styles.badgeText, compact && styles.badgeTextCompact, { color: textColor }]}>
         {compact ? '🔒' : signUp ? '🔒 Sign up' : '🔒 Premium'}
       </Text>
     </View>
@@ -83,7 +84,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
   },
   badgeCompact: { paddingHorizontal: 6 },
-  badgeText: { fontSize: 11, fontWeight: '800', color: PREMIUM_GOLD, letterSpacing: 0.3 },
+  badgeText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.3 },
   badgeTextCompact: { fontSize: 10 },
 });
 
