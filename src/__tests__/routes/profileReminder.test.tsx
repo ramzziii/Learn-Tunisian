@@ -7,7 +7,8 @@ const mockCancel = jest.fn();
 const mockPermission = jest.fn();
 const mockSchedule = jest.fn();
 const mockUpdateSettings = jest.fn();
-let mockSettings: Record<string, unknown> = { dailyGoalMinutes: 10, reminderEnabled: false, reminderTime: '18:00:00' };
+const mockCreateSettings = jest.fn();
+let mockSettings: Record<string, unknown> | null = { dailyGoalMinutes: 10, reminderEnabled: false, reminderTime: '18:00:00' };
 // Signed-in account (the guest guard and Talk lock read the access tier).
 jest.mock('@/lib/access/AccessContext', () => ({ useAccess: () => ({ tier: 'free', isResolved: true }) }));
 jest.mock('@/components/onboarding/TimeWheelPicker', () => ({
@@ -52,6 +53,7 @@ jest.mock('@/lib/notifications/reminders', () => ({
 jest.mock('@/data/profiles', () => ({
   fetchDailyGoalSettings: jest.fn(async () => mockSettings),
   updateDailyGoalSettings: (...a: unknown[]) => mockUpdateSettings(...a),
+  createDailyGoalSettings: (...a: unknown[]) => mockCreateSettings(...a),
 }));
 jest.mock('@/data/progress', () => ({
   fetchProgressSummary: jest.fn(async () => ({ wordsLearning: 1, wordsMastered: 2, wordsReviewed: 3, totalWordsSeen: 4 })),
@@ -78,7 +80,7 @@ const renderProfile = () =>
   );
 
 beforeEach(() => {
-  [mockCancel, mockPermission, mockSchedule, mockUpdateSettings].forEach((m) => m.mockReset());
+  [mockCancel, mockPermission, mockSchedule, mockUpdateSettings, mockCreateSettings].forEach((m) => m.mockReset());
   mockUpdateSettings.mockResolvedValue(undefined);
   mockSettings = { dailyGoalMinutes: 10, reminderEnabled: false, reminderTime: '18:00:00' };
   mockIsAdmin = false;
@@ -127,6 +129,18 @@ it('turning a reminder off cancels it', async () => {
   expect(mockUpdateSettings).toHaveBeenCalledWith('p1', expect.objectContaining({ reminderEnabled: false }));
   expect(mockCancel).toHaveBeenCalledWith('p1');
   expect(mockPermission).not.toHaveBeenCalled();
+});
+
+it('no settings yet (sign-up stopped before the daily goal): Profile still opens, and saving creates them', async () => {
+  mockSettings = null;
+  await renderProfile();
+  await screen.findByText('Save changes');
+  expect(screen.getByText('Sign out')).toBeOnTheScreen();
+  expect(reminderSwitch().props.value).toBe(false);
+  await fireEvent.press(screen.getByText('15 minutes a day'));
+  await fireEvent.press(screen.getByText('Save changes'));
+  expect(mockCreateSettings).toHaveBeenCalledWith('p1', 15, '18:00:00', false);
+  expect(mockUpdateSettings).not.toHaveBeenCalled();
 });
 
 it('the daily goal can still be changed after signup', async () => {

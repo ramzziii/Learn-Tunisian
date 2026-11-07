@@ -15,7 +15,7 @@ import { WHY_TUNISIAN_LINK } from '@/constants/appCopy';
 import { DAILY_GOAL_OPTIONS } from '@/constants/dailyGoal';
 import { radii, spacing, type ThemeColors } from '@/constants/theme';
 import { countCompletedLessons } from '@/data/content';
-import { fetchDailyGoalSettings, updateDailyGoalSettings } from '@/data/profiles';
+import { createDailyGoalSettings, fetchDailyGoalSettings, updateDailyGoalSettings } from '@/data/profiles';
 import { fetchProgressSummary, type ProfileProgressSummary } from '@/data/progress';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
 import { useIsAdmin } from '@/lib/admin/AdminContext';
@@ -98,6 +98,9 @@ function ProfileScreen() {
 
     setGoalSettings(settings);
     setProgressStats({ ...summary, lessonsCompleted });
+    // No settings yet (sign-up stopped before the daily-goal step): show the
+    // defaults with the reminder off; saving creates them.
+    if (!settings) setReminderEnabled(false);
     if (settings) {
       setDailyGoalMinutes(settings.dailyGoalMinutes);
       setReminderEnabled(settings.reminderEnabled);
@@ -117,11 +120,11 @@ function ProfileScreen() {
     setSaved(false);
     setNotificationsDenied(false);
     const reminderTime = `${String(reminderHour).padStart(2, '0')}:${String(reminderMinute).padStart(2, '0')}:00`;
-    await updateDailyGoalSettings(activeProfile.id, {
-      dailyGoalMinutes,
-      reminderTime,
-      reminderEnabled,
-    });
+    setGoalSettings(
+      goalSettings
+        ? await updateDailyGoalSettings(activeProfile.id, { dailyGoalMinutes, reminderTime, reminderEnabled })
+        : await createDailyGoalSettings(activeProfile.id, dailyGoalMinutes, reminderTime, reminderEnabled)
+    );
 
     if (reminderEnabled) {
       const granted = await requestNotificationPermission();
@@ -178,7 +181,7 @@ function ProfileScreen() {
     );
   }
 
-  if (!goalSettings || !progressStats) return <LoadingScreen themed />;
+  if (!progressStats) return <LoadingScreen themed />;
 
   return (
     <ScreenContainer themed>
