@@ -2,10 +2,12 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 
 import { AccessCheckProblem, AccessLimitScreen } from '@/components/access/AccessLimit';
+import { NewWordsIntro } from '@/components/lesson/NewWordsIntro';
 import { SessionRunner } from '@/components/session/SessionRunner';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { fetchWordGroupsForLesson } from '@/data/content';
 import { fetchDailyGoalSettings } from '@/data/profiles';
+import { fetchSeenWordGroupIds } from '@/data/progress';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
 import { useAccess } from '@/lib/access/AccessContext';
 import { useLessonAccess } from '@/lib/access/useLessonAccess';
@@ -26,6 +28,10 @@ export default function LessonSession() {
   const [groups, setGroups] = useState<WordGroupWithVariants[] | null>(null);
   const [goalMinutes, setGoalMinutes] = useState<DailyGoalMinutes>(DEFAULT_GOAL_MINUTES);
   const [isReady, setIsReady] = useState(false);
+  // Teach before testing: words not practised yet are shown first (all of
+  // them, then the quiz). Empty when every word has been met before.
+  const [newGroups, setNewGroups] = useState<WordGroupWithVariants[]>([]);
+  const [introDone, setIntroDone] = useState(false);
 
   useEffect(() => {
     if (!activeProfile || !lessonId || access.status !== 'open') return;
@@ -35,7 +41,13 @@ export default function LessonSession() {
         fetchWordGroupsForLesson(lessonId),
         fetchDailyGoalSettings(activeProfile.id),
       ]);
+      // A failed lookup just skips the intro — never blocks the lesson.
+      const seen = await fetchSeenWordGroupIds(
+        activeProfile.id,
+        lessonGroups.map((g) => g.id)
+      ).catch(() => null);
       if (cancelled) return;
+      setNewGroups(seen ? lessonGroups.filter((g) => !seen.has(g.id)) : []);
       setGroups(lessonGroups);
       setGoalMinutes(dailyGoal?.dailyGoalMinutes ?? DEFAULT_GOAL_MINUTES);
       setIsReady(true);
@@ -52,6 +64,8 @@ export default function LessonSession() {
   }
 
   if (!isReady || !groups || !activeProfile) return <LoadingScreen themed />;
+
+  if (newGroups.length > 0 && !introDone) return <NewWordsIntro groups={newGroups} onDone={() => setIntroDone(true)} />;
 
   return (
     <SessionRunner

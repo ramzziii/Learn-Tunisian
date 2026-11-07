@@ -34,6 +34,22 @@ jest.mock('@/data/profiles', () => ({ fetchDailyGoalSettings: jest.fn(async () =
 jest.mock('@/data/favorites', () => ({ fetchFavoriteWordGroupIds: jest.fn(async () => new Set()) }));
 jest.mock('@/lib/display/useDisplayPreferences', () => ({ useDisplayPreferences: () => ({ preferences: { script: 'both', form: 'default' } }) }));
 jest.mock('@/lib/offline/audioCache', () => ({ prefetchLessonAudio: jest.fn() }));
+// Words already practised (the "New words" intro shows only the others).
+let mockSeenAll = true;
+jest.mock('@/data/progress', () => ({
+  fetchSeenWordGroupIds: jest.fn(async (_p: string, ids: string[]) => new Set(mockSeenAll ? ids : [])),
+}));
+jest.mock('@/components/lesson/NewWordsIntro', () => ({
+  NewWordsIntro: ({ groups, onDone }: { groups: unknown[]; onDone: () => void }) => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { Text: RNText, Pressable } = require('react-native');
+    return (
+      <Pressable onPress={onDone}>
+        <RNText>{`New words intro: ${groups.length}`}</RNText>
+      </Pressable>
+    );
+  },
+}));
 jest.mock('@/components/session/SessionRunner', () => ({
   SessionRunner: ({ groups, onComplete }: { groups: unknown[]; onComplete?: () => void }) => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -63,6 +79,14 @@ beforeEach(() => {
   mockOpen.mockReset().mockResolvedValue(true);
   mockFetchWordGroups.mockClear();
   mockFetchTarget.mockClear();
+  mockSeenAll = true;
+});
+
+it('teach before testing: words not practised yet are shown first, then the quiz starts', async () => {
+  mockSeenAll = false;
+  await renderRoute();
+  await fireEvent.press(await screen.findByText('New words intro: 1'));
+  expect(await screen.findByText('Session started with 1 words')).toBeOnTheScreen();
 });
 
 it('opens the lesson through the access layer, then starts the session', async () => {
