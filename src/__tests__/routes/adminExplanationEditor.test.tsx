@@ -44,6 +44,8 @@ jest.mock('expo-router', () => ({
   router: { back: jest.fn(), push: jest.fn(), replace: jest.fn(), canGoBack: () => true },
 }));
 jest.mock('@/lib/auth/AuthContext', () => ({ useAuth: () => ({ session: { user: { id: 'admin-1' } } }) }));
+let mockIsReviewer = true;
+jest.mock('@/data/reviewers', () => ({ fetchIsReviewer: jest.fn(async () => mockIsReviewer) }));
 jest.mock('@/data/admin/content', () => ({
   getWordGroupAdmin: jest.fn(async () => mockGroup),
   createWordVariant: (...a: unknown[]) => mockCreateVariant(...a),
@@ -111,6 +113,7 @@ beforeEach(() => {
   mockSetInclusion.mockReset().mockImplementation(async (id: string, include: boolean) => variant(id, { inRepeatAfterMe: include }));
   mockCreateVariant.mockReset();
   mockUpdateVariant.mockReset().mockImplementation(async (id: string, patch: Record<string, unknown>) => variant(id, patch));
+  mockIsReviewer = true;
 });
 
 it('shows two clearly labelled recorders per form: pronunciation (with Repeat After Me) and explanation (without)', async () => {
@@ -144,4 +147,40 @@ it('a form with no explanation yet says so', async () => {
   await renderScreen();
   expect(await screen.findByText(/No explanation yet/)).toBeOnTheScreen();
   expect(screen.getByText('Recorder v1-explanation current=null ram=false')).toBeOnTheScreen();
+});
+
+describe('reviewer-only choices (0028)', () => {
+  const draftGroup = () => {
+    mockGroup = { ...mockGroup, contentStatus: 'draft', variants: [variant('v1', { contentStatus: 'draft' })] };
+  };
+
+  it('an admin who isn’t a reviewer: no "Live" or "Rejected" to pick, and "text checked" is locked', async () => {
+    mockIsReviewer = false;
+    draftGroup();
+    await renderScreen();
+    expect(await screen.findAllByText('Language reviewers only')).toHaveLength(1);
+    expect(screen.queryByText('Live')).toBeNull();
+    expect(screen.queryByText('Rejected')).toBeNull();
+    expect(screen.getAllByText('Archived').length).toBeGreaterThan(0);
+    // (The jest Switch stand-in drops `disabled`; the note above shares its condition.)
+  });
+
+  it('a reviewer can pick every status', async () => {
+    draftGroup();
+    await renderScreen();
+    expect((await screen.findAllByText('Live')).length).toBeGreaterThan(0);
+    expect(screen.queryByText('Language reviewers only')).toBeNull();
+  });
+
+  it('changing the spelling of a recorded form says the recording will wait for re-check', async () => {
+    await renderScreen();
+    await fireEvent.changeText(await screen.findByLabelText('Transliteration'), '3asslema');
+    expect(screen.getByText(/keeps the recording and marks it for re-check/)).toBeOnTheScreen();
+  });
+
+  it('a form already waiting for re-check says so', async () => {
+    mockGroup = { ...mockGroup, variants: [variant('v1', { audioNeedsRecheck: true })] };
+    await renderScreen();
+    expect(await screen.findByText(/Recording waiting for re-check/)).toBeOnTheScreen();
+  });
 });

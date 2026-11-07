@@ -42,6 +42,7 @@ jest.mock('expo-router', () => ({
   router: { back: jest.fn(), push: jest.fn(), replace: jest.fn(), canGoBack: () => true },
 }));
 jest.mock('@/lib/auth/AuthContext', () => ({ useAuth: () => ({ session: { user: { id: 'admin-1' } } }) }));
+jest.mock('@/data/reviewers', () => ({ fetchIsReviewer: jest.fn(async () => true) }));
 jest.mock('@/data/admin/content', () => ({
   getWordGroupAdmin: jest.fn(async () => mockGroup),
   createWordVariant: (...a: unknown[]) => mockCreateVariant(...a),

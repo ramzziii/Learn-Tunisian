@@ -18,6 +18,8 @@ import {
   updateWordVariant,
 } from '@/data/admin/content';
 import { setRepeatAfterMeInclusion } from '@/data/repeatAfterMe';
+import { fetchIsReviewer } from '@/data/reviewers';
+import { adminSaveErrorMessage, REVIEWER_ONLY_STATUSES } from '@/lib/admin/adminErrors';
 import { hasApprovedPrimaryOrGenderPair } from '@/lib/admin/wordGroupValidation';
 import { useAuth } from '@/lib/auth/AuthContext';
 import type { ContentStatus, VariantLabel, WordGroupWithVariants, WordVariant } from '@/types/models';
@@ -30,6 +32,13 @@ const CONTENT_STATUS_OPTIONS: { value: ContentStatus; label: string }[] = [
   { value: 'rejected', label: 'Rejected' },
   { value: 'archived', label: 'Archived' },
 ];
+
+/** Admins who aren't language reviewers can't make content live or reject it (0028) — those choices are hidden, except the current one. */
+function statusOptionsFor(isReviewer: boolean, current: ContentStatus) {
+  return CONTENT_STATUS_OPTIONS.filter(
+    (o) => isReviewer || o.value === current || !(REVIEWER_ONLY_STATUSES as readonly string[]).includes(o.value)
+  );
+}
 
 const VARIANT_LABEL_OPTIONS: { value: VariantLabel; label: string }[] = [
   { value: 'primary', label: 'Primary' },
@@ -54,6 +63,13 @@ export default function AdminWordGroupDetail() {
   const [contentStatus, setContentStatus] = useState<ContentStatus>('draft');
   const [groupError, setGroupError] = useState<string | null>(null);
   const [isSavingGroup, setIsSavingGroup] = useState(false);
+  const [isReviewer, setIsReviewer] = useState(false);
+
+  useEffect(() => {
+    fetchIsReviewer()
+      .then(setIsReviewer)
+      .catch(() => setIsReviewer(false));
+  }, []);
 
   const load = useCallback(async () => {
     setLoadError(false);
@@ -99,7 +115,7 @@ export default function AdminWordGroupDetail() {
       );
       setGroup((current) => (current ? { ...current, ...updated } : current));
     } catch (err) {
-      setGroupError(err instanceof Error ? err.message : 'Could not save word group.');
+      setGroupError(adminSaveErrorMessage(err, 'Could not save word group.'));
     } finally {
       setIsSavingGroup(false);
     }
@@ -149,7 +165,7 @@ export default function AdminWordGroupDetail() {
           <TextInput value={sortOrder} onChangeText={setSortOrder} style={styles.input} keyboardType="number-pad" />
           <PillSelect
             label="Status"
-            options={CONTENT_STATUS_OPTIONS}
+            options={statusOptionsFor(isReviewer, group.contentStatus)}
             value={contentStatus}
             onChange={(v) => setContentStatus(v as ContentStatus)}
           />
@@ -169,6 +185,7 @@ export default function AdminWordGroupDetail() {
             key={variant.id}
             variant={variant}
             actorAccountId={actorAccountId}
+            isReviewer={isReviewer}
             onSaved={handleVariantSaved}
             onDeleted={handleVariantDeleted}
           />
@@ -191,11 +208,13 @@ export default function AdminWordGroupDetail() {
 function VariantRow({
   variant,
   actorAccountId,
+  isReviewer,
   onSaved,
   onDeleted,
 }: {
   variant: WordVariant;
   actorAccountId: string;
+  isReviewer: boolean;
   onSaved: (variant: WordVariant) => void;
   onDeleted: (variantId: string) => void;
 }) {
@@ -237,7 +256,7 @@ function VariantRow({
       );
       onSaved(updated);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not save variant.');
+      setError(adminSaveErrorMessage(err, 'Could not save variant.'));
     } finally {
       setIsSaving(false);
     }
@@ -272,18 +291,31 @@ function VariantRow({
         <PillSelect label="Label" options={VARIANT_LABEL_OPTIONS} value={variantLabel} onChange={(v) => setVariantLabel(v as VariantLabel)} />
         <View style={styles.verifiedBox}>
           <Text style={styles.fieldLabel}>Text checked by a native speaker</Text>
-          <Switch value={nativeVerified} onValueChange={setNativeVerified} trackColor={{ true: colors.success }} />
+          <Switch
+            value={nativeVerified}
+            onValueChange={setNativeVerified}
+            disabled={!isReviewer}
+            accessibilityLabel="Text checked by a native speaker"
+            trackColor={{ true: colors.success }}
+          />
+          {!isReviewer ? <Text style={styles.hint}>Language reviewers only</Text> : null}
         </View>
       </View>
+      {variant.audioNeedsRecheck ? (
+        <Text style={styles.recheckBadge}>🔁 Recording waiting for re-check (Audio → Re-check)</Text>
+      ) : null}
       <Text style={styles.fieldLabel}>Arabic</Text>
-      <TextInput value={wordArabic} onChangeText={setWordArabic} style={styles.input} />
+      <TextInput value={wordArabic} onChangeText={setWordArabic} style={styles.input} accessibilityLabel="Arabic" />
       <Text style={styles.fieldLabel}>Transliteration</Text>
-      <TextInput value={transliteration} onChangeText={setTransliteration} style={styles.input} />
+      <TextInput value={transliteration} onChangeText={setTransliteration} style={styles.input} accessibilityLabel="Transliteration" />
+      {variant.audioPath && (wordArabic.trim() !== variant.wordArabic || transliteration.trim() !== variant.transliteration) ? (
+        <Text style={styles.hint}>Saving keeps the recording and marks it for re-check, so learners won&apos;t hear it until someone confirms it.</Text>
+      ) : null}
       <Text style={styles.fieldLabel}>Notes</Text>
       <TextInput value={notes} onChangeText={setNotes} style={styles.input} />
       <Text style={styles.fieldLabel}>Sort order</Text>
       <TextInput value={sortOrder} onChangeText={setSortOrder} style={styles.input} keyboardType="number-pad" />
-      <PillSelect label="Status" options={CONTENT_STATUS_OPTIONS} value={status} onChange={(v) => setStatus(v as ContentStatus)} />
+      <PillSelect label="Status" options={statusOptionsFor(isReviewer, variant.contentStatus)} value={status} onChange={(v) => setStatus(v as ContentStatus)} />
 
       <Text style={styles.fieldLabel}>Pronunciation recording</Text>
       <AudioRecorderField
@@ -416,7 +448,7 @@ function NewVariantForm({
       setNotes('');
       setSortOrder('0');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not create variant.');
+      setError(adminSaveErrorMessage(err, 'Could not create variant.'));
     } finally {
       setIsSaving(false);
     }
@@ -472,6 +504,8 @@ const makeStyles = (colors: ThemeColors) =>
     sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md },
     card: { backgroundColor: colors.surface, borderRadius: radii.lg, padding: spacing.md, gap: 4 },
     errorText: { fontSize: 13, color: colors.error, marginBottom: spacing.xs },
+    hint: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+    recheckBadge: { fontSize: 13, fontWeight: '700', color: colors.accentText, marginVertical: spacing.xs },
     helperText: { fontSize: 12, color: colors.textSecondary },
     fieldLabel: { fontSize: 11, fontWeight: '700', color: colors.textSecondary, marginTop: spacing.sm, textTransform: 'uppercase' },
     input: {
