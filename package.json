@@ -67,7 +67,8 @@
       "/node_modules/",
       "/.expo/",
       "/supabase/tests/",
-      "/scripts/tests/"
+      "/scripts/tests/",
+      "/e2e/"
     ]
   }
 }
