@@ -123,6 +123,16 @@ describe('isAnyVariantTransliterationMatch', () => {
     expect(isAnyVariantTransliterationMatch(g, 'kelb')).toBe(false);
   });
 
+  it('ignores punctuation and extra spaces, but never merges different sounds', () => {
+    const more = group([variant('primary', 'chwaya okhra, 3aychek')]);
+    expect(isAnyVariantTransliterationMatch(more, 'chwaya okhra 3aychek')).toBe(true);
+    expect(isAnyVariantTransliterationMatch(more, 'chwaya  okhra,3aychek!')).toBe(true);
+    expect(isAnyVariantTransliterationMatch(more, 'chwaya okhra aaychek')).toBe(false); // 3 ≠ a
+    const how = group([variant('primary', 'chniya a7walek?')]);
+    expect(isAnyVariantTransliterationMatch(how, 'chniya a7walek')).toBe(true);
+    expect(isAnyVariantTransliterationMatch(how, 'chniya ahwalek')).toBe(false); // 7 ≠ h
+  });
+
   it('rejects an empty submission rather than treating it as a match', () => {
     expect(isAnyVariantTransliterationMatch(g, '   ')).toBe(false);
   });

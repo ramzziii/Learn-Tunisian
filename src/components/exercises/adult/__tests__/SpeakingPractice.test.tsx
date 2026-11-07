@@ -66,7 +66,8 @@ it('uses the shared flow: the word’s variants for the check, its prompt record
       maxAttempts: 3,
     })
   );
-  expect(screen.getByText('Listen, then record yourself saying it')).toBeOnTheScreen();
+  // This word has no native recording, so there's nothing to listen to first.
+  expect(screen.getByText('Record yourself saying it')).toBeOnTheScreen();
 });
 
 it('said right → completes as correct', async () => {

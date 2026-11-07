@@ -27,6 +27,9 @@ export function SpeakingPractice({ exercise, onComplete }: SpeakingPracticeProps
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
+  // Without a native recording there's nothing to listen to first.
+  const hasNativeRecording = !!(exercise.promptVariant.isNativeVoice && exercise.promptVariant.audioPath);
+
   return (
     <View style={styles.container}>
       <PronunciationPractice
@@ -36,7 +39,9 @@ export function SpeakingPractice({ exercise, onComplete }: SpeakingPracticeProps
         outOfTriesMessage={exercise.isRevisit ? 'Good effort — it’ll come up again in your reviews.' : undefined}
         onFinish={({ correct }) => (correct ? onComplete(true) : onComplete(true, { mispronounced: true }))}
       >
-        <Text style={styles.instructions}>Listen, then record yourself saying it</Text>
+        <Text style={styles.instructions}>
+          {hasNativeRecording ? 'Listen, then record yourself saying it' : 'Record yourself saying it'}
+        </Text>
         <VariantCallout group={exercise.targetGroup} />
       </PronunciationPractice>
     </View>
