@@ -32,6 +32,15 @@ it('right answer: a "Great job" pop-up with Next and a countdown from 3', async 
   expect(onNext).toHaveBeenCalledTimes(1);
 });
 
+it('right answer: also shows the word and what it means, so a lucky guess still teaches', async () => {
+  await renderFeedback({ isCorrect: true, correctWordArabic: 'كملت', correctTransliteration: 'kamelt', correctMeaning: 'all done' });
+
+  expect(screen.getByText('Great job!')).toBeOnTheScreen();
+  expect(screen.getByText('كملت')).toBeOnTheScreen();
+  expect(screen.getByText('kamelt')).toBeOnTheScreen();
+  expect(screen.getByText('all done')).toBeOnTheScreen();
+});
+
 it('wrong answer: "Not quite" teaches the right one (Arabic, transliteration, meaning), no "Listen again"', async () => {
   await renderFeedback({
     isCorrect: false,

@@ -23,8 +23,9 @@ interface AnswerFeedbackProps {
 
 /**
  * The result pop-up after a reading or typing answer: "Great job!" or
- * "Not quite" (with the right answer, so a miss teaches), a Next button and a
- * countdown from 3 that moves on by itself.
+ * "Not quite", always with the word and what it means (so every answer
+ * teaches, a lucky guess included), a Next button and a countdown from 3
+ * that moves on by itself.
  */
 export function AnswerFeedback({
   isCorrect,
@@ -44,12 +45,12 @@ export function AnswerFeedback({
       tone={isCorrect ? 'success' : 'error'}
       icon={isCorrect ? '🎉' : '❌'}
       title={isCorrect ? 'Great job!' : 'Not quite'}
-      message={isCorrect ? 'That’s the one.' : correctWordArabic ? 'Here’s the right answer:' : undefined}
+      message={correctWordArabic ? (isCorrect ? 'That’s the one:' : 'Here’s the right answer:') : isCorrect ? 'That’s the one.' : undefined}
       autoAdvanceSeconds={ANSWER_AUTO_ADVANCE_SECONDS}
       onPrimary={onNext}
     >
-      {!isCorrect && correctWordArabic ? (
-        <View style={styles.answer}>
+      {correctWordArabic ? (
+        <View style={[styles.answer, isCorrect && styles.answerCorrect]}>
           <TunisianText
             arabic={correctWordArabic}
             latin={correctTransliteration}
@@ -75,6 +76,7 @@ const makeStyles = (colors: ThemeColors) =>
       borderRadius: radii.md,
       backgroundColor: `${colors.error}10`,
     },
+    answerCorrect: { backgroundColor: `${colors.success}14` },
     word: { alignItems: 'center' },
     wordArabic: { fontSize: 30, fontWeight: '700', color: colors.textPrimary },
     transliteration: { fontSize: 16, color: colors.textSecondary, fontStyle: 'italic' },

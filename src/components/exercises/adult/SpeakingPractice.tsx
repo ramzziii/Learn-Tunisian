@@ -42,7 +42,8 @@ export function SpeakingPractice({ exercise, onComplete }: SpeakingPracticeProps
         <Text style={styles.instructions}>
           {hasNativeRecording ? 'Listen, then record yourself saying it' : 'Record yourself saying it'}
         </Text>
-        <VariantCallout group={exercise.targetGroup} />
+        {/* Pronunciation exercise: forms shown, but no play buttons (never a computer voice here). */}
+        <VariantCallout group={exercise.targetGroup} showAudio={false} />
       </PronunciationPractice>
     </View>
   );
