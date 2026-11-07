@@ -82,6 +82,7 @@ Decided from the schema's actual foreign keys and verified in
 | `ai_daily_usage` | Their daily AI counters. |
 | `learner_display_preferences` | Their script and default-form display settings (cascades with the profile). |
 | `feature_item_claims` | Which free sample items the account has used (cascades with the account row). |
+| `app_feedback` (0029) | Notes they sent from Profile → Send feedback (cascades with the account row). |
 | `reviewers` | Their language-reviewer allowlist entry. |
 | Auth user | Sign-in identity and email (hard delete). |
 

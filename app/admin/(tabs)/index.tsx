@@ -45,6 +45,7 @@ async function loadToday(): Promise<TodayData> {
       correctionsWaiting: metrics.pendingCorrectionsCount,
       recordingsToRecheck: metrics.recordingsToRecheckCount,
       importsNeedingALook: metrics.importsNeedingALookCount,
+      unreadFeedback: metrics.unreadFeedbackCount,
       isReviewer,
     }),
   };

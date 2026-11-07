@@ -94,6 +94,9 @@
   add it to `delete_account_data` and `account_storage_objects` (0022 or a
   later migration), `supabase/tests/accountDeletion.test.mjs`, and
   docs/account-deletion.md.
+- Feedback (0029 `app_feedback`, Profile → Send feedback): signed-in only
+  (guests never write), the note + screen + app version and nothing else;
+  deleted with the account (cascade); admins read it at Admin → Feedback.
 - New per-profile device storage must use `learn-tunisian.<feature>.<profileId>`
   keys so `clearLocalAccountData` finds them; shared/device-wide keys go in
   `src/lib/localStorageKeys.ts`.

@@ -283,6 +283,13 @@ function ProfileScreen() {
 
         <Text style={styles.sectionTitle} accessibilityRole="header">About</Text>
         <Button themed label={WHY_TUNISIAN_LINK} variant="secondary" onPress={() => router.push('/why-tunisian')} />
+        <Button
+          themed
+          label="💌 Send feedback"
+          variant="secondary"
+          onPress={() => router.push({ pathname: '/feedback', params: { from: '/profile' } })}
+          style={{ marginTop: spacing.sm }}
+        />
 
         <Text style={styles.sectionTitle} accessibilityRole="header">Account</Text>
         <Button

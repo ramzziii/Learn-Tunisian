@@ -6,6 +6,11 @@ import { buildNeedsAttention } from '@/lib/admin/needsAttention';
 const none = { requestsOpen: 0, requestsOverdue: 0, wordsWaitingForReview: 0, recordingsNeeded: 0, correctionsWaiting: 0, isReviewer: true };
 
 describe('buildNeedsAttention', () => {
+  it('0029: unread feedback notes, pointing at Admin → Feedback', () => {
+    const rows = buildNeedsAttention({ ...none, unreadFeedback: 3 });
+    expect(rows.map((r) => [r.key, r.title, r.href])).toEqual([['feedback', '3 feedback notes to read', '/admin/feedback']]);
+  });
+
   it('0028: refused/failed imports and recordings to re-check, before new recordings', () => {
     const rows = buildNeedsAttention({ ...none, recordingsNeeded: 5, recordingsToRecheck: 2, importsNeedingALook: 1 });
     expect(rows.map((r) => [r.key, r.title, r.href])).toEqual([

@@ -14,15 +14,17 @@ export interface NeedsAttentionInput {
   recordingsToRecheck?: number;
   /** 0028: refused or failed imports not marked as seen. */
   importsNeedingALook?: number;
+  /** 0029: feedback notes not read yet. */
+  unreadFeedback?: number;
   isReviewer: boolean;
 }
 
 export interface NeedsAttentionRow {
-  key: 'requests' | 'review' | 'corrections' | 'recordings' | 'recheck' | 'imports';
+  key: 'requests' | 'review' | 'corrections' | 'recordings' | 'recheck' | 'imports' | 'feedback';
   icon: string;
   title: string;
   detail: string;
-  href: '/admin/requests' | '/admin/review' | '/admin/corrections' | '/admin/audio' | '/admin/imports';
+  href: '/admin/requests' | '/admin/review' | '/admin/corrections' | '/admin/audio' | '/admin/imports' | '/admin/feedback';
 }
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
@@ -54,6 +56,15 @@ export function buildNeedsAttention(input: NeedsAttentionInput): NeedsAttentionR
       title: `${plural(input.correctionsWaiting, 'AI correction', 'AI corrections')} to check`,
       detail: 'From learners’ conversations',
       href: '/admin/corrections',
+    });
+  }
+  if ((input.unreadFeedback ?? 0) > 0) {
+    rows.push({
+      key: 'feedback',
+      icon: '💌',
+      title: `${plural(input.unreadFeedback!, 'feedback note', 'feedback notes')} to read`,
+      detail: 'From learners, via Profile → Send feedback',
+      href: '/admin/feedback',
     });
   }
   if ((input.importsNeedingALook ?? 0) > 0) {

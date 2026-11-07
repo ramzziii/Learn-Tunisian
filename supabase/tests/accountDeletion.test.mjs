@@ -58,6 +58,8 @@ async function seed(db) {
     insert into public.favorites (profile_id, word_group_id) values ('${PA}', 'wg_hello'), ('${PB}', 'wg_hello');
     insert into public.session_logs (profile_id, session_type, duration_seconds) values ('${PA}', 'lesson', 120), ('${PB}', 'review', 60);
     insert into public.corrections (profile_id, ai_generated_text) values ('${PA}', '{"tunisian":"a","english":"b"}'), ('${PB}', '{"tunisian":"c","english":"d"}');
+    -- 0029: in-app feedback, deleted with its account.
+    insert into public.app_feedback (account_id, message) values ('${A}', 'from A'), ('${B}', 'from B');
 
     -- A's own translation request (answered by B? no — by A as admin is irrelevant; answered by someone).
     insert into public.translation_requests (id, account_id, client_request_id, english_text, status, due_at,
@@ -148,6 +150,7 @@ describe('delete_account_data', () => {
     ['public.ai_daily_usage', `account_id = '${A}'`],
     ['public.feature_item_claims', `account_id = '${A}'`],
     ['public.reviewers', `user_id = '${A}'`],
+    ['public.app_feedback', `account_id = '${A}'`],
   ]) {
     it(`deletes: ${table}`, async () => {
       assert.equal(await count(db, `select count(*)::int as n from ${table} where ${where}`), 0);
@@ -208,6 +211,7 @@ describe('delete_account_data', () => {
       ['public.favorites', `profile_id = '${PB}'`],
       ['public.session_logs', `profile_id = '${PB}'`],
       ['public.corrections', `profile_id = '${PB}'`],
+      ['public.app_feedback', `account_id = '${B}'`],
       ['public.ai_daily_usage', `account_id = '${B}'`],
       ['public.feature_item_claims', `account_id = '${B}'`],
       ['public.ai_usage_log', `account_id = '${B}' and profile_id = '${PB}'`],
