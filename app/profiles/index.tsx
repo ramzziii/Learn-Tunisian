@@ -1,6 +1,6 @@
 import { Redirect, router } from 'expo-router';
 import { useMemo } from 'react';
-import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
+import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { RequireAccount } from '@/components/guest/RequireAccount';
 
 import { BackButton } from '@/components/ui/BackButton';
@@ -12,6 +12,7 @@ import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { radii, spacing, type ThemeColors } from '@/constants/theme';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
 import { useAuth } from '@/lib/auth/AuthContext';
+import { confirmAction } from '@/lib/confirmAction';
 import { calculateAge } from '@/lib/age';
 import { useTheme } from '@/lib/theme/ThemeContext';
 import type { Profile } from '@/types/models';
@@ -39,17 +40,16 @@ function ProfileChooser() {
   };
 
   const handleSignOut = () => {
-    Alert.alert('Sign out?', "You'll need to sign back in with your email and password.", [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Sign out',
-        style: 'destructive',
-        onPress: async () => {
-          await signOut();
-          router.replace('/');
-        },
+    confirmAction({
+      title: 'Sign out?',
+      message: "You'll need to sign back in with your email and password.",
+      confirmLabel: 'Sign out',
+      destructive: true,
+      onConfirm: async () => {
+        await signOut();
+        router.replace('/');
       },
-    ]);
+    });
   };
 
   return (

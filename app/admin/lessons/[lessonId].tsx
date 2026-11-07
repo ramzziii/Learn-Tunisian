@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { StatusBadge } from '@/components/admin/StatusBadge';
 import { BackButton } from '@/components/ui/BackButton';
@@ -18,6 +18,7 @@ import {
 import { useAuth } from '@/lib/auth/AuthContext';
 import type { ContentStatus, Lesson, WordGroupWithVariants } from '@/types/models';
 import { useTheme } from '@/lib/theme/ThemeContext';
+import { confirmAction } from '@/lib/confirmAction';
 
 export default function AdminLessonDetail() {
   const { colors } = useTheme();
@@ -83,17 +84,16 @@ export default function AdminLessonDetail() {
 
   const handleDelete = () => {
     if ((wordGroups?.length ?? 0) > 0) return;
-    Alert.alert('Delete this lesson?', 'This cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          await deleteLesson(lessonId);
-          router.back();
-        },
+    confirmAction({
+      title: 'Delete this lesson?',
+      message: 'This cannot be undone.',
+      confirmLabel: 'Delete',
+      destructive: true,
+      onConfirm: async () => {
+        await deleteLesson(lessonId);
+        router.back();
       },
-    ]);
+    });
   };
 
   if (loadError) {

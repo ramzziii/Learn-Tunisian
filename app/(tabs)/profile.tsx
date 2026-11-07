@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { RequireAccount } from '@/components/guest/RequireAccount';
 
 import { TimeWheelPicker } from '@/components/onboarding/TimeWheelPicker';
@@ -22,6 +22,7 @@ import { useIsAdmin } from '@/lib/admin/AdminContext';
 import { useAuth } from '@/lib/auth/AuthContext';
 import { requestPasswordReset } from '@/lib/auth/passwordResetRequest';
 import { useAccess } from '@/lib/access/AccessContext';
+import { confirmAction, showNotice } from '@/lib/confirmAction';
 import { FREE_ITEM_TOTAL } from '@/lib/access/accessRules';
 import { usePremium } from '@/lib/premium/PremiumContext';
 import { cancelDailyReminder, requestNotificationPermission, scheduleDailyReminder } from '@/lib/notifications/reminders';
@@ -150,17 +151,16 @@ function ProfileScreen() {
   };
 
   const handleSignOut = () => {
-    Alert.alert('Sign out?', "You'll need to sign back in with your email and password.", [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Sign out',
-        style: 'destructive',
-        onPress: async () => {
-          await signOut();
-          router.replace('/');
-        },
+    confirmAction({
+      title: 'Sign out?',
+      message: "You'll need to sign back in with your email and password.",
+      confirmLabel: 'Sign out',
+      destructive: true,
+      onConfirm: async () => {
+        await signOut();
+        router.replace('/');
       },
-    ]);
+    });
   };
 
   if (!activeProfile) return <LoadingScreen themed />;
@@ -339,7 +339,7 @@ function ProfileScreen() {
                   variant="ghost"
                   onPress={async () => {
                     await resetPreview();
-                    Alert.alert('Free-plan preview reset', 'Your preview counts are cleared. Your real account and its counts are unchanged.');
+                    showNotice('Free-plan preview reset', 'Your preview counts are cleared. Your real account and its counts are unchanged.');
                   }}
                 />
               ) : null}
