@@ -93,17 +93,17 @@ describe('verdicts', () => {
     ]);
   });
 
-  it('fix: applies the correction, approves, logs old and new text; a recording that no longer matches is un-marked', async () => {
+  it('fix: applies the correction, approves, logs old and new text; the recording is kept for re-check (never un-marked)', async () => {
     const db = memoryDb(DB);
     const p = await plan(db, {
       'v-welcome-m': { verdict: 'fix', corrected_transliteration: 'mar7ba bik', reviewer_note: 'ح is 7' },
       'v-welcome-f': { verdict: 'fix', corrected_transliteration: 'mar7ba biki' },
     });
     assert.deepEqual(p.errors, []);
-    assert.match(p.warnings.join('\n'), /welcome \(masculine\) was corrected, so its native recording needs re-recording/);
+    assert.match(p.warnings.join('\n'), /welcome \(masculine\) was corrected, so its recording will wait for a re-check/);
     await applyReview(db, p);
     const m = db.tables.word_variants.find((v) => v.id === 'v-welcome-m');
-    assert.deepEqual([m.transliteration, m.word_arabic, m.content_status, m.native_verified, m.is_native_voice], ['mar7ba bik', 'مرحبا بيك', 'approved', true, false]);
+    assert.deepEqual([m.transliteration, m.word_arabic, m.content_status, m.native_verified, m.is_native_voice], ['mar7ba bik', 'مرحبا بيك', 'approved', true, true]);
     const e = db.tables.content_review_events[0];
     assert.deepEqual([e.verdict, e.reviewed_transliteration, e.corrected_transliteration, e.corrected_arabic, e.reviewer_note], ['fix', 'marhba bik', 'mar7ba bik', null, 'ح is 7']);
   });
@@ -203,6 +203,19 @@ describe('the command', () => {
       importReviewCommand({ file: await file(db, {}), db, reviewerAccount: REVIEWER, reviewerName: 'Reviewer', execute: true, log: () => {} }),
       /not in public.reviewers/
     );
+    assert.deepEqual(db.writes, []);
+  });
+
+  it('membership is checked first: a non-reviewer’s run reads nothing else and writes nothing (the service role bypasses the database rule, so this check is the guard)', async () => {
+    const db = memoryDb({ ...DB, reviewers: [{ user_id: '22222222-2222-4222-8222-222222222222' }] });
+    const sheetPath = await file(memoryDb(DB), { 'v-hello': { verdict: 'ok' }, 'v-sorry': { verdict: 'reject' } });
+    const tablesRead = [];
+    const watching = { ...db, select: async (table, cols) => (tablesRead.push(table), db.select(table, cols)) };
+    await assert.rejects(
+      importReviewCommand({ file: sheetPath, db: watching, reviewerAccount: REVIEWER, reviewerName: 'Reviewer', execute: true, log: () => {} }),
+      /not in public.reviewers/
+    );
+    assert.deepEqual(tablesRead, ['reviewers']);
     assert.deepEqual(db.writes, []);
   });
 

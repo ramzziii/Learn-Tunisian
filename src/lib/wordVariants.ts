@@ -60,9 +60,23 @@ export function getPromptVariant(
  * variant happened to be the exercise's prompt.
  */
 export function isAnyVariantTransliterationMatch(group: WordGroupWithVariants, input: string): boolean {
-  const normalized = input.trim().toLowerCase();
+  const normalized = normalizeTransliterationForMatch(input);
   if (normalized.length === 0) return false;
-  return group.variants.some((v) => v.transliteration.trim().toLowerCase() === normalized);
+  return group.variants.some((v) => normalizeTransliterationForMatch(v.transliteration) === normalized);
+}
+
+/**
+ * Case, punctuation (",", "?", "!", "'", "…") and spacing don't change a
+ * typed answer — "chwaya okhra 3aychek" matches "chwaya okhra, 3aychek".
+ * Letters and digits are compared exactly: 3, 7, 9, 5, 8, 2 stay distinct
+ * sounds and are never merged with letters.
+ */
+function normalizeTransliterationForMatch(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
 }
 
 // Arabic diacritics (harakat, tanween, sukoon), tatweel, and other combining

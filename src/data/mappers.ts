@@ -138,7 +138,22 @@ export function mapWordVariant(row: WordVariantRow): WordVariant {
     explanationAudioPath: row.explanation_audio_path ?? null,
     approvedBy: row.approved_by,
     approvedAt: row.approved_at,
+    audioNeedsRecheck: row.audio_needs_recheck === true,
   };
+}
+
+/**
+ * A word form as learners get it: a recording that needs re-check (0028) is
+ * treated as no recording at all — never played, never in an exercise or
+ * Repeat After Me — and screens say "Recording being re-checked". Admin
+ * data keeps using mapWordVariant (the file stays, to be confirmed).
+ */
+export function mapLearnerWordVariant(row: WordVariantRow): WordVariant {
+  return withoutRecheckAudio(mapWordVariant(row));
+}
+
+export function withoutRecheckAudio(variant: WordVariant): WordVariant {
+  return variant.audioNeedsRecheck ? { ...variant, audioPath: null } : variant;
 }
 
 export function mapProgress(row: ProgressRow): Progress {

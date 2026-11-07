@@ -3,7 +3,7 @@
 // an exit code: 0 done (or nothing to do), 1 problems found (nothing
 // written). Without `execute` nothing is ever written.
 import { readdir, readFile, stat } from 'node:fs/promises';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 
 import { applyAudio, describeAudioMatch, matchAudioFiles } from './audio.mjs';
 import { loadSnapshot, UsageError } from './db.mjs';
@@ -16,13 +16,49 @@ import { validateImportRows } from './validate.mjs';
 const DRY_RUN = 'Dry run: nothing was written. Run again with --execute --confirm-host <host> to write.';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+const MAX_LOGGED_PROBLEMS = 500;
+
+/** Counts for the import log: what an import wrote (or would have). */
+const planSummary = (plan) => ({
+  new_units: plan.newUnits.length,
+  new_lessons: plan.newLessons.length,
+  new_words: plan.newGroups.length,
+  new_forms: plan.newVariants.length,
+  changed_words: plan.groupUpdates.length,
+  changed_forms: plan.variantUpdates.length,
+  unchanged_words: plan.unchangedGroups,
+  unchanged_forms: plan.unchangedVariants,
+});
+
 export async function importContentCommand({ file, db, execute = false, validateOnly = false, log }) {
+  // Runs started with --execute are recorded in content_import_runs (0028):
+  // the sheet's file name, the outcome, counts and problems (row numbers and
+  // messages only). Dry runs and --validate-only write nothing at all.
+  const record = async (outcome, rowsRead, summary, problems) => {
+    if (!execute) return;
+    try {
+      await db.insert('content_import_runs', [
+        {
+          source_file: basename(file).slice(0, 200),
+          outcome,
+          rows_read: rowsRead,
+          summary,
+          problems: problems.slice(0, MAX_LOGGED_PROBLEMS).map((p) => ({ rows: p.rows, message: p.message })),
+        },
+      ]);
+    } catch (error) {
+      log(`Note: the import log couldn't be written (${error instanceof Error ? error.message : 'unknown error'}).`);
+    }
+  };
+
   const table = await readTable(file);
+  const rowsRead = table.records.length;
   const { rows, errors } = validateImportRows(table.header, table.records);
-  log(`Read ${table.records.length} row(s), ${new Set(rows.map((r) => r.wordGroupId)).size} word group(s).`);
+  log(`Read ${rowsRead} row(s), ${new Set(rows.map((r) => r.wordGroupId)).size} word group(s).`);
   if (errors.length > 0) {
     log(`INVALID (${errors.length}) — nothing can be imported until these are fixed:`);
     for (const e of errors) log(`  row ${e.rows.join(', ')}: ${e.message}`);
+    await record('refused', rowsRead, {}, errors);
     return 1;
   }
   log('All rows pass validation.');
@@ -31,16 +67,26 @@ export async function importContentCommand({ file, db, execute = false, validate
   const snapshot = await loadSnapshot(db);
   const plan = planImport(rows, snapshot);
   log(describeImportPlan(plan));
-  if (plan.errors.length > 0) return 1;
+  if (plan.errors.length > 0) {
+    await record('refused', rowsRead, planSummary(plan), plan.errors);
+    return 1;
+  }
   if (!planHasChanges(plan)) {
     log('Nothing to change: the database already matches this sheet.');
+    await record('imported', rowsRead, planSummary(plan), []);
     return 0;
   }
   if (!execute) {
     log(DRY_RUN);
     return 0;
   }
-  await applyImportPlan(db, plan, snapshot);
+  try {
+    await applyImportPlan(db, plan, snapshot);
+  } catch (error) {
+    await record('failed', rowsRead, planSummary(plan), [{ rows: [], message: error instanceof Error ? error.message : 'unknown error' }]);
+    throw error;
+  }
+  await record('imported', rowsRead, planSummary(plan), []);
   log('Imported. Everything new or changed is a draft until your native reviewer approves it.');
   return 0;
 }

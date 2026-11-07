@@ -88,6 +88,8 @@ export function TypingSpelling({ exercise, onComplete }: TypingSpellingProps) {
         <PressableScale
           haptic
           onPress={submit}
+          accessibilityRole="button"
+          accessibilityLabel="Check"
           disabled={input.trim().length === 0}
           style={[styles.submitButton, input.trim().length === 0 && styles.submitButtonDisabled]}
         >

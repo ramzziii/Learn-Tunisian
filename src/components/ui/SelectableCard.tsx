@@ -22,7 +22,8 @@ export function SelectableCard({ title, subtitle, selected, onPress, themed = fa
   return (
     <Pressable
       accessibilityRole="radio"
-      accessibilityState={{ selected: !!selected }}
+      // Radios report checked (screen readers need it); selected kept for older readers.
+      accessibilityState={{ checked: !!selected, selected: !!selected }}
       onPress={onPress}
       style={({ pressed }) => [styles.card, selected && styles.selected, pressed && styles.pressed]}
     >

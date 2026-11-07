@@ -10,6 +10,7 @@ export function memoryDb(initial = {}) {
     word_variants: [],
     content_source_notes: [],
     content_review_events: [],
+    content_import_runs: [],
     reviewers: [],
     ...structuredClone(initial),
   };

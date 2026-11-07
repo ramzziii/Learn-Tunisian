@@ -11,7 +11,13 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,
   default: { getItem: jest.fn(async () => null), setItem: jest.fn(async () => undefined) },
 }));
-jest.mock('@/components/exercises/shared/VariantCallout', () => ({ VariantCallout: () => null }));
+const mockCalloutProps = jest.fn();
+jest.mock('@/components/exercises/shared/VariantCallout', () => ({
+  VariantCallout: (props: unknown) => {
+    mockCalloutProps(props);
+    return null;
+  },
+}));
 jest.mock('@/components/pronunciation/PronunciationPractice', () => ({
   PRONUNCIATION_MAX_ATTEMPTS: 3,
   PronunciationPractice: (props: { onFinish: (r: { correct: boolean; attempts: number }) => void; children?: unknown }) => {
@@ -66,7 +72,8 @@ it('uses the shared flow: the word’s variants for the check, its prompt record
       maxAttempts: 3,
     })
   );
-  expect(screen.getByText('Listen, then record yourself saying it')).toBeOnTheScreen();
+  // This word has no native recording, so there's nothing to listen to first.
+  expect(screen.getByText('Record yourself saying it')).toBeOnTheScreen();
 });
 
 it('said right → completes as correct', async () => {
@@ -93,4 +100,10 @@ it('in the end-of-session revisit pass, a miss promises review later instead of 
   expect(mockPracticeProps).toHaveBeenCalledWith(
     expect.objectContaining({ outOfTriesMessage: expect.stringMatching(/come up again in your reviews/) })
   );
+});
+
+it('the forms are shown without play buttons: a computer voice is never offered in a pronunciation exercise', async () => {
+  mockCalloutProps.mockClear();
+  await renderExercise(jest.fn());
+  expect(mockCalloutProps).toHaveBeenCalledWith(expect.objectContaining({ showAudio: false }));
 });

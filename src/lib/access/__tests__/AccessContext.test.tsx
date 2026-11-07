@@ -132,6 +132,24 @@ describe('Premium', () => {
   });
 });
 
+describe('a Premium account that is "free" for a moment while it loads', () => {
+  it('a slow free-plan load finishing after the switch to Premium never undoes it (no endless loading)', async () => {
+    let finishSlowLoad: (v: object) => void = () => undefined;
+    mockFetchClaims.mockReturnValueOnce(new Promise((resolve) => (finishSlowLoad = resolve)));
+    const hook = await renderHook(() => useAccess(), { wrapper });
+    expect(hook.result.current.tier).toBe('free');
+
+    mockPremium = { isPremium: true, isResolved: true, isAdmin: false, adminPreview: 'premium' };
+    await hook.rerender(undefined);
+    await waitFor(() => expect(hook.result.current.isResolved).toBe(true));
+    expect(hook.result.current.tier).toBe('premium');
+
+    await act(async () => finishSlowLoad({ lesson: ['l1', 'l2'] }));
+    expect(hook.result.current.isResolved).toBe(true);
+    expect(hook.result.current.claimed('lesson').size).toBe(0);
+  });
+});
+
 describe('guest (device only)', () => {
   it('2 items per feature on the device, no server calls at all', async () => {
     mockSession = null;

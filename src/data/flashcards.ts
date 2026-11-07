@@ -1,4 +1,4 @@
-import { mapWordGroup, mapWordVariant } from '@/data/mappers';
+import { mapWordGroup, mapLearnerWordVariant } from '@/data/mappers';
 import { inPracticeScope, type PracticeScope } from '@/lib/access/practiceScope';
 import { buildFlashcardDecks, type FlashcardDeck } from '@/lib/flashcards';
 import { isGuestSessionActive } from '@/lib/guest/guestSession';
@@ -151,5 +151,5 @@ export async function fetchFlashcards(groupIds: string[]): Promise<WordGroupWith
   return groupIds
     .map((id) => groupsById.get(id))
     .filter((g): g is WordGroupRow => g !== undefined && (variantsByGroup.get(g.id)?.length ?? 0) > 0)
-    .map((group) => ({ ...mapWordGroup(group), variants: variantsByGroup.get(group.id)!.map(mapWordVariant) }));
+    .map((group) => ({ ...mapWordGroup(group), variants: variantsByGroup.get(group.id)!.map(mapLearnerWordVariant) }));
 }

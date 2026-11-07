@@ -31,7 +31,11 @@ jest.mock('@/lib/premium/PremiumContext', () => ({ usePremium: () => ({ isPremiu
 jest.mock('@/data/content', () => ({
   fetchPhrasebookCategories: jest.fn(async () => [{ unitId: 'u-cafe', lessonId: 'l-cafe', name: 'At the café', sortOrder: 1, phraseCount: 5 }]),
 }));
-jest.mock('@/data/progress', () => ({ fetchReviewQueue: (...a: unknown[]) => mockFetchReviewQueue(...a) }));
+let mockWordsSeen = 3;
+jest.mock('@/data/progress', () => ({
+  fetchReviewQueue: (...a: unknown[]) => mockFetchReviewQueue(...a),
+  fetchProgressSummary: jest.fn(async () => ({ wordsLearning: 0, wordsMastered: 0, wordsReviewed: 0, totalWordsSeen: mockWordsSeen })),
+}));
 jest.mock('@/data/profiles', () => ({ fetchDailyGoalSettings: jest.fn(async () => ({ dailyGoalMinutes: 5 })) }));
 jest.mock('@/lib/offline/audioCache', () => ({ prefetchLessonAudio: jest.fn() }));
 jest.mock('@/lib/supabase/client', () => ({ supabase: {} }));
@@ -63,6 +67,14 @@ describe('Review', () => {
     await themed(<Review />);
     expect(await screen.findByText('All caught up')).toBeOnTheScreen();
     expect(mockFetchReviewQueue).toHaveBeenCalledWith('p1');
+  });
+
+  it('a brand-new learner is told there is nothing to review yet (not "all caught up") and pointed to a lesson', async () => {
+    mockWordsSeen = 0;
+    await themed(<Review />);
+    expect(await screen.findByText('Nothing to review yet')).toBeOnTheScreen();
+    expect(screen.queryByText('All caught up')).toBeNull();
+    mockWordsSeen = 3;
   });
 });
 

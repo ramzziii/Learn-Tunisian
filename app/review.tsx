@@ -11,7 +11,7 @@ import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { spacing, type ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/lib/theme/ThemeContext';
 import { fetchDailyGoalSettings } from '@/data/profiles';
-import { fetchReviewQueue } from '@/data/progress';
+import { fetchProgressSummary, fetchReviewQueue } from '@/data/progress';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
 import { filterToPracticeScope } from '@/lib/access/practiceScope';
 import { usePracticeScope } from '@/lib/access/usePracticeScope';
@@ -28,6 +28,8 @@ export default function ReviewSession() {
   const [groups, setGroups] = useState<WordGroupWithVariants[] | null>(null);
   const [goalMinutes, setGoalMinutes] = useState<DailyGoalMinutes>(DEFAULT_GOAL_MINUTES);
   const [isReady, setIsReady] = useState(false);
+  // A brand-new learner has nothing to review yet — not "all caught up".
+  const [hasLearnedWords, setHasLearnedWords] = useState(true);
   // Practice isn't counted: the queue only holds approved words from lessons /
   // categories the learner has open (every approved word with Premium).
   const { scope, error: scopeError, reload } = usePracticeScope();
@@ -36,13 +38,15 @@ export default function ReviewSession() {
     if (!activeProfile || !scope) return;
     let cancelled = false;
     (async () => {
-      const [dueGroups, dailyGoal] = await Promise.all([
+      const [dueGroups, dailyGoal, summary] = await Promise.all([
         fetchReviewQueue(activeProfile.id),
         fetchDailyGoalSettings(activeProfile.id),
+        fetchProgressSummary(activeProfile.id).catch(() => null),
       ]);
       if (cancelled) return;
       const inScope = filterToPracticeScope(scope, dueGroups);
       setGroups(inScope);
+      setHasLearnedWords(!summary || summary.totalWordsSeen > 0);
       setGoalMinutes(dailyGoal?.dailyGoalMinutes ?? DEFAULT_GOAL_MINUTES);
       setIsReady(true);
       prefetchLessonAudio(inScope.flatMap((g) => g.variants));
@@ -55,6 +59,20 @@ export default function ReviewSession() {
   if (scopeError) return <AccessCheckProblem kind="error" onRetry={reload} />;
 
   if (!isReady || !groups || !activeProfile) return <LoadingScreen themed />;
+
+  if (groups.length === 0 && !hasLearnedWords) {
+    return (
+      <ScreenContainer themed>
+        <Reveal style={styles.emptyContainer}>
+          <Text style={styles.emptyEmoji}>🌱</Text>
+          <Text style={styles.emptyTitle}>Nothing to review yet</Text>
+          <Text style={styles.emptyBody}>Review brings back the words you’ve learned. Start a lesson, and they’ll show up here.</Text>
+          <Button themed label="Start a lesson" onPress={() => router.replace('/learn')} />
+          <Button themed label="Back to home" variant="ghost" onPress={() => router.replace('/home')} />
+        </Reveal>
+      </ScreenContainer>
+    );
+  }
 
   if (groups.length === 0) {
     // Review and speaking are the same "keep it fresh" loop — with nothing

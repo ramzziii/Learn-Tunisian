@@ -1,4 +1,4 @@
-import { mapWordGroup, mapWordVariant } from '@/data/mappers';
+import { mapWordGroup, mapLearnerWordVariant } from '@/data/mappers';
 import { inPracticeScope, type PracticeScope } from '@/lib/access/practiceScope';
 import { isGuestSessionActive } from '@/lib/guest/guestSession';
 import { supabase } from '@/lib/supabase/client';
@@ -83,7 +83,7 @@ export async function fetchSearchableWordGroups(scope: PracticeScope): Promise<W
     list.push(v);
     variantsByGroup.set(v.word_group_id, list);
   }
-  return groups.map((g) => ({ ...g, variants: (variantsByGroup.get(g.id) ?? []).map(mapWordVariant) }));
+  return groups.map((g) => ({ ...g, variants: (variantsByGroup.get(g.id) ?? []).map(mapLearnerWordVariant) }));
 }
 
 /** PostgREST `or` filter for the open lessons (unit + lesson number) and open phrasebook units; null when nothing is open. */

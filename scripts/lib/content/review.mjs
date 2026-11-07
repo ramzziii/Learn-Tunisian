@@ -176,10 +176,10 @@ export function planReview(header, records, snapshot, reviewer, now = new Date()
             approved_by: reviewer.accountId,
             approved_at: now,
             ...(verdict === 'fix' ? { word_arabic: finalArabic, transliteration: finalLatin } : {}),
-            // A corrected text no longer matches an existing native recording.
-            ...(verdict === 'fix' && v.is_native_voice ? { is_native_voice: false } : {}),
+            // A corrected spelling keeps the recording; the database (0028)
+            // marks it "needs re-check" — never un-marked as native here.
           };
-    if (verdict === 'fix' && v.is_native_voice) warnings.push(`row ${rowNumber}: ${v.word_group_id} (${v.variant_label}) was corrected, so its native recording needs re-recording`);
+    if (verdict === 'fix' && v.audio_path) warnings.push(`row ${rowNumber}: ${v.word_group_id} (${v.variant_label}) was corrected, so its recording will wait for a re-check (Admin → Audio → Re-check)`);
     variantUpdates.push({ id: v.id, rowNumber, patch, verdict });
     events.push({
       word_variant_id: v.id,

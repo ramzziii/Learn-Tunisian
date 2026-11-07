@@ -83,7 +83,13 @@ export function FormDisplay({ group, size = 'md', showAudio = true, arabicStyle,
 
 function FormAudio({ variant, name, autoPlay, colors }: { variant: WordVariant; name: string; autoPlay: boolean; colors: ThemeColors }) {
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  if (!variant.audioPath) return <Text style={styles.noAudio}>No recording for this form yet</Text>;
+  if (!variant.audioPath) {
+    return (
+      <Text style={styles.noAudio}>
+        {variant.audioNeedsRecheck ? 'Recording being re-checked' : 'No recording for this form yet'}
+      </Text>
+    );
+  }
   return <FormAudioButton variant={variant} name={name} autoPlay={autoPlay} colors={colors} />;
 }
 
@@ -123,8 +129,10 @@ const makeStyles = (colors: ThemeColors) =>
     container: { gap: spacing.sm },
     form: { gap: 2 },
     label: { fontSize: 12, fontWeight: '700', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 },
-    row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-    text: { flexShrink: 1 },
+    // The word keeps its own line width; the play button and its note wrap
+    // underneath on narrow screens instead of squeezing the Arabic.
+    row: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm },
+    text: { flexShrink: 0, maxWidth: '100%' },
     play: {
       width: 44,
       height: 44,

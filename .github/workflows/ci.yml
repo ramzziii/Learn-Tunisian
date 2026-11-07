@@ -38,6 +38,14 @@ jobs:
       - name: Jest
         run: npm run test:ci
 
+      # Database rules on an in-memory Postgres (PGlite) and the content
+      # scripts against an in-memory store — no Supabase, no secrets.
+      - name: Database tests (PGlite)
+        run: npm run test:db
+
+      - name: Content script tests
+        run: npm run test:scripts
+
       # Smoke check: the whole app (every route) bundles for web. Catches
       # broken imports/route files that tsc and unit tests don't load. No
       # .env needed — EXPO_PUBLIC_* values are only read at runtime.

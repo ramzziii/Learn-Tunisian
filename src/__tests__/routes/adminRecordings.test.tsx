@@ -26,7 +26,15 @@ jest.mock('expo-router', () => ({
     }, [effect]),
 }));
 jest.mock('@/lib/auth/AuthContext', () => ({ useAuth: () => ({ session: { user: { id: 'admin-1' } } }) }));
+const mockFetchRecheck = jest.fn();
+const mockConfirm = jest.fn();
+jest.mock('@/hooks/useWordAudioPlayer', () => ({
+  useWordAudioPlayer: () => ({ play: jest.fn(), hasAudio: true, isResolving: false, isPlaying: false, source: 'native' }),
+}));
 jest.mock('@/data/admin/recordingQueue', () => ({
+  fetchRecheckQueue: (...a: unknown[]) => mockFetchRecheck(...a),
+  confirmAudioMatches: (...a: unknown[]) => mockConfirm(...a),
+  confirmErrorMessage: (e: Error) => `refused: ${e.message}`,
   fetchRecordingQueue: (...a: unknown[]) => mockFetchQueue(...a),
   fetchSkippedRecordings: (...a: unknown[]) => mockFetchSkipped(...a),
   skipRecording: (...a: unknown[]) => mockSkip(...a),
@@ -233,6 +241,59 @@ describe('Native Recordings', () => {
     await fireEvent.press(await screen.findByText('Try again'));
 
     expect(await screen.findByText('1 word needs a native voice')).toBeOnTheScreen();
+  });
+});
+
+describe('Re-check (spelling changed after recording)', () => {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const Recheck = require('../../../app/admin/recordings-recheck').default;
+  const recheck = (id: string) => ({ ...item(id), reason: 'needs_recheck' });
+  const renderRecheck = () =>
+    render(
+      <ThemeProvider>
+        <Recheck />
+      </ThemeProvider>
+    );
+
+  beforeEach(() => {
+    mockFetchRecheck.mockReset().mockResolvedValue([recheck('a'), recheck('b')]);
+    mockConfirm.mockReset().mockResolvedValue(undefined);
+  });
+
+  it('lists each one with Listen, "Still matches" and "Record a new one"', async () => {
+    await renderRecheck();
+    expect(await screen.findByText('meaning a')).toBeOnTheScreen();
+    expect(screen.getByText(/Learners don.t hear them until you check/)).toBeOnTheScreen();
+    expect(screen.getAllByText('✓ Still matches')).toHaveLength(2);
+    expect(screen.getByLabelText('Listen to the recording of meaning a')).toBeOnTheScreen();
+  });
+
+  it('"Still matches" confirms it (the database clears the flag) and takes it off the list', async () => {
+    await renderRecheck();
+    await fireEvent.press((await screen.findAllByText('✓ Still matches'))[0]);
+    expect(mockConfirm).toHaveBeenCalledWith('a');
+    expect(await screen.findByText('meaning b')).toBeOnTheScreen();
+    expect(screen.queryByText('meaning a')).toBeNull();
+  });
+
+  it('a refusal is shown in plain words and the item stays', async () => {
+    mockConfirm.mockRejectedValue(new Error('permission denied'));
+    await renderRecheck();
+    await fireEvent.press((await screen.findAllByText('✓ Still matches'))[0]);
+    expect(await screen.findByText('refused: permission denied')).toBeOnTheScreen();
+    expect(screen.getByText('meaning a')).toBeOnTheScreen();
+  });
+
+  it('"Record a new one" opens the recording station for that form', async () => {
+    await renderRecheck();
+    await fireEvent.press((await screen.findAllByText('Record a new one'))[1]);
+    expect(screen.getByText('Recording b (no skip)')).toBeOnTheScreen();
+  });
+
+  it('nothing flagged: says so', async () => {
+    mockFetchRecheck.mockResolvedValue([]);
+    await renderRecheck();
+    expect(await screen.findByText('Nothing to re-check')).toBeOnTheScreen();
   });
 });
 

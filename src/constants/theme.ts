@@ -2,18 +2,25 @@
 // flat `colors`/`gradients` exports below for every screen not yet
 // converted to the theme system (see src/lib/theme/ThemeContext.tsx), so
 // nothing outside that converted set changes behavior at all.
+// Text colours meet WCAG AA (4.5:1) on every surface they're used on:
+// primary, error, accentText and premiumText were darkened (light) or
+// lightened (dark) for that; accent / gold stay bright for fills only.
 export const lightColors = {
   background: '#FBF8F3',
   surface: '#FFFFFF',
   surfaceRaised: '#FFFFFF',
-  primary: '#3E7CB1',
+  primary: '#356FA3',
   primaryLight: '#5B95C9',
   primaryDark: '#2C5A85',
   accent: '#F2A65A',
   accentLight: '#F6BE81',
+  /** Orange as text (accent itself is too light for text). */
+  accentText: '#9A5A0B',
+  /** The 🔒 Premium badge's text. */
+  premiumText: '#8A5A00',
   success: '#4CA771',
   successLight: '#6FC291',
-  error: '#D9634C',
+  error: '#B94E39',
   textPrimary: '#242021',
   textSecondary: '#6B6560',
   textOnPrimary: '#FFFFFF',
@@ -30,11 +37,13 @@ export const darkColors = {
   background: '#0F1419',
   surface: '#1A2028',
   surfaceRaised: '#232B35',
-  primary: '#4E8AC2',
+  primary: '#5B96CF',
   primaryLight: '#6FA8D8',
   primaryDark: '#35618C',
   accent: '#F5B673',
   accentLight: '#F8CB99',
+  accentText: '#F5B673',
+  premiumText: '#E5B65C',
   success: '#5FBE87',
   successLight: '#7FCE9E',
   error: '#E2786A',

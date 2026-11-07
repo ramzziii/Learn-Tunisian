@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase/client';
 import { isGuestSessionActive } from '@/lib/guest/guestSession';
-import { mapProgress, mapWordGroup, mapWordVariant } from '@/data/mappers';
+import { mapProgress, mapWordGroup, mapLearnerWordVariant } from '@/data/mappers';
 import { startOfLocalDayIso } from '@/data/sessionLogs';
 import { calculateMasteryStatus } from '@/lib/masteryStatus';
 import { sortReviewCandidates, STRUGGLING_STREAK_THRESHOLD } from '@/lib/reviewSelection';
@@ -205,7 +205,7 @@ async function hydrateWordGroupsInOrder(groupIds: string[]): Promise<WordGroupWi
     .filter((g): g is WordGroupRow => g !== undefined)
     .map((group) => ({
       ...mapWordGroup(group),
-      variants: (variantsByGroup.get(group.id) ?? []).map(mapWordVariant),
+      variants: (variantsByGroup.get(group.id) ?? []).map(mapLearnerWordVariant),
     }));
 }
 

@@ -104,7 +104,7 @@ function Choice({
       onPress={onPress}
       accessibilityRole="radio"
       accessibilityLabel={accessibilityLabel}
-      accessibilityState={{ selected }}
+      accessibilityState={{ checked: selected, selected }}
       style={[styles.choice, selected && styles.choiceSelected]}
     >
       <Text style={[styles.choiceText, selected && styles.choiceTextSelected]}>

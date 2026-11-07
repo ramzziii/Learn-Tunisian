@@ -1,0 +1,42 @@
+# Browser journeys (npm run test:e2e) against the deployed web app — run by
+# hand (Actions → E2E → Run workflow) or weekly. Separate from CI because it
+# talks to the live site. Guest journeys need nothing; the free / Premium
+# journeys run only if these repository secrets are set (Settings → Secrets
+# and variables → Actions): E2E_FREE_EMAIL, E2E_FREE_PASSWORD,
+# E2E_PREMIUM_EMAIL, E2E_PREMIUM_PASSWORD. Use test accounts only.
+name: E2E
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: Site to test
+        default: https://learn-tunisian.expo.app
+  schedule:
+    - cron: '0 6 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  journeys:
+    name: Guest, free and Premium journeys
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Install Chromium
+        run: npx playwright-core install --with-deps chromium
+      - name: Journeys
+        run: npm run test:e2e
+        env:
+          E2E_BASE: ${{ inputs.base_url || 'https://learn-tunisian.expo.app' }}
+          E2E_FREE_EMAIL: ${{ secrets.E2E_FREE_EMAIL }}
+          E2E_FREE_PASSWORD: ${{ secrets.E2E_FREE_PASSWORD }}
+          E2E_PREMIUM_EMAIL: ${{ secrets.E2E_PREMIUM_EMAIL }}
+          E2E_PREMIUM_PASSWORD: ${{ secrets.E2E_PREMIUM_PASSWORD }}

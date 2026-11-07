@@ -10,6 +10,7 @@ import { PressableScale } from '@/components/ui/PressableScale';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { radii, spacing, type ThemeColors } from '@/constants/theme';
+import { isGuestSessionActive } from '@/lib/guest/guestSession';
 import { useTheme } from '@/lib/theme/ThemeContext';
 import { confirmAction } from '@/lib/confirmAction';
 import { fetchLessonMap } from '@/data/content';
@@ -75,7 +76,8 @@ export function SessionRunner({
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const timer = useSessionTimer(goalMinutes);
   const { preferences } = useDisplayPreferences();
-  const { currentExercise: queuedExercise, next } = useExerciseQueue(groups, exerciseMode, preferences.form);
+  // Guests never call Edge Functions, so no pronunciation checks (talk-stt).
+  const { currentExercise: queuedExercise, next } = useExerciseQueue(groups, exerciseMode, preferences.form, !isGuestSessionActive());
 
   // Words left mispronounced in speaking exercises are replayed once the time
   // goal is reached, before the summary — see src/lib/speakingRevisit.ts.

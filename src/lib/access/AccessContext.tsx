@@ -70,20 +70,31 @@ export function AccessProvider({ children }: { children: ReactNode }) {
   const [loadError, setLoadError] = useState(false);
   const sourceKey = `${source}:${source === 'preview' ? profileId : ''}:${session?.user.id ?? ''}`;
 
+  // Only the latest load may write. When the tier changes mid-load (a Premium
+  // account is "free" for a moment while its profile loads), the older,
+  // slower load would otherwise finish last, overwrite the counts and mark
+  // the wrong source as loaded — and isResolved would stay false for good.
+  const latestLoad = useRef(0);
   const load = useCallback(async () => {
+    const thisLoad = ++latestLoad.current;
+    const isLatest = () => thisLoad === latestLoad.current;
     setLoadError(false);
     try {
-      if (source === 'guest') setClaims((await getGuestData()).claims);
-      else if (source === 'server') setClaims(await fetchMyClaims());
+      let next: ClaimsByFeature = {};
+      if (source === 'guest') next = (await getGuestData()).claims;
+      else if (source === 'server') next = await fetchMyClaims();
       else if (source === 'preview' && profileId) {
         const raw = await AsyncStorage.getItem(previewKey(profileId)).catch(() => null);
-        setClaims(raw ? (JSON.parse(raw) as ClaimsByFeature) : {});
-      } else setClaims({});
+        next = raw ? (JSON.parse(raw) as ClaimsByFeature) : {};
+      }
+      if (isLatest()) setClaims(next);
     } catch {
-      setClaims({});
-      setLoadError(true);
+      if (isLatest()) {
+        setClaims({});
+        setLoadError(true);
+      }
     } finally {
-      setLoadedFor(sourceKey);
+      if (isLatest()) setLoadedFor(sourceKey);
     }
   }, [source, profileId, sourceKey, setClaims]);
 

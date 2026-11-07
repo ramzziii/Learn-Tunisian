@@ -16,6 +16,7 @@ const REASON_SHORT: Record<RecordingQueueItem['reason'], string> = {
   no_audio: 'No recording',
   missing_file: 'File missing',
   not_native: 'Computer voice',
+  needs_recheck: 'Re-check',
 };
 
 /** The item after `id` in list order, wrapping to the start; null if none left. */

@@ -283,6 +283,13 @@ function ProfileScreen() {
 
         <Text style={styles.sectionTitle} accessibilityRole="header">About</Text>
         <Button themed label={WHY_TUNISIAN_LINK} variant="secondary" onPress={() => router.push('/why-tunisian')} />
+        <Button
+          themed
+          label="💌 Send feedback"
+          variant="secondary"
+          onPress={() => router.push({ pathname: '/feedback', params: { from: '/profile' } })}
+          style={{ marginTop: spacing.sm }}
+        />
 
         <Text style={styles.sectionTitle} accessibilityRole="header">Account</Text>
         <Button
@@ -327,8 +334,8 @@ function ProfileScreen() {
               </View>
               <Text style={styles.previewBody}>
                 {adminPreview === 'premium'
-                  ? 'Showing the full Premium app. Switch off to see exactly what free learners see.'
-                  : 'Viewing as a new free user. Free users can open any 5 lessons, and 5 each of phrasebook categories, proverbs, letters and Repeat After Me. After that the rest show 🔒 Premium. Grammar: only sentence order, present tense and questions are free. Practice uses only words from what’s open. Talk is Premium only. Counted on this device only; your own progress doesn’t unlock anything here.'}
+                  ? 'Showing the full Premium app. Switch off to see what free learners see.'
+                  : 'Viewing as a new free user: any 5 of each item, 3 grammar notes, no Talk. Counted on this device only.'}
               </Text>
               {adminPreview === 'free' ? (
                 <Text style={styles.previewBody}>

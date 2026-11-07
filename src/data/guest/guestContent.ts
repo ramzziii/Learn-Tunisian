@@ -23,7 +23,7 @@ export interface GuestLesson {
 
 const GROUP_COLUMNS = 'id, unit_id, lesson_number, english_meaning, image_keyword, image_path, sort_order, content_status';
 const VARIANT_COLUMNS =
-  'id, word_group_id, variant_label, word_arabic, transliteration, audio_path, notes, sort_order, native_verified, is_native_voice, content_status, in_repeat_after_me, updated_at';
+  'id, word_group_id, variant_label, word_arabic, transliteration, audio_path, notes, sort_order, native_verified, is_native_voice, content_status, in_repeat_after_me, updated_at, audio_needs_recheck';
 
 export async function fetchGuestUnits(): Promise<GuestUnit[]> {
   const { data, error } = await supabase.from('guest_preview_units').select('id, name, sort_order, is_curriculum').order('sort_order');
@@ -72,6 +72,7 @@ interface VariantRow {
   content_status: WordVariant['contentStatus'];
   in_repeat_after_me: boolean;
   updated_at: string;
+  audio_needs_recheck?: boolean;
 }
 
 function toVariant(v: VariantRow): WordVariant {
@@ -81,7 +82,9 @@ function toVariant(v: VariantRow): WordVariant {
     variantLabel: v.variant_label,
     wordArabic: v.word_arabic,
     transliteration: v.transliteration,
-    audioPath: v.audio_path,
+    // Needs re-check (0028): guests never hear it either.
+    audioPath: v.audio_needs_recheck ? null : v.audio_path,
+    audioNeedsRecheck: v.audio_needs_recheck === true,
     notes: v.notes,
     sortOrder: v.sort_order,
     nativeVerified: v.native_verified,

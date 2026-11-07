@@ -1,4 +1,4 @@
-import { mapWordGroup, mapWordVariant } from '@/data/mappers';
+import { mapWordGroup, mapLearnerWordVariant } from '@/data/mappers';
 import { isGuestSessionActive } from '@/lib/guest/guestSession';
 import { supabase } from '@/lib/supabase/client';
 import type { WordGroupRow, WordVariantRow } from '@/types/database';
@@ -67,7 +67,7 @@ export async function fetchWordsUsed(phraseId: string): Promise<WordUsed[]> {
   for (const row of (groupRows ?? []) as WordGroupRow[]) {
     if (row.content_status !== 'approved') continue;
     const forms = variantsByGroup.get(row.id) ?? [];
-    if (forms.length > 0) words.set(row.id, { ...mapWordGroup(row), variants: forms.map(mapWordVariant) });
+    if (forms.length > 0) words.set(row.id, { ...mapWordGroup(row), variants: forms.map(mapLearnerWordVariant) });
   }
   // A link to a word that isn't approved (or has no approved form) is left out entirely.
   return links

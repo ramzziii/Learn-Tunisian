@@ -97,6 +97,23 @@ jest.mock('../../../app/admin/recordings-explanations', () => {
   };
 });
 
+jest.mock('../../../app/admin/recordings-recheck', () => {
+  // Like the real screens: the shared top (the tab's switcher), then the content.
+  /* eslint-disable @typescript-eslint/no-var-requires */
+  const { Text } = require('react-native');
+  const { AdminScreenTop } = require('@/components/admin/AdminScreenTop');
+  /* eslint-enable @typescript-eslint/no-var-requires */
+  return {
+    __esModule: true,
+    default: () => (
+      <>
+        <AdminScreenTop />
+        <Text>[re-check]</Text>
+      </>
+    ),
+  };
+});
+
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { ThemeProvider } = require('@/lib/theme/ThemeContext');
 const themed = (el: React.ReactElement) => render(<ThemeProvider>{el}</ThemeProvider>);
@@ -212,25 +229,30 @@ describe('Review', () => {
     expect(await screen.findByText('Waiting for review')).toBeOnTheScreen();
     await fireEvent.press(await screen.findByRole('button', { name: 'AI corrections to check' }));
     expect(mockPush).toHaveBeenCalledWith('/admin/corrections');
+    await fireEvent.press(screen.getByRole('button', { name: 'Review one at a time' }));
+    expect(mockPush).toHaveBeenCalledWith('/admin/review-session');
   });
 
-  it('no AI corrections for an admin who isn’t a reviewer', async () => {
+  it('no "Review one at a time" or AI corrections for an admin who isn’t a reviewer', async () => {
     mockIsReviewer = false;
     await themed(<Review />);
     await screen.findByText('Waiting for review');
     await waitFor(() => expect(screen.queryByRole('button', { name: 'AI corrections to check' })).toBeNull());
+    expect(screen.queryByRole('button', { name: 'Review one at a time' })).toBeNull();
   });
 });
 
 describe('Audio', () => {
-  it('one studio: To record, Skipped, Explanations', async () => {
+  it('one studio: To record, Skipped, Explain, Re-check', async () => {
     await themed(<Audio />);
     expect(screen.getByText('[words to record]')).toBeOnTheScreen();
-    expect(screen.getAllByRole('tab').map((t) => t.props.accessibilityState.selected)).toEqual([true, false, false]);
+    expect(screen.getAllByRole('tab').map((t) => t.props.accessibilityState.selected)).toEqual([true, false, false, false]);
     await fireEvent.press(screen.getByRole('tab', { name: 'Skipped' }));
     expect(screen.getByText('[skipped]')).toBeOnTheScreen();
-    await fireEvent.press(screen.getByRole('tab', { name: 'Explanations' }));
+    await fireEvent.press(screen.getByRole('tab', { name: 'Explain' }));
     expect(screen.getByText('[explanations]')).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole('tab', { name: 'Re-check' }));
+    expect(screen.getByText('[re-check]')).toBeOnTheScreen();
   });
 });
 

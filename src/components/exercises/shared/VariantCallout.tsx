@@ -11,6 +11,8 @@ import type { WordGroupWithVariants } from '@/types/models';
 
 interface VariantCalloutProps {
   group: WordGroupWithVariants;
+  /** Per-form play buttons. Off in pronunciation exercises: a computer voice is never offered there. */
+  showAudio?: boolean;
 }
 
 /**
@@ -20,7 +22,7 @@ interface VariantCalloutProps {
  * in the order of the learner's display preference with the other form one
  * tap away. Renders nothing if the group has neither.
  */
-export function VariantCallout({ group }: VariantCalloutProps) {
+export function VariantCallout({ group, showAudio = true }: VariantCalloutProps) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
@@ -34,7 +36,7 @@ export function VariantCallout({ group }: VariantCalloutProps) {
       {twoForms ? (
         <>
           <Text style={styles.line}>This changes with the form used:</Text>
-          <FormDisplay group={group} size="sm" arabicStyle={styles.arabic} latinStyle={styles.latin} />
+          <FormDisplay group={group} size="sm" showAudio={showAudio} arabicStyle={styles.arabic} latinStyle={styles.latin} />
         </>
       ) : null}
       {alsoHeard.map((variant) => (

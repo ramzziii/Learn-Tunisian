@@ -181,7 +181,7 @@ export default function WordDetail() {
           {source === 'computer' ? <ComputerVoiceNote style={{ marginTop: spacing.xs }} /> : null}
           <ExplanationPlayButton variant={displayVariant} style={{ marginTop: spacing.md }} />
           <Text style={[styles.verificationBadge, displayVariant.nativeVerified && styles.verificationBadgeVerified]}>
-            {displayVariant.nativeVerified ? '✓ Native-speaker verified' : '⚠️ Draft — pending native review'}
+            {displayVariant.nativeVerified ? '✓ Spelling checked by a native speaker' : '⚠️ Draft — pending native review'}
           </Text>
         </Reveal>
 

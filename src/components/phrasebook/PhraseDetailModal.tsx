@@ -108,7 +108,13 @@ export function PhraseDetailModal({ phrase, onClose }: PhraseDetailModalProps) {
               {wordPlayer.source === 'computer' ? (
                 <ComputerVoiceNote style={styles.sourceLabel} />
               ) : (
-                <Text style={styles.sourceLabel}>{wordPlayer.source === 'native' ? '🎙️ Native recording' : 'No recording yet'}</Text>
+                <Text style={styles.sourceLabel}>
+                  {wordPlayer.source === 'native'
+                    ? '🎙️ Native recording'
+                    : variant?.audioNeedsRecheck
+                      ? 'Recording being re-checked'
+                      : 'No recording yet'}
+                </Text>
               )}
               <ExplanationPlayButton variant={variant} style={{ marginTop: 8 }} />
             </Animated.View>

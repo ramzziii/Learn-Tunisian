@@ -6,7 +6,10 @@
 npm test            # Jest (watch: npm run test:watch)
 npm run typecheck   # tsc --noEmit
 npm run test:ci     # what CI runs
-npx expo-doctor     # SDK 57 project health (advisory — see below)
+npm run test:db     # database rules on PGlite (in-memory Postgres)
+npm run test:scripts # content scripts against an in-memory store
+npm run test:e2e    # browser journeys against the live site (see below)
+npx expo-doctor     # SDK project health (advisory — see below)
 ```
 
 No Supabase credentials or `.env` are needed for any of these. Tests that
@@ -21,8 +24,25 @@ On every pull request and every push to `main`, with no secrets:
 
 | Job | Steps | Blocking |
 | --- | --- | --- |
-| `checks` | `npm ci` → `npm run typecheck` → `npm run test:ci` → `npx expo export --platform web` (bundles every route; smoke check) | Yes |
+| `checks` | `npm ci` → `npm run typecheck` → `npm run test:ci` → `npm run test:db` → `npm run test:scripts` → `npx expo export --platform web` (bundles every route; smoke check) | Yes |
 | `expo-doctor` | `npx expo-doctor` | No (`continue-on-error`) |
+
+## Browser journeys (`npm run test:e2e`, `.github/workflows/e2e.yml`)
+
+`e2e/*.test.mjs` drive a real browser (playwright-core) through the deployed
+web app like a user: the guest preview (lesson 1 with its new-words intro,
+units, grammar locks, deep links, and that guests read only the
+`guest_preview_*` views, with no console errors or failed requests), then —
+only when `E2E_FREE_*` / `E2E_PREMIUM_*` logins are set — the free and
+Premium accounts (plan, locks, Talk, sign out). They only look: no counted
+item is opened beyond lesson 1, and Talk is never started.
+
+- Locally: `E2E_BROWSER_CHANNEL=msedge npm run test:e2e` (or `chrome`; or
+  install Chromium with `npx playwright-core install chromium`). `E2E_BASE`
+  points them at another URL (default https://learn-tunisian.expo.app).
+- On GitHub: Actions → E2E → Run workflow (also weekly). Not part of CI,
+  since it talks to the live site. Signed-in journeys need the four
+  `E2E_*` repository secrets — test accounts only, never real ones.
 
 `expo-doctor` is advisory because it compares installed versions against the
 latest SDK 57 patch releases fetched from the network, so it turns red when

@@ -84,6 +84,16 @@ it('rotates through reading, typing and speaking (the only exercise types)', asy
   expect(new Set(exercises.map((e) => e.type))).toEqual(new Set(['reading_match', 'typing_spelling', 'speaking']));
 });
 
+it('guests (no speaking): only reading and typing, never a pronunciation check', async () => {
+  const { result } = await renderHook(() => useExerciseQueue(groups, 'mixed', 'both', false));
+  const seen = [];
+  for (let i = 0; i < groups.length * 3; i++) {
+    seen.push(result.current.currentExercise!.type);
+    await act(async () => result.current.next());
+  }
+  expect(new Set(seen)).toEqual(new Set(['reading_match', 'typing_spelling']));
+});
+
 it('an empty lesson yields no exercise rather than crashing', async () => {
   // Hoisted: callers pass state-held (stable) arrays — an inline [] would be a
   // new identity every render and re-trigger the hook's reset effect forever.

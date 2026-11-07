@@ -2,6 +2,7 @@ import { StyleSheet, Text, View, type StyleProp, type TextStyle, type ViewStyle 
 
 import { scriptsToShow } from '@/lib/display/displayRules';
 import { useDisplayPreferences } from '@/lib/display/useDisplayPreferences';
+import { useOptionalTheme } from '@/lib/theme/ThemeContext';
 
 type Size = 'sm' | 'md' | 'lg' | 'xl';
 
@@ -28,7 +29,8 @@ interface TunisianTextProps {
  * Arabic is laid out right-to-left and announced as Arabic; Latin is
  * left-to-right — each in its own Text, so mixed-script lines don't
  * reorder. If the preferred script is missing, the other one is shown.
- * Colours come from the caller's styles, so it fits any screen's theme.
+ * Colours come from the caller's styles; without one, the theme's text
+ * colours (never the browser's default black, unreadable in dark mode).
  */
 export function TunisianText({
   arabic,
@@ -43,6 +45,11 @@ export function TunisianText({
   numberOfLines,
 }: TunisianTextProps) {
   const { preferences } = useDisplayPreferences();
+  const theme = useOptionalTheme();
+  const themeColor = {
+    arabic: theme ? { color: theme.colors.textPrimary } : null,
+    latin: theme ? { color: theme.colors.textSecondary } : null,
+  };
   const hasArabic = !!arabic?.trim();
   const hasLatin = !!latin?.trim();
   const show = scriptsToShow(preferences.script, { alwaysShowArabic, alwaysShowLatin, hasArabic, hasLatin });
@@ -50,12 +57,12 @@ export function TunisianText({
   return (
     <View style={[layout === 'inline' ? styles.inline : styles.stacked, style]}>
       {show.arabic ? (
-        <Text accessibilityLanguage="ar" numberOfLines={numberOfLines} style={[styles.arabic, ARABIC_SIZE[size], arabicStyle]}>
+        <Text accessibilityLanguage="ar" numberOfLines={numberOfLines} style={[styles.arabic, ARABIC_SIZE[size], themeColor.arabic, arabicStyle]}>
           {arabic}
         </Text>
       ) : null}
       {show.latin ? (
-        <Text numberOfLines={numberOfLines} style={[styles.latin, LATIN_SIZE[size], latinStyle]}>
+        <Text numberOfLines={numberOfLines} style={[styles.latin, LATIN_SIZE[size], themeColor.latin, latinStyle]}>
           {latin}
         </Text>
       ) : null}

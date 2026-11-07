@@ -10,15 +10,21 @@ export interface NeedsAttentionInput {
   wordsWaitingForReview: number;
   recordingsNeeded: number;
   correctionsWaiting: number;
+  /** 0028: recordings waiting for re-check after a spelling change. */
+  recordingsToRecheck?: number;
+  /** 0028: refused or failed imports not marked as seen. */
+  importsNeedingALook?: number;
+  /** 0029: feedback notes not read yet. */
+  unreadFeedback?: number;
   isReviewer: boolean;
 }
 
 export interface NeedsAttentionRow {
-  key: 'requests' | 'review' | 'corrections' | 'recordings';
+  key: 'requests' | 'review' | 'corrections' | 'recordings' | 'recheck' | 'imports' | 'feedback';
   icon: string;
   title: string;
   detail: string;
-  href: '/admin/requests' | '/admin/review' | '/admin/corrections' | '/admin/audio';
+  href: '/admin/requests' | '/admin/review' | '/admin/corrections' | '/admin/audio' | '/admin/imports' | '/admin/feedback';
 }
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
@@ -50,6 +56,33 @@ export function buildNeedsAttention(input: NeedsAttentionInput): NeedsAttentionR
       title: `${plural(input.correctionsWaiting, 'AI correction', 'AI corrections')} to check`,
       detail: 'From learners’ conversations',
       href: '/admin/corrections',
+    });
+  }
+  if ((input.unreadFeedback ?? 0) > 0) {
+    rows.push({
+      key: 'feedback',
+      icon: '💌',
+      title: `${plural(input.unreadFeedback!, 'feedback note', 'feedback notes')} to read`,
+      detail: 'From learners, via Profile → Send feedback',
+      href: '/admin/feedback',
+    });
+  }
+  if ((input.importsNeedingALook ?? 0) > 0) {
+    rows.push({
+      key: 'imports',
+      icon: '📥',
+      title: `${plural(input.importsNeedingALook!, 'import needs', 'imports need')} a look`,
+      detail: 'Refused or failed — see what went wrong',
+      href: '/admin/imports',
+    });
+  }
+  if ((input.recordingsToRecheck ?? 0) > 0) {
+    rows.push({
+      key: 'recheck',
+      icon: '🔁',
+      title: `${plural(input.recordingsToRecheck!, 'recording', 'recordings')} to re-check`,
+      detail: 'Spelling changed — listen in Audio → Re-check',
+      href: '/admin/audio',
     });
   }
   if (input.recordingsNeeded > 0) {

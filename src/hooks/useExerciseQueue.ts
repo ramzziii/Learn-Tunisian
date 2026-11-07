@@ -7,6 +7,8 @@ import type { FormPreference, WordGroupWithVariants } from '@/types/models';
 
 const OPTION_COUNT = 4;
 const TYPE_CYCLE: ExerciseType[] = ['reading_match', 'typing_spelling', 'speaking'];
+/** Guests: no speaking — checking pronunciation calls talk-stt, which needs an account. */
+const NO_SPEAKING_TYPE_CYCLE: ExerciseType[] = ['reading_match', 'typing_spelling'];
 
 function shuffled<T>(items: T[]): T[] {
   const copy = [...items];
@@ -37,10 +39,11 @@ export function buildOptions(
 }
 
 /** One shuffled pass over every word_group, each paired with an exercise type. */
-function buildPass(groups: WordGroupWithVariants[], passIndex: number, form: FormPreference): ExerciseItem[] {
+function buildPass(groups: WordGroupWithVariants[], passIndex: number, form: FormPreference, allowSpeaking: boolean): ExerciseItem[] {
   const order = shuffled(groups);
+  const cycle = allowSpeaking ? TYPE_CYCLE : NO_SPEAKING_TYPE_CYCLE;
   return order.map((group, i) => {
-    const type = TYPE_CYCLE[(passIndex + i) % TYPE_CYCLE.length];
+    const type = cycle[(passIndex + i) % cycle.length];
     const alternateSeed = passIndex + i;
     // Two-form words lead with the learner's preferred form (display only).
     const promptVariant = getPromptVariant(group, alternateSeed, form);
@@ -78,7 +81,8 @@ export interface ExerciseQueue {
 export function useExerciseQueue(
   groups: WordGroupWithVariants[],
   mode: ExerciseMode = 'mixed',
-  form: FormPreference = 'both'
+  form: FormPreference = 'both',
+  allowSpeaking = true
 ): ExerciseQueue {
   // Read through a ref: changing the preference mid-session affects the
   // next passes without restarting the session.
@@ -92,7 +96,7 @@ export function useExerciseQueue(
     (passIndex: number): ExerciseItem[] => {
       if (groups.length === 0) return [];
       if (mode === 'listening') return buildListeningPass(groups, passIndex);
-      const pass = interleaveListening(buildPass(groups, passIndex, formRef.current), groups, passIndex, countsRef.current);
+      const pass = interleaveListening(buildPass(groups, passIndex, formRef.current, allowSpeaking), groups, passIndex, countsRef.current);
       const listening = pass.filter(isListening).length;
       countsRef.current = {
         regularCount: countsRef.current.regularCount + pass.length - listening,
@@ -100,7 +104,7 @@ export function useExerciseQueue(
       };
       return pass;
     },
-    [groups, mode]
+    [groups, mode, allowSpeaking]
   );
 
   const [queue, setQueue] = useState<ExerciseItem[]>(() => makePass(0));

@@ -66,6 +66,7 @@ jest.mock('@/hooks/useWordAudioPlayer', () => ({
 jest.mock('@/data/progress', () => ({
   fetchWeakestWordGroups: jest.fn(async () => mockWeakest),
   fetchReviewQueue: jest.fn(async () => mockReviewQueue),
+  fetchProgressSummary: jest.fn(async () => ({ wordsLearning: 1, wordsMastered: 0, wordsReviewed: 0, totalWordsSeen: 1 })),
   fetchProgressForWordGroup: jest.fn(async () => null),
   recordWordGroupResult: jest.fn(async () => undefined),
 }));

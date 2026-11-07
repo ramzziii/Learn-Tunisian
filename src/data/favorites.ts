@@ -1,4 +1,4 @@
-import { mapFavorite, mapWordGroup, mapWordVariant } from '@/data/mappers';
+import { mapFavorite, mapWordGroup, mapLearnerWordVariant } from '@/data/mappers';
 import { isGuestSessionActive } from '@/lib/guest/guestSession';
 import { supabase } from '@/lib/supabase/client';
 import type { FavoriteRow, WordGroupRow, WordVariantRow } from '@/types/database';
@@ -74,6 +74,6 @@ export async function fetchFavoriteWordGroups(profileId: string): Promise<WordGr
     .filter((g): g is WordGroupRow => g !== undefined)
     .map((group) => ({
       ...mapWordGroup(group),
-      variants: (variantsByGroup.get(group.id) ?? []).map(mapWordVariant),
+      variants: (variantsByGroup.get(group.id) ?? []).map(mapLearnerWordVariant),
     }));
 }

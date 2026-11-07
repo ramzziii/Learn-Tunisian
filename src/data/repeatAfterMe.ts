@@ -1,5 +1,5 @@
 import { updateWordVariant } from '@/data/admin/content';
-import { mapWordVariant } from '@/data/mappers';
+import { mapLearnerWordVariant } from '@/data/mappers';
 import { isGuestSessionActive } from '@/lib/guest/guestSession';
 import { orderItemsForSession, type RamSavedItemProgress } from '@/lib/repeatAfterMe/session';
 import { supabase } from '@/lib/supabase/client';
@@ -89,7 +89,7 @@ async function accountItems(): Promise<RepeatAfterMeItem[]> {
       id: row.id,
       wordGroupId: row.word_group_id,
       englishMeaning: groupsById.get(row.word_group_id)!.english_meaning,
-      variant: { ...mapWordVariant(row), explanationAudioPath: null },
+      variant: { ...mapLearnerWordVariant(row), explanationAudioPath: null },
     }));
 }
 

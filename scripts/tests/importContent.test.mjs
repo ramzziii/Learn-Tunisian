@@ -101,7 +101,7 @@ describe('running again', () => {
     assert.equal(plan.unchangedVariants, 7);
   });
 
-  it('a changed row updates just that form and sends it back to unreviewed draft', async () => {
+  it('a changed row updates just that form and sends it back to unreviewed draft; the recording is kept, still native (the database flags it for re-check)', async () => {
     const db = await imported();
     const helloId = db.tables.word_variants.find((v) => v.word_group_id === 'hello' && v.variant_label === 'primary').id;
     Object.assign(db.tables.word_variants.find((v) => v.id === helloId), { content_status: 'approved', native_verified: true, is_native_voice: true, audio_path: 'hello/x.mp3' });
@@ -115,7 +115,7 @@ describe('running again', () => {
     const v = db.tables.word_variants.find((x) => x.id === helloId);
     assert.deepEqual(
       [v.transliteration, v.content_status, v.native_verified, v.is_native_voice, v.audio_path],
-      ['3aslema', 'draft', false, false, 'hello/x.mp3']
+      ['3aslema', 'draft', false, true, 'hello/x.mp3']
     );
   });
 });
@@ -157,7 +157,7 @@ describe('the command', () => {
     assert.ok(db.tables.word_groups.some((g) => g.id === 'hello' && g.content_status === 'draft'));
   });
 
-  it('an invalid sheet stops before the database is even read', async () => {
+  it('an invalid sheet stops before the database is even read; with --execute only the import log is written', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'lt-import-'));
     const file = join(dir, 'bad.csv');
     await writeFile(file, importCsv([['Greetings', 9, 'hello', 'primary', 'أسلامة', 'Aslema', 'Hello', '', '']]), 'utf8');
@@ -167,6 +167,69 @@ describe('the command', () => {
     const code = await importContentCommand({ file, db: counting, execute: true, log: () => {} });
     assert.equal(code, 1);
     assert.equal(reads, 0);
+    assert.deepEqual(db.writes.map((w) => w.table), ['content_import_runs']);
+    const [run] = db.tables.content_import_runs;
+    assert.equal(run.outcome, 'refused');
+    assert.equal(run.source_file, 'bad.csv');
+    assert.deepEqual(run.problems.map((p) => p.rows), [[2]]);
+  });
+});
+
+describe('the import log (0028): only runs started with --execute', () => {
+  const sheet = async (rows, name = 'words.csv') => {
+    const file = join(await mkdtemp(join(tmpdir(), 'lt-log-')), name);
+    await writeFile(file, importCsv(rows), 'utf8');
+    return file;
+  };
+  const GOOD = [['Greetings', 9, 'hello', 'primary', 'أسلامة', 'aslema', 'Hello', '', '']];
+
+  it('dry runs and invalid dry runs write nothing — not even the log', async () => {
+    const db = memoryDb(EXISTING);
+    await importContentCommand({ file: await sheet(GOOD), db, log: () => {} });
+    await importContentCommand({ file: await sheet([['Greetings', 9, 'hello', 'primary', 'أسلامة', 'Aslema', 'Hello', '', '']]), db, log: () => {} });
     assert.deepEqual(db.writes, []);
+  });
+
+  it('an executed import is logged as imported, with counts and the file name only', async () => {
+    const db = memoryDb(EXISTING);
+    await importContentCommand({ file: await sheet(GOOD, 'my words.csv'), db, execute: true, log: () => {} });
+    const [run] = db.tables.content_import_runs;
+    assert.equal(run.outcome, 'imported');
+    assert.equal(run.source_file, 'my words.csv');
+    assert.equal(run.rows_read, 1);
+    assert.deepEqual(run.problems, []);
+    assert.equal(run.summary.new_words, 1);
+    assert.equal(run.summary.new_forms, 1);
+  });
+
+  it('a conflict with existing words is logged as refused, with its rows', async () => {
+    const db = memoryDb(EXISTING);
+    const code = await importContentCommand({
+      file: await sheet([['Food', 17, 'orange', 'primary', 'برتقال', 'borto9al', 'Orange', '', '']]),
+      db, execute: true, log: () => {},
+    });
+    assert.equal(code, 1);
+    assert.deepEqual(db.writes.map((w) => w.table), ['content_import_runs']);
+    assert.equal(db.tables.content_import_runs[0].outcome, 'refused');
+    assert.match(db.tables.content_import_runs[0].problems[0].message, /orange already exists/);
+  });
+
+  it('a failure while writing is logged as failed, and still reported', async () => {
+    const db = memoryDb(EXISTING);
+    const failing = { ...db, insert: async (table, rows) => (table === 'word_groups' ? Promise.reject(new Error('network down')) : db.insert(table, rows)) };
+    await assert.rejects(importContentCommand({ file: await sheet(GOOD), db: failing, execute: true, log: () => {} }), /network down/);
+    const run = db.tables.content_import_runs.at(-1);
+    assert.equal(run.outcome, 'failed');
+    assert.match(run.problems[0].message, /network down/);
+  });
+
+  it('if the log itself can’t be written, the import still finishes and says so', async () => {
+    const db = memoryDb(EXISTING);
+    const noLog = { ...db, insert: async (table, rows) => (table === 'content_import_runs' ? Promise.reject(new Error('no table')) : db.insert(table, rows)) };
+    const out = [];
+    const code = await importContentCommand({ file: await sheet(GOOD), db: noLog, execute: true, log: (s) => out.push(s) });
+    assert.equal(code, 0);
+    assert.ok(db.tables.word_groups.some((g) => g.id === 'hello'));
+    assert.match(out.join('\n'), /import log couldn't be written/);
   });
 });
