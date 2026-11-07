@@ -186,7 +186,7 @@ export default function SpeakingPracticeScreen() {
     <ScreenContainer themed>
       {phase === 'revisit' ? <Text style={styles.revisitLabel}>🔁 Revisiting tricky words</Text> : null}
       <View style={styles.header}>
-        <PressableScale haptic onPress={() => router.back()} accessibilityLabel="Exit" style={styles.closeButton}>
+        <PressableScale haptic onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Exit" style={styles.closeButton}>
           <Text style={styles.closeIcon}>✕</Text>
         </PressableScale>
         <View style={{ flex: 1 }}>

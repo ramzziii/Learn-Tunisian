@@ -123,7 +123,7 @@ export default function AlphabetMatchingScreen() {
     <ScreenContainer themed style={styles.screen}>
       <View style={styles.topbar}>
         <Text style={styles.timer}>⏱ {(elapsedMs / 1000).toFixed(1)} seconds</Text>
-        <Pressable onPress={() => router.back()} style={styles.closeButton}>
+        <Pressable onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Close" style={styles.closeButton}>
           <Text style={styles.closeIcon}>✕</Text>
         </Pressable>
       </View>

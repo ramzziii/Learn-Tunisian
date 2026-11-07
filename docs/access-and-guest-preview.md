@@ -21,6 +21,11 @@ don't reopen for free there. While it's on, every screen shows a "Viewing as
 a free user" banner (`FreePreviewBanner`, in `ScreenContainer`) that opens
 Profile.
 
+Lock badges say what unlocks the item (`lockKind` in accessRules.ts): a
+guest sees "🔒 Sign up" on anything a free account would open, and
+"🔒 Premium" only on Premium-only items; signed-in free accounts always see
+"🔒 Premium".
+
 ## The access table
 
 | Feature | Item | Guest | Free (total, guest use included) | Premium |

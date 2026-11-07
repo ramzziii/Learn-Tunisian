@@ -222,7 +222,7 @@ export function SessionRunner({
   return (
     <ScreenContainer themed>
       <View style={styles.header}>
-        <PressableScale haptic onPress={handleExitPress} accessibilityLabel="Exit session" style={styles.closeButton}>
+        <PressableScale haptic onPress={handleExitPress} accessibilityRole="button" accessibilityLabel="Exit session" style={styles.closeButton}>
           <Text style={styles.closeIcon}>✕</Text>
         </PressableScale>
         <View style={{ flex: 1 }}>

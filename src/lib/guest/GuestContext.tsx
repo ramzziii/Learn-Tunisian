@@ -52,6 +52,10 @@ export function GuestProvider({ children }: { children: ReactNode }) {
     () => ({ isGuest, isLoading, startGuest, endGuest }),
     [isGuest, isLoading, startGuest, endGuest]
   );
+  // Nothing renders until guest mode is known (one device read): a screen
+  // that loads data before then would see "not a guest" and read the
+  // signed-in tables, which return nothing to a signed-out visitor.
+  if (isLoading) return null;
   return <GuestContext.Provider value={value}>{children}</GuestContext.Provider>;
 }
 

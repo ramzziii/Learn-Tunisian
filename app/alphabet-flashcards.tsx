@@ -26,7 +26,7 @@ export default function AlphabetFlashcardsScreen() {
 
   // A card shows once its letter is open; tapping an unopened one opens it
   // (counted) while the allowance lasts, then → upgrade / create-account.
-  const { decide, open } = useAccess();
+  const { tier, decide, open } = useAccess();
   const onLockedPress = useLockedItemAction();
   const letter = letters[index];
   const decision = decide('alphabet_letter', letter.id);
@@ -59,7 +59,7 @@ export default function AlphabetFlashcardsScreen() {
   return (
     <ScreenContainer themed style={styles.screen}>
       <View style={styles.topbar}>
-        <Pressable onPress={() => router.back()} style={styles.closeButton}>
+        <Pressable onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Close" style={styles.closeButton}>
           <Text style={styles.closeIcon}>✕</Text>
         </Pressable>
         <View style={styles.progressTrack}>
@@ -75,7 +75,7 @@ export default function AlphabetFlashcardsScreen() {
         // Not opened yet: the card stays visible and in order (so the deck's
         // size is honest), but shows no audio/examples until it's opened.
         <PressableScale haptic onPress={openLetter} style={[styles.card, shadows.raised]}>
-          {decision === 'limit' ? <PremiumBadge /> : null}
+          {decision === 'limit' ? <PremiumBadge signUp={tier === 'guest'} /> : null}
           <Text style={[styles.bigLetter, styles.lockedText]}>{letter.label}</Text>
           <Text style={[styles.name, styles.lockedText]}>{letter.name}</Text>
           <Text style={styles.lockedHint}>

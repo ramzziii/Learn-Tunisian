@@ -79,7 +79,7 @@ export function LetterDiacriticsModal({ letter, onClose }: LetterDiacriticsModal
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         {letter ? (
           <View style={[styles.sheet, shadows.raised]}>
-            <Pressable onPress={onClose} style={styles.closeButton}>
+            <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" style={styles.closeButton}>
               <Text style={styles.closeIcon}>✕</Text>
             </Pressable>
 

@@ -103,8 +103,18 @@ describe('category list', () => {
     mockTier = 'guest';
     mockClaimed = ['pb-greetings', 'pb-food'];
     await themed(<Phrasebook />);
+    expect(await screen.findAllByLabelText('Sign up to unlock')).toHaveLength(4);
+    expect(screen.queryByLabelText('Premium')).toBeNull();
     await fireEvent.press(await screen.findByText('Travel'));
     expect(mockPush).toHaveBeenCalledWith({ pathname: '/guest/create-account', params: { reason: 'keep-learning' } });
+  });
+
+  it('no categories (e.g. nothing in the guest preview yet): says so instead of a blank page', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { fetchPhrasebookCategories } = require('@/data/content');
+    fetchPhrasebookCategories.mockResolvedValueOnce([]);
+    await themed(<Phrasebook />);
+    expect(await screen.findByText('No phrases here yet')).toBeOnTheScreen();
   });
 });
 

@@ -41,7 +41,7 @@ export default function PhrasebookScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   // A category counts once opened; locked only when the allowance is used up.
-  const { decide } = useAccess();
+  const { tier, decide } = useAccess();
   const onLockedPress = useLockedItemAction();
   const [categories, setCategories] = useState<PhrasebookCategory[] | null>(null);
   const [loadError, setLoadError] = useState(false);
@@ -93,6 +93,12 @@ export default function PhrasebookScreen() {
         ) : (
           <LoadingScreen themed />
         )
+      ) : categories.length === 0 ? (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorEmoji}>📖</Text>
+          <Text style={styles.errorTitle}>No phrases here yet</Text>
+          <Text style={styles.emptyBody}>New situations are on the way — check back soon.</Text>
+        </View>
       ) : (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.list}>
           {categories.map((category, index) => {
@@ -115,7 +121,7 @@ export default function PhrasebookScreen() {
                   <View style={{ flex: 1 }}>
                     <View style={styles.titleRow}>
                       <Text style={styles.cardTitle}>{category.name}</Text>
-                      {isLocked ? <PremiumBadge /> : null}
+                      {isLocked ? <PremiumBadge signUp={tier === 'guest'} /> : null}
                     </View>
                     <View style={styles.countRow}>
                       <View style={[styles.countDot, { backgroundColor: meta.color }]} />
@@ -190,4 +196,5 @@ const makeStyles = (colors: ThemeColors) =>
     errorContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm, padding: spacing.lg },
     errorEmoji: { fontSize: 48, marginBottom: spacing.sm },
     errorTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
+    emptyBody: { fontSize: 14, color: colors.textSecondary, textAlign: 'center' },
   });

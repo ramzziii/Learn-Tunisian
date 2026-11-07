@@ -144,7 +144,7 @@ export default function RepeatAfterMeScreen() {
     return (
       <ScreenContainer themed>
         <Reveal style={styles.centered}>
-          <PremiumBadge />
+          <PremiumBadge signUp={tier === 'guest'} />
           <Text style={styles.centeredTitle}>
             {tier === 'guest' ? 'Create a free account to keep learning' : freeLimitTitle('repeat_after_me')}
           </Text>

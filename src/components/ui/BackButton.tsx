@@ -13,13 +13,26 @@ interface BackButtonProps {
   themed?: boolean;
 }
 
+/**
+ * On the web, a page opened straight from its link (or refreshed) renders
+ * before the router is ready, and router.canGoBack() throws then. There's no
+ * history in that case anyway, so it counts as "can't go back".
+ */
+function canGoBack(): boolean {
+  try {
+    return router.canGoBack();
+  } catch {
+    return false;
+  }
+}
+
 /** Renders nothing if there's no previous screen to go back to (e.g. reached this screen directly). */
 export function BackButton({ onPress, themed = false }: BackButtonProps) {
   const { colors: liveColors } = useTheme();
   const colors = themed ? liveColors : lightColors;
   const styles = makeStyles(colors);
 
-  if (!onPress && !router.canGoBack()) return null;
+  if (!onPress && !canGoBack()) return null;
 
   return (
     <Pressable

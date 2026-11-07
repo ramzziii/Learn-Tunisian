@@ -79,7 +79,7 @@ export function PhraseDetailModal({ phrase, onClose }: PhraseDetailModalProps) {
       <Animated.View style={[styles.overlay, { opacity: backdropAnim }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         <View style={[styles.sheet, styles.shadowRaised]}>
-          <Pressable onPress={onClose} style={styles.closeButton}>
+          <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" style={styles.closeButton}>
             <Text style={styles.closeIcon}>✕</Text>
           </Pressable>
 

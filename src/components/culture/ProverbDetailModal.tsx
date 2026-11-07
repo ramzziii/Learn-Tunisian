@@ -58,7 +58,7 @@ export function ProverbDetailModal({ proverb, onClose }: ProverbDetailModalProps
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         {proverb ? (
           <View style={[styles.sheet, shadows.raised]}>
-            <Pressable onPress={onClose} style={styles.closeButton}>
+            <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" style={styles.closeButton}>
               <Text style={styles.closeIcon}>✕</Text>
             </Pressable>
 
@@ -76,7 +76,7 @@ export function ProverbDetailModal({ proverb, onClose }: ProverbDetailModalProps
 
                 <TunisianText arabic={proverb.arabic} latin={proverb.transliteration} arabicStyle={styles.arabic} latinStyle={styles.transliteration} />
 
-                <PressableScale onPress={play} style={[styles.playButton, isActive && styles.playButtonActive]}>
+                <PressableScale onPress={play} accessibilityRole="button" accessibilityLabel="Play the proverb" style={[styles.playButton, isActive && styles.playButtonActive]}>
                   <Text style={styles.playIcon}>{isActive ? '🔊' : '▶'}</Text>
                 </PressableScale>
               </Animated.View>

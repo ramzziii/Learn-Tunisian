@@ -5,6 +5,7 @@ import { LayoutAnimation, Platform, ScrollView, StyleSheet, Text, UIManager, Vie
 import { useLockedItemAction } from '@/components/access/AccessLimit';
 import { PremiumBadge } from '@/components/premium/Premium';
 import { useAccess } from '@/lib/access/AccessContext';
+import { lockKind } from '@/lib/access/accessRules';
 import { BackButton } from '@/components/ui/BackButton';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Reveal } from '@/components/ui/Reveal';
@@ -51,7 +52,7 @@ export default function GrammarScreen() {
   const groupedNotes = useMemo(() => groupGrammarNotes(), []);
   // The basics are free; the rest are Premium (FIXED_FREE_ITEMS in
   // src/lib/access/accessRules.ts). Nothing is counted.
-  const { decide, open } = useAccess();
+  const { tier, decide, open } = useAccess();
   const onLockedPress = useLockedItemAction();
   const [expandedId, setExpandedId] = useState<string | null>(
     () => GRAMMAR_NOTES.find((note) => decide('grammar_note', note.id) === 'open')?.id ?? null
@@ -108,7 +109,7 @@ export default function GrammarScreen() {
                         <Text style={styles.emoji}>{note.emoji}</Text>
                       </View>
                       <Text style={styles.cardTitle}>{note.title}</Text>
-                      {isLocked ? <PremiumBadge /> : <Text style={styles.chevron}>{isExpanded ? '⌄' : '›'}</Text>}
+                      {isLocked ? <PremiumBadge signUp={lockKind(tier, 'grammar_note', note.id) === 'signup'} /> : <Text style={styles.chevron}>{isExpanded ? '⌄' : '›'}</Text>}
                     </PressableScale>
 
                     {isExpanded ? (

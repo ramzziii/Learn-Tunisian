@@ -19,6 +19,9 @@ interface ScreenContainerProps {
   themed?: boolean;
 }
 
+/** Widest the content gets on a computer screen. */
+export const MAX_CONTENT_WIDTH = 560;
+
 export function ScreenContainer({ children, style, themed = false }: ScreenContainerProps) {
   const { colors: liveColors } = useTheme();
   const colors = themed ? liveColors : lightColors;
@@ -35,5 +38,6 @@ export function ScreenContainer({ children, style, themed = false }: ScreenConta
 const makeStyles = (colors: ThemeColors) =>
   StyleSheet.create({
     safeArea: { flex: 1, backgroundColor: colors.background },
-    container: { flex: 1, padding: spacing.lg },
+    // On wide (web) screens the content stays a centred, phone-like column.
+    container: { flex: 1, padding: spacing.lg, width: '100%', maxWidth: MAX_CONTENT_WIDTH, alignSelf: 'center' },
   });

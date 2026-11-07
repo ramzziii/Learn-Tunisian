@@ -19,6 +19,8 @@ jest.mock('expo-router', () => ({
   },
 }));
 jest.mock('@/data/translationRequests', () => ({ fetchMyTranslationRequests: (...a: unknown[]) => mockFetchMine(...a) }));
+let mockSession: object | null = { user: { id: 'acc-1' } };
+jest.mock('@/lib/auth/AuthContext', () => ({ useAuth: () => ({ session: mockSession }) }));
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { TranslationRequestsEntry } = require('@/components/translation/TranslationRequestsEntry');
@@ -35,6 +37,13 @@ const renderEntry = () =>
 beforeEach(() => {
   mockFetchMine.mockReset().mockResolvedValue([]);
   mockPush.mockReset();
+  mockSession = { user: { id: 'acc-1' } };
+});
+
+it('a guest (not signed in) never asks the server', async () => {
+  mockSession = null;
+  await renderEntry();
+  expect(mockFetchMine).not.toHaveBeenCalled();
 });
 
 it('opens Request a Translation', async () => {

@@ -94,7 +94,7 @@ function PracticeRound({ letters, onExit }: AlphabetPracticeSessionProps & { let
   return (
     <ScreenContainer themed style={styles.screen}>
       <View style={styles.topbar}>
-        <Pressable onPress={onExit} style={styles.closeButton}>
+        <Pressable onPress={onExit} accessibilityRole="button" accessibilityLabel="Exit practice" style={styles.closeButton}>
           <Text style={styles.closeIcon}>✕</Text>
         </Pressable>
         <View style={styles.progressTrack}>
