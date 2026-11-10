@@ -124,6 +124,15 @@ describe('a guest (device-only preview)', () => {
     expect(screen.queryByText('Start today’s practice')).toBeNull();
   });
 
+  it('while lesson 1 is still being found, the button waits (a quick tap never lands on Learn instead)', async () => {
+    mockTier = 'guest';
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    require('@/data/content').fetchLessonMap.mockReturnValueOnce(new Promise(() => undefined));
+    await renderHome();
+    expect(screen.queryByRole('button', { name: 'Try lesson 1' })).toBeNull();
+    expect(mockRouter.push).not.toHaveBeenCalledWith('/learn');
+  });
+
   it('offers a free account without pressure', async () => {
     mockTier = 'guest';
     await renderHome();

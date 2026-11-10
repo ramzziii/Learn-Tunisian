@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 
-import { BASE, bodyText, openPage, startGuest } from './helpers.mjs';
+import { BASE, bodyText, eventually, openPage, startGuest } from './helpers.mjs';
 
 describe('guest', () => {
   let ctx;
@@ -14,8 +14,10 @@ describe('guest', () => {
 
   it('Home offers lesson 1; the lesson starts with the new words, then the quiz', async () => {
     const { page } = ctx;
-    await page.getByRole('button', { name: 'Try lesson 1' }).click();
-    await page.getByText(/New words · 1 of \d+/).waitFor({ timeout: 15000 });
+    // The button only appears (named) once lesson 1 is known, so this waits for it.
+    await page.getByRole('button', { name: 'Try lesson 1' }).click({ timeout: 20000 });
+    await page.waitForURL('**/lesson/**', { timeout: 15000 });
+    await page.getByText(/New words · 1 of \d+/).waitFor({ timeout: 20000 });
     await page.getByRole('button', { name: 'Skip to practice' }).click();
     await page.getByText(/Tap the|Type the Tunisian|Listen/).first().waitFor({ timeout: 15000 });
   });
@@ -31,8 +33,8 @@ describe('guest', () => {
     const { page } = ctx;
     await page.goto(`${BASE}/grammar`);
     await page.getByText('Basic Sentence Order').waitFor();
-    assert.equal(await page.getByLabel('Sign up to unlock').count(), 2);
-    assert.equal(await page.getByLabel('Premium', { exact: true }).count(), 5);
+    assert.equal(await eventually(() => page.getByLabel('Sign up to unlock').count(), 2), 2);
+    assert.equal(await eventually(() => page.getByLabel('Premium', { exact: true }).count(), 5), 5);
     await page.getByText('Present Tense', { exact: true }).click();
     await page.waitForURL('**/guest/create-account**');
   });

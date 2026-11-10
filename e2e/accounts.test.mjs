@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { ACCOUNTS, BASE, bodyText, openPage, signIn } from './helpers.mjs';
+import { ACCOUNTS, BASE, bodyText, eventually, openPage, signIn } from './helpers.mjs';
 
 for (const [name, expectPremium] of [
   ['free', false],
@@ -22,11 +22,12 @@ for (const [name, expectPremium] of [
 
         await page.goto(`${BASE}/grammar`);
         await page.getByText('Basic Sentence Order').waitFor();
-        assert.equal(await page.getByLabel('Premium', { exact: true }).count(), expectPremium ? 0 : 5);
+        const locks = expectPremium ? 0 : 5;
+        assert.equal(await eventually(() => page.getByLabel('Premium', { exact: true }).count(), locks), locks);
 
         await page.goto(`${BASE}/talk`);
-        await page.waitForTimeout(2500);
-        assert.equal((await bodyText(page)).includes('Talk is part of Premium'), !expectPremium);
+        const talkLocked = async () => (await bodyText(page)).includes('Talk is part of Premium');
+        assert.equal(await eventually(talkLocked, !expectPremium), !expectPremium);
 
         await page.goto(`${BASE}/profile`);
         await page.getByRole('button', { name: 'Sign out', exact: true }).click();

@@ -56,7 +56,9 @@ export default function Home() {
 function GuestHome() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const [firstLessonId, setFirstLessonId] = useState<string | null>(null);
+  // undefined while loading: the button waits rather than sending a quick tap
+  // to Learn; null (none / couldn't load) falls back to Learn.
+  const [firstLessonId, setFirstLessonId] = useState<string | null | undefined>(undefined);
 
   useEffect(() => {
     fetchLessonMap('guest')
@@ -72,6 +74,7 @@ function GuestHome() {
           <Button
             themed
             label="Try lesson 1"
+            loading={firstLessonId === undefined}
             onPress={() => router.push(firstLessonId ? `/lesson/${firstLessonId}` : '/learn')}
           />
         </Reveal>
