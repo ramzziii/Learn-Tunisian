@@ -50,3 +50,18 @@ export async function signIn(page, { email, password }) {
 }
 
 export const bodyText = (page) => page.locator('body').innerText();
+
+/**
+ * Waits (up to `timeout`) until `read()` returns `expected` — screens settle
+ * after access and data load, so a single early read can be wrong.
+ */
+export async function eventually(read, expected, { timeout = 10000, interval = 250 } = {}) {
+  const until = Date.now() + timeout;
+  let last;
+  while (Date.now() < until) {
+    last = await read();
+    if (last === expected) return last;
+    await new Promise((r) => setTimeout(r, interval));
+  }
+  return last;
+}
