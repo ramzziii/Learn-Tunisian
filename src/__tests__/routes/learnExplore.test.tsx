@@ -232,7 +232,7 @@ it('the Continue card doesn’t repeat the unit name when the lesson is titled a
   expect(await screen.findByRole('button', { name: /^Start your first lesson: Colors\. Lesson 1$/ })).toBeOnTheScreen();
 });
 
-it('Home: Today’s Practice first, then the path (Your path · Learn, Your units)', async () => {
+it('Home: Today’s Practice first, then the path (Your path, Your units)', async () => {
   await renderHome();
   await screen.findByText('Your units');
   const texts = screen.getAllByText(/.+/).map((el) => [el.props.children].flat(Infinity).join(''));

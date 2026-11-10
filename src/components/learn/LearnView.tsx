@@ -150,12 +150,9 @@ export function LearnPath({ data, isLessonLocked, onLockedPress, baseDelay = 0 }
     <View>
       <Reveal delay={baseDelay}>
         <View style={styles.pathHeader}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.eyebrow}>Your path</Text>
-            <Text style={styles.sectionHeading} accessibilityRole="header">
-              Learn
-            </Text>
-          </View>
+          <Text style={[styles.sectionHeading, { flex: 1 }]} accessibilityRole="header">
+            Your path
+          </Text>
           <HeaderBadge value={`${percent}%`} label="done" />
         </View>
         <Text style={styles.progressText}>
