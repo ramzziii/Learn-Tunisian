@@ -1,8 +1,8 @@
-// Learn answers "what should I learn next?": the curriculum map (unchanged —
-// same order, same locks), an "Explore Tunisian" section below it with the
-// reference features (Alphabet, Phrasebook, Grammar Notes, Culture Corner,
-// Ask for a translation), and — before any lesson is completed — Alphabet as
-// a "Start here" card near the top.
+// The learner's path now sits on Home, under Today's Practice and Review:
+// the curriculum map (unchanged — same order, same locks), progress, the
+// Continue card and — before any lesson is completed — Alphabet as a "Start
+// here" card. Learn keeps the search bar and "Explore Tunisian" (Alphabet,
+// Phrasebook, Grammar Notes, Culture Corner, Ask for a translation).
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 const mockPush = jest.fn();
@@ -42,7 +42,10 @@ let mockTranslationRequests: { isNewAnswer: boolean }[] = [];
 jest.mock('@/data/translationRequests', () => ({
   fetchMyTranslationRequests: jest.fn(async () => mockTranslationRequests),
 }));
+jest.mock('@/data/profiles', () => ({ fetchDailyGoalSettings: jest.fn(async () => ({ dailyGoalMinutes: 10 })) }));
+jest.mock('@/data/sessionLogs', () => ({ fetchMinutesLearnedToday: jest.fn(async () => 3) }));
 jest.mock('@/data/progress', () => ({
+  fetchReviewDueCount: jest.fn(async () => 0),
   fetchProgressSummary: jest.fn(async () => ({ wordsLearning: 0, wordsMastered: 0, wordsReviewed: 0, totalWordsSeen: 0 })),
 }));
 // The map itself is unchanged; this stand-in just shows its lessons in order
@@ -70,6 +73,8 @@ jest.mock('@/components/lesson-map/UnitSection', () => ({
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const Learn = require('../../../app/(tabs)/learn').default;
 // eslint-disable-next-line @typescript-eslint/no-var-requires
+const Home = require('../../../app/(tabs)/home').default;
+// eslint-disable-next-line @typescript-eslint/no-var-requires
 const { ThemeProvider } = require('@/lib/theme/ThemeContext');
 
 const lesson = (id: string, n: number, state: string) => ({
@@ -88,6 +93,7 @@ const unitsWith = (...lessons: ReturnType<typeof lesson>[]) => [
 ];
 
 const renderLearn = () => render(<ThemeProvider><Learn /></ThemeProvider>);
+const renderHome = () => render(<ThemeProvider><Home /></ThemeProvider>);
 
 beforeEach(() => {
   mockPush.mockReset();
@@ -98,7 +104,7 @@ beforeEach(() => {
 });
 
 it('keeps the curriculum map: same lessons, order and states; nothing locked while lessons are left', async () => {
-  await renderLearn();
+  await renderHome();
   expect(await screen.findByText('[lesson L1 unlocked]')).toBeOnTheScreen();
   expect(screen.getByText('[lesson L2 locked]')).toBeOnTheScreen();
   await fireEvent.press(screen.getByText('[lesson L1 unlocked]'));
@@ -108,7 +114,7 @@ it('keeps the curriculum map: same lessons, order and states; nothing locked whi
 it('free account with all 5 lessons used: new lessons show the lock; opened and completed ones stay open', async () => {
   mockUnits = unitsWith(lesson('l1', 1, 'completed'), lesson('l2', 2, 'unlocked'), lesson('l3', 3, 'locked'));
   mockClaimed = ['x1', 'x2', 'x3', 'x4', 'l2'];
-  await renderLearn();
+  await renderHome();
   expect(await screen.findByText('[lesson L1 completed]')).toBeOnTheScreen();
   expect(screen.getByText('[lesson L2 unlocked]')).toBeOnTheScreen();
   expect(screen.getByText('[lesson L3 locked premium]')).toBeOnTheScreen();
@@ -120,12 +126,10 @@ it('a search bar at the top of Learn opens the dictionary', async () => {
   expect(mockPush).toHaveBeenCalledWith('/search');
 });
 
-it('an Explore Tunisian section below the curriculum links to each reference feature', async () => {
+it('Learn is Explore Tunisian (no lesson path — that is on Home), linking to each reference feature', async () => {
   await renderLearn();
   await screen.findByText('Explore Tunisian');
-
-  const texts = screen.getAllByText(/.+/).map((el) => [el.props.children].flat(Infinity).join(''));
-  expect(texts.findIndex((t) => t === 'Explore Tunisian')).toBeGreaterThan(texts.findIndex((t) => t.includes('[lesson L2')));
+  expect(screen.queryByText(/\[lesson/)).toBeNull();
 
   const targets: [string, string][] = [
     ['Alphabet', '/alphabet'],
@@ -142,7 +146,7 @@ it('an Explore Tunisian section below the curriculum links to each reference fea
 });
 
 it('before any lesson is completed: Alphabet as a Start here card near the top', async () => {
-  await renderLearn();
+  await renderHome();
   const startHere = await screen.findByRole('button', { name: /^Start here: Alphabet/ });
   const texts = screen.getAllByText(/.+/).map((el) => [el.props.children].flat(Infinity).join(''));
   expect(texts.findIndex((t) => t === 'Start here')).toBeLessThan(texts.findIndex((t) => t.includes('[lesson L1')));
@@ -152,8 +156,8 @@ it('before any lesson is completed: Alphabet as a Start here card near the top',
 
 it('once a lesson is completed, no Start here card', async () => {
   mockUnits = unitsWith(lesson('l1', 1, 'completed'), lesson('l2', 2, 'unlocked'));
-  await renderLearn();
-  await screen.findByText('Explore Tunisian');
+  await renderHome();
+  await screen.findByText('[lesson L1 completed]');
   expect(screen.queryByText('Start here')).toBeNull();
   expect(screen.queryByRole('button', { name: /^Start here/ })).toBeNull();
 });
@@ -170,15 +174,15 @@ it('no notice when nothing new has been answered', async () => {
   expect(screen.queryByText(/translation.* ready/)).toBeNull();
 });
 
-describe('the redesigned top of Learn', () => {
+describe('the path on Home', () => {
   it('a hero with overall progress: how many lessons are complete', async () => {
     mockUnits = unitsWith(lesson('l1', 1, 'completed'), lesson('l2', 2, 'unlocked'), lesson('l3', 3, 'locked'));
-    await renderLearn();
+    await renderHome();
     expect(await screen.findByText('1 of 3 lessons complete')).toBeOnTheScreen();
   });
 
   it('a brand-new learner gets a “Start your first lesson” card that opens it', async () => {
-    await renderLearn();
+    await renderHome();
     await fireEvent.press(await screen.findByRole('button', { name: /^Start your first lesson: L1/ }));
     expect(mockPush).toHaveBeenCalledWith('/lesson/l1');
   });
@@ -186,7 +190,7 @@ describe('the redesigned top of Learn', () => {
   it('a returning learner gets a Continue card for the lesson that’s up next', async () => {
     mockUnits = unitsWith(lesson('l1', 1, 'completed'), lesson('l2', 2, 'unlocked'), lesson('l3', 3, 'locked'));
     mockTier = 'premium';
-    await renderLearn();
+    await renderHome();
     await fireEvent.press(await screen.findByRole('button', { name: /^Continue: L2/ }));
     expect(mockPush).toHaveBeenCalledWith('/lesson/l2');
   });
@@ -194,7 +198,7 @@ describe('the redesigned top of Learn', () => {
   it('free account past its 5 lessons: the Continue card opens the upgrade flow', async () => {
     mockUnits = unitsWith(lesson('l1', 1, 'completed'), lesson('l2', 2, 'unlocked'));
     mockClaimed = ['x1', 'x2', 'x3', 'x4', 'x5'];
-    await renderLearn();
+    await renderHome();
     await fireEvent.press(await screen.findByRole('button', { name: /^Continue: L2/ }));
     expect(mockPush).toHaveBeenCalledWith({ pathname: '/onboarding/plans', params: { source: 'premium' } });
     expect(mockPush).not.toHaveBeenCalledWith('/lesson/l2');
@@ -204,14 +208,14 @@ describe('the redesigned top of Learn', () => {
     mockTier = 'guest';
     mockUnits = unitsWith(lesson('l1', 1, 'completed'), lesson('l2', 2, 'unlocked'));
     mockClaimed = ['x1', 'x2'];
-    await renderLearn();
+    await renderHome();
     await fireEvent.press(await screen.findByRole('button', { name: /^Continue: L2/ }));
     expect(mockPush).toHaveBeenCalledWith({ pathname: '/guest/create-account', params: { reason: 'keep-learning' } });
   });
 
   it('when every lesson is done, a celebration instead of a Continue card', async () => {
     mockUnits = unitsWith(lesson('l1', 1, 'completed'), lesson('l2', 2, 'completed'));
-    await renderLearn();
+    await renderHome();
     expect(await screen.findByText('Every lesson complete 🎉')).toBeOnTheScreen();
     expect(screen.queryByRole('button', { name: /^Continue/ })).toBeNull();
   });
@@ -224,6 +228,16 @@ it('the Continue card doesn’t repeat the unit name when the lesson is titled a
       lessons: [{ ...lesson('l1', 1, 'unlocked'), unitName: 'Colors', title: 'Colors' }],
     },
   ];
-  await renderLearn();
+  await renderHome();
   expect(await screen.findByRole('button', { name: /^Start your first lesson: Colors\. Lesson 1$/ })).toBeOnTheScreen();
+});
+
+it('Home: Today’s Practice first, then the path (Your path · Learn, Your units)', async () => {
+  await renderHome();
+  await screen.findByText('Your units');
+  const texts = screen.getAllByText(/.+/).map((el) => [el.props.children].flat(Infinity).join(''));
+  const practice = texts.findIndex((t) => t === 'Today’s Practice');
+  expect(practice).toBeGreaterThanOrEqual(0);
+  expect(texts.findIndex((t) => t === 'Your path')).toBeGreaterThan(practice);
+  expect(texts.findIndex((t) => t === 'Your units')).toBeGreaterThan(texts.findIndex((t) => t === 'Your path'));
 });
