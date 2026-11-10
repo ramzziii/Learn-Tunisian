@@ -67,7 +67,7 @@ export default function AdminNewWordGroup() {
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
         <Text style={styles.fieldLabel}>ID (slug)</Text>
-        <TextInput
+        <TextInput accessibilityLabel="ID (slug)"
           value={id}
           onChangeText={setId}
           style={styles.input}
@@ -75,11 +75,11 @@ export default function AdminNewWordGroup() {
           autoCapitalize="none"
         />
         <Text style={styles.fieldLabel}>English meaning</Text>
-        <TextInput value={englishMeaning} onChangeText={setEnglishMeaning} style={styles.input} placeholder="e.g. hello" />
+        <TextInput accessibilityLabel="English meaning" value={englishMeaning} onChangeText={setEnglishMeaning} style={styles.input} placeholder="e.g. hello" />
         <Text style={styles.fieldLabel}>Image keyword (optional)</Text>
-        <TextInput value={imageKeyword} onChangeText={setImageKeyword} style={styles.input} />
+        <TextInput accessibilityLabel="Image keyword (optional)" value={imageKeyword} onChangeText={setImageKeyword} style={styles.input} />
         <Text style={styles.fieldLabel}>Sort order</Text>
-        <TextInput value={sortOrder} onChangeText={setSortOrder} style={styles.input} keyboardType="number-pad" />
+        <TextInput accessibilityLabel="Sort order" value={sortOrder} onChangeText={setSortOrder} style={styles.input} keyboardType="number-pad" />
 
         <Button themed label="Create" onPress={handleCreate} loading={isSaving} style={{ marginTop: spacing.lg }} />
       </ScrollView>

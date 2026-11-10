@@ -30,9 +30,8 @@ const LEARNER_EMAIL = 'e2e-learner@example.com';
 
 const skip = unsafeReason() ?? false;
 
-/** The text box right after a field label (these admin forms label inputs with a Text above them). */
-const fieldAfter = (page, label) =>
-  page.getByText(label, { exact: true }).locator('xpath=following::input[1] | following::textarea[1]').first();
+/** A text box by its accessible name (every admin field is labelled for screen readers). */
+const field = (page, name) => page.getByRole('textbox', { name, exact: true });
 
 async function signInUi(page, email) {
   await page.goto(`${STAGING.base}/auth/sign-in`);
@@ -98,8 +97,8 @@ describe('admin content journey (TEST project)', { skip }, () => {
     const { page } = admin;
     await page.goto(`${STAGING.base}/admin/units`);
     await page.getByRole('button', { name: '+ New Unit' }).click({ timeout: 20000 });
-    await page.getByPlaceholder('e.g. Greetings').fill(UNIT);
-    await fieldAfter(page, 'Sort order').fill('-100');
+    await field(page, 'Name').fill(UNIT);
+    await field(page, 'Sort order').fill('-100');
     await page.getByRole('button', { name: 'Create', exact: true }).click();
     await page.getByText(UNIT).click({ timeout: 15000 });
     await page.waitForURL('**/admin/units/**');
@@ -107,8 +106,8 @@ describe('admin content journey (TEST project)', { skip }, () => {
     step('unit');
 
     await page.getByRole('button', { name: '+ New Lesson' }).click({ timeout: 15000 });
-    await fieldAfter(page, 'Lesson number').fill('1');
-    await fieldAfter(page, 'Title (optional)').fill(LESSON_TITLE);
+    await field(page, 'Lesson number').fill('1');
+    await field(page, 'Title (optional)').fill(LESSON_TITLE);
     await page.getByRole('button', { name: 'Create', exact: true }).click();
     await page.getByText(LESSON_TITLE).click({ timeout: 15000 });
     await page.waitForURL('**/admin/lessons/**');
@@ -118,14 +117,14 @@ describe('admin content journey (TEST project)', { skip }, () => {
   it('adds a word with one form', shotOnFailure('adds a word with one form', async () => {
     const { page } = admin;
     await page.getByRole('button', { name: '+ New Word Group' }).click({ timeout: 15000 });
-    await page.getByPlaceholder('e.g. pb_greet_hello').fill(WORD_ID);
-    await page.getByPlaceholder('e.g. hello').fill(MEANING);
+    await field(page, 'ID (slug)').fill(WORD_ID);
+    await field(page, 'English meaning').fill(MEANING);
     await page.getByRole('button', { name: 'Create', exact: true }).click();
     await page.waitForURL(`**/admin/word-groups/${WORD_ID}`, { timeout: 20000 });
     step('word');
 
-    await page.getByPlaceholder('Arabic', { exact: true }).fill(ARABIC);
-    await page.getByPlaceholder('Transliteration', { exact: true }).fill(LATIN);
+    await field(page, 'New form: Arabic').fill(ARABIC);
+    await field(page, 'New form: Transliteration').fill(LATIN);
     await page.getByRole('button', { name: '+ Add Variant' }).click();
     await page.getByText(/Forms \(1\)/).waitFor({ timeout: 15000 });
     step('form');
@@ -140,8 +139,9 @@ describe('admin content journey (TEST project)', { skip }, () => {
     const chooser = page.waitForEvent('filechooser', { timeout: 15000 });
     await page.getByRole('button', { name: 'Upload audio' }).click();
     await (await chooser).setFiles(wav);
-    // Only the word's recording here: untick the (default-on) explanation recording.
-    await page.getByRole('checkbox', { name: 'Add explanation recording' }).click();
+    // Only the word's recording: "Add explanation recording" starts unticked.
+    const explanation = page.getByRole('checkbox', { name: 'Add explanation recording' });
+    assert.equal(await explanation.isChecked(), false, 'explanation is optional (unticked)');
     await page.getByRole('button', { name: 'Save & next' }).click({ timeout: 15000 });
     // Saving finishes when the station moves on (next word, or the list) — or shows an error.
     await page.waitForTimeout(4000);

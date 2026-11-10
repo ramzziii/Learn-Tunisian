@@ -99,11 +99,14 @@ describe('pronunciation + optional explanation', () => {
     expect(screen.getByText('No explanation yet')).toBeOnTheScreen();
   });
 
-  it('"Add explanation recording" is ticked by default once there is a pronunciation take', async () => {
+  it('"Add explanation recording" starts unticked (the word saves alone); ticking it shows the explanation controls', async () => {
     await renderStation();
     await recordPronunciation();
 
     expect(explanationBox().props.accessibilityLabel).toBe('Add explanation recording');
+    expect(explanationBox().props.accessibilityState).toMatchObject({ checked: false });
+    expect(screen.queryByText('● Record explanation')).toBeNull();
+    await fireEvent.press(explanationBox());
     expect(explanationBox().props.accessibilityState).toMatchObject({ checked: true });
     expect(screen.getByText('● Record explanation')).toBeOnTheScreen();
     expect(screen.getByText('Upload explanation')).toBeOnTheScreen();
@@ -113,17 +116,17 @@ describe('pronunciation + optional explanation', () => {
     await renderStation();
     await recordPronunciation();
 
+    await fireEvent.press(explanationBox());
     await fireEvent.press(screen.getByText('Save & next'));
 
     expect(await screen.findByText(/Record or upload the explanation, or untick/)).toBeOnTheScreen();
     expect(mockSave).not.toHaveBeenCalled();
   });
 
-  it('unticked: saves the pronunciation alone', async () => {
+  it('by default (unticked): saves the pronunciation alone', async () => {
     const { onSaved } = await renderStation();
     await recordPronunciation();
 
-    await fireEvent.press(explanationBox());
     expect(screen.queryByText('● Record explanation')).toBeNull();
     await fireEvent.press(screen.getByText('Save & next'));
 
@@ -134,6 +137,7 @@ describe('pronunciation + optional explanation', () => {
   it('records the explanation as a separate take, plays each one back separately, and saves both', async () => {
     const { onSaved } = await renderStation();
     await recordPronunciation();
+    await fireEvent.press(explanationBox()); // tick "Add explanation recording"
 
     await fireEvent.press(screen.getByText('● Record explanation'));
     await fireEvent.press(await screen.findByText(/■ Stop explanation/));
@@ -157,6 +161,7 @@ describe('pronunciation + optional explanation', () => {
     });
     await renderStation();
     await recordPronunciation();
+    await fireEvent.press(explanationBox()); // tick "Add explanation recording"
 
     await fireEvent.press(screen.getByText('Upload explanation'));
     expect(await screen.findByText(/explain\.mp3/)).toBeOnTheScreen();
@@ -173,6 +178,7 @@ describe('pronunciation + optional explanation', () => {
     mockPick.mockResolvedValueOnce({ kind: 'canceled' }).mockResolvedValueOnce({ kind: 'invalid', message: 'That file type isn’t supported.' });
     await renderStation();
     await recordPronunciation();
+    await fireEvent.press(explanationBox()); // tick "Add explanation recording"
 
     await fireEvent.press(screen.getByText('Upload explanation'));
     expect(screen.queryByText('▶ Play explanation')).toBeNull();
@@ -183,6 +189,7 @@ describe('pronunciation + optional explanation', () => {
   it('"Redo explanation" drops only the explanation take — the pronunciation take stays', async () => {
     await renderStation();
     await recordPronunciation();
+    await fireEvent.press(explanationBox()); // tick "Add explanation recording"
     await fireEvent.press(screen.getByText('● Record explanation'));
     await fireEvent.press(await screen.findByText(/■ Stop explanation/));
 
@@ -196,6 +203,7 @@ describe('pronunciation + optional explanation', () => {
     mockSave.mockRejectedValueOnce(new Error('Couldn’t upload the explanation recording (blocked).')).mockResolvedValueOnce({ id: 'v1' });
     const { onSaved } = await renderStation();
     await recordPronunciation();
+    await fireEvent.press(explanationBox()); // tick "Add explanation recording"
     await fireEvent.press(screen.getByText('● Record explanation'));
     await fireEvent.press(await screen.findByText(/■ Stop explanation/));
 

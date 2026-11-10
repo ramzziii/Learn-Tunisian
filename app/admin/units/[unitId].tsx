@@ -154,9 +154,9 @@ export default function AdminUnitDetail() {
         <View style={[styles.card, shadows.card]}>
           {saveError ? <Text style={styles.errorText}>{saveError}</Text> : null}
           <Text style={styles.fieldLabel}>Name</Text>
-          <TextInput value={name} onChangeText={setName} style={styles.input} />
+          <TextInput accessibilityLabel="Name" value={name} onChangeText={setName} style={styles.input} />
           <Text style={styles.fieldLabel}>Sort order</Text>
-          <TextInput value={sortOrder} onChangeText={setSortOrder} style={styles.input} keyboardType="number-pad" />
+          <TextInput accessibilityLabel="Sort order" value={sortOrder} onChangeText={setSortOrder} style={styles.input} keyboardType="number-pad" />
           <PillSelect label="Type" options={CURRICULUM_OPTIONS} value={isCurriculum} onChange={setIsCurriculum} />
           <Button themed label="Save" onPress={handleSave} loading={isSaving} style={{ marginTop: spacing.sm }} />
         </View>
@@ -182,16 +182,16 @@ export default function AdminUnitDetail() {
           <View style={[styles.card, shadows.card]}>
             {lessonError ? <Text style={styles.errorText}>{lessonError}</Text> : null}
             <Text style={styles.fieldLabel}>Lesson number</Text>
-            <TextInput
+            <TextInput accessibilityLabel="Lesson number"
               value={lessonNumber}
               onChangeText={setLessonNumber}
               style={styles.input}
               keyboardType="number-pad"
             />
             <Text style={styles.fieldLabel}>Title (optional)</Text>
-            <TextInput value={lessonTitle} onChangeText={setLessonTitle} style={styles.input} />
+            <TextInput accessibilityLabel="Title (optional)" value={lessonTitle} onChangeText={setLessonTitle} style={styles.input} />
             <Text style={styles.fieldLabel}>Sort order</Text>
-            <TextInput
+            <TextInput accessibilityLabel="Sort order"
               value={lessonSortOrder}
               onChangeText={setLessonSortOrder}
               style={styles.input}

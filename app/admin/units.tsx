@@ -112,9 +112,9 @@ export default function AdminUnitsList() {
           <View style={[styles.card, shadows.card]}>
             {createError ? <Text style={styles.errorText}>{createError}</Text> : null}
             <Text style={styles.fieldLabel}>Name</Text>
-            <TextInput value={name} onChangeText={setName} style={styles.input} placeholder="e.g. Greetings" />
+            <TextInput accessibilityLabel="Name" value={name} onChangeText={setName} style={styles.input} placeholder="e.g. Greetings" />
             <Text style={styles.fieldLabel}>Sort order</Text>
-            <TextInput
+            <TextInput accessibilityLabel="Sort order"
               value={sortOrder}
               onChangeText={setSortOrder}
               style={styles.input}
