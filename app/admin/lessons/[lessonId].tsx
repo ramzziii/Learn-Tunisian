@@ -121,11 +121,11 @@ export default function AdminLessonDetail() {
         <View style={[styles.card, shadows.card]}>
           {saveError ? <Text style={styles.errorText}>{saveError}</Text> : null}
           <Text style={styles.fieldLabel}>Lesson number</Text>
-          <TextInput value={lessonNumber} onChangeText={setLessonNumber} style={styles.input} keyboardType="number-pad" />
+          <TextInput accessibilityLabel="Lesson number" value={lessonNumber} onChangeText={setLessonNumber} style={styles.input} keyboardType="number-pad" />
           <Text style={styles.fieldLabel}>Title</Text>
-          <TextInput value={title} onChangeText={setTitle} style={styles.input} />
+          <TextInput accessibilityLabel="Title" value={title} onChangeText={setTitle} style={styles.input} />
           <Text style={styles.fieldLabel}>Sort order</Text>
-          <TextInput value={sortOrder} onChangeText={setSortOrder} style={styles.input} keyboardType="number-pad" />
+          <TextInput accessibilityLabel="Sort order" value={sortOrder} onChangeText={setSortOrder} style={styles.input} keyboardType="number-pad" />
           <Button themed label="Save" onPress={handleSave} loading={isSaving} style={{ marginTop: spacing.sm }} />
         </View>
 

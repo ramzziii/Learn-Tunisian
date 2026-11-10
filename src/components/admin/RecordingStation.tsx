@@ -61,8 +61,9 @@ type StationProps = {
  * Alongside the pronunciation there's an optional *explanation* recording
  * (a native speaker explaining it in English, Arabic or both) — its own
  * take, its own playback, saved to its own column, never part of Repeat
- * After Me. "Add explanation recording" is ticked by default; untick it to
- * save the pronunciation alone. In `mode="explanation"` (Missing
+ * After Me. "Add explanation recording" starts unticked — the word's
+ * recording saves on its own; tick it to add an explanation too. In
+ * `mode="explanation"` (Missing
  * Explanations) only the explanation is recorded. A failed save shows the
  * error and stays on the word with both takes kept.
  */
@@ -80,7 +81,8 @@ export function RecordingStation(props: StationProps) {
   // Set when recordedUri came from Upload audio rather than the recorder.
   const [pickedFile, setPickedFile] = useState<PickedAudioFile | null>(null);
   const [explanationTake, setExplanationTake] = useState<Take | null>(null);
-  const [includeExplanation, setIncludeExplanation] = useState(!hasExistingExplanation);
+  // Optional: off by default, so a word's recording never waits on an explanation.
+  const [includeExplanation, setIncludeExplanation] = useState(false);
   const [addToRepeatAfterMe, setAddToRepeatAfterMe] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -95,6 +97,7 @@ export function RecordingStation(props: StationProps) {
   const micDenied = recorder.permission === 'denied';
   const recordingPronunciation = recorder.isRecording && recordingTarget === 'pronunciation';
   const recordingExplanation = recorder.isRecording && recordingTarget === 'explanation';
+  const hasSaveButton = explanationOnly || (!!recordedUri && !recordingPronunciation);
 
   const toggleRecording = async (target: 'pronunciation' | 'explanation') => {
     setError(null);
@@ -288,7 +291,8 @@ export function RecordingStation(props: StationProps) {
         </Pressable>
       ) : null}
 
-      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+      {/* With a take ready, the message sits right above Save (where you're looking). */}
+      {error && !hasSaveButton ? <Text style={styles.errorText}>{error}</Text> : null}
 
       {explanationOnly ? (
         <>
@@ -301,6 +305,7 @@ export function RecordingStation(props: StationProps) {
           <Text style={styles.sectionLabel}>Explanation recording</Text>
           <Text style={styles.context}>A native speaker explaining it — in English, Arabic, or both.</Text>
           {explanationControls}
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
           <Button themed label="Save explanation & next" onPress={saveExplanationOnly} loading={isSaving} />
         </>
       ) : recordedUri && !recordingPronunciation ? (
@@ -364,6 +369,7 @@ export function RecordingStation(props: StationProps) {
             </>
           ) : null}
 
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
           <Button themed label="Save & next" onPress={save} loading={isSaving} disabled={recorder.isRecording} />
         </>
       ) : (

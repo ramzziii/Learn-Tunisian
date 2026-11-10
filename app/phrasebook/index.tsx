@@ -41,7 +41,7 @@ export default function PhrasebookScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   // A category counts once opened; locked only when the allowance is used up.
-  const { tier, decide } = useAccess();
+  const { isResolved, tier, decide } = useAccess();
   const onLockedPress = useLockedItemAction();
   const [categories, setCategories] = useState<PhrasebookCategory[] | null>(null);
   const [loadError, setLoadError] = useState(false);
@@ -66,6 +66,9 @@ export default function PhrasebookScreen() {
       load();
     }, [load])
   );
+
+  // Until access is known, locks could flash on items this learner can open.
+  if (!isResolved) return <LoadingScreen themed />;
 
   return (
     <ScreenContainer themed>

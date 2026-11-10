@@ -9,6 +9,7 @@ import { PremiumBadge } from '@/components/premium/Premium';
 import { useAccess } from '@/lib/access/AccessContext';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Reveal } from '@/components/ui/Reveal';
+import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { radii, shadows, spacing, type ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/lib/theme/ThemeContext';
@@ -45,7 +46,7 @@ export default function CultureScreen() {
   );
 
   // Any proverb can be picked; each counts when first opened (src/lib/access).
-  const { tier, decide, open } = useAccess();
+  const { isResolved, tier, decide, open } = useAccess();
   const onLockedPress = useLockedItemAction();
 
   const selectProverb = async (proverb: Proverb) => {
@@ -59,6 +60,9 @@ export default function CultureScreen() {
     setViewedIds((prev) => [...prev, proverb.id]);
     markProverbViewed(activeProfile.id, proverb.id);
   };
+
+  // Until access is known, locks could flash on items this learner can open.
+  if (!isResolved) return <LoadingScreen themed />;
 
   return (
     <ScreenContainer themed style={styles.screen}>

@@ -158,11 +158,11 @@ export default function AdminWordGroupDetail() {
         <View style={[styles.card, shadows.card]}>
           {groupError ? <Text style={styles.errorText}>{groupError}</Text> : null}
           <Text style={styles.fieldLabel}>English meaning</Text>
-          <TextInput value={englishMeaning} onChangeText={setEnglishMeaning} style={styles.input} />
+          <TextInput accessibilityLabel="English meaning" value={englishMeaning} onChangeText={setEnglishMeaning} style={styles.input} />
           <Text style={styles.fieldLabel}>Image keyword</Text>
-          <TextInput value={imageKeyword} onChangeText={setImageKeyword} style={styles.input} />
+          <TextInput accessibilityLabel="Image keyword" value={imageKeyword} onChangeText={setImageKeyword} style={styles.input} />
           <Text style={styles.fieldLabel}>Sort order</Text>
-          <TextInput value={sortOrder} onChangeText={setSortOrder} style={styles.input} keyboardType="number-pad" />
+          <TextInput accessibilityLabel="Sort order" value={sortOrder} onChangeText={setSortOrder} style={styles.input} keyboardType="number-pad" />
           <PillSelect
             label="Status"
             options={statusOptionsFor(isReviewer, group.contentStatus)}
@@ -312,9 +312,9 @@ function VariantRow({
         <Text style={styles.hint}>Saving keeps the recording and marks it for re-check, so learners won&apos;t hear it until someone confirms it.</Text>
       ) : null}
       <Text style={styles.fieldLabel}>Notes</Text>
-      <TextInput value={notes} onChangeText={setNotes} style={styles.input} />
+      <TextInput accessibilityLabel="Notes" value={notes} onChangeText={setNotes} style={styles.input} />
       <Text style={styles.fieldLabel}>Sort order</Text>
-      <TextInput value={sortOrder} onChangeText={setSortOrder} style={styles.input} keyboardType="number-pad" />
+      <TextInput accessibilityLabel="Sort order" value={sortOrder} onChangeText={setSortOrder} style={styles.input} keyboardType="number-pad" />
       <PillSelect label="Status" options={statusOptionsFor(isReviewer, variant.contentStatus)} value={status} onChange={(v) => setStatus(v as ContentStatus)} />
 
       <Text style={styles.fieldLabel}>Pronunciation recording</Text>
@@ -357,7 +357,7 @@ function VariantRow({
       <View style={styles.variantHeaderRow}>
         <View style={{ flex: 1 }}>
           <Text style={styles.fieldLabel}>Speaker name</Text>
-          <TextInput value={speakerName} onChangeText={setSpeakerName} style={styles.input} />
+          <TextInput accessibilityLabel="Speaker name" value={speakerName} onChangeText={setSpeakerName} style={styles.input} />
         </View>
         <View style={styles.verifiedBox}>
           <Text style={styles.fieldLabel}>Native recording</Text>
@@ -365,7 +365,7 @@ function VariantRow({
         </View>
       </View>
       <Text style={styles.fieldLabel}>Dialect / regional notes</Text>
-      <TextInput value={dialectNotes} onChangeText={setDialectNotes} style={styles.input} />
+      <TextInput accessibilityLabel="Dialect / regional notes" value={dialectNotes} onChangeText={setDialectNotes} style={styles.input} />
 
       <View style={styles.actionsRow}>
         <Button themed label="Delete" variant="ghost" onPress={handleDelete} loading={isDeleting} style={{ flex: 1 }} />
@@ -460,13 +460,13 @@ function NewVariantForm({
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
       <PillSelect label="Label" options={VARIANT_LABEL_OPTIONS} value={variantLabel} onChange={(v) => setVariantLabel(v as VariantLabel)} />
       <Text style={styles.fieldLabel}>Arabic</Text>
-      <TextInput value={wordArabic} onChangeText={setWordArabic} style={styles.input} placeholder="Arabic" />
+      <TextInput accessibilityLabel="New form: Arabic" value={wordArabic} onChangeText={setWordArabic} style={styles.input} placeholder="Arabic" />
       <Text style={styles.fieldLabel}>Transliteration</Text>
-      <TextInput value={transliteration} onChangeText={setTransliteration} style={styles.input} placeholder="Transliteration" />
+      <TextInput accessibilityLabel="New form: Transliteration" value={transliteration} onChangeText={setTransliteration} style={styles.input} placeholder="Transliteration" />
       <Text style={styles.fieldLabel}>Notes</Text>
-      <TextInput value={notes} onChangeText={setNotes} style={styles.input} />
+      <TextInput accessibilityLabel="New form: Notes" value={notes} onChangeText={setNotes} style={styles.input} />
       <Text style={styles.fieldLabel}>Sort order</Text>
-      <TextInput value={sortOrder} onChangeText={setSortOrder} style={styles.input} keyboardType="number-pad" />
+      <TextInput accessibilityLabel="New form: Sort order" value={sortOrder} onChangeText={setSortOrder} style={styles.input} keyboardType="number-pad" />
       <Button themed label="+ Add Variant" variant="secondary" onPress={handleCreate} loading={isSaving} style={{ marginTop: spacing.sm }} />
 
       {createdVariant ? (

@@ -9,6 +9,7 @@ import { PremiumBadge } from '@/components/premium/Premium';
 import { useAccess } from '@/lib/access/AccessContext';
 import { Button } from '@/components/ui/Button';
 import { PressableScale } from '@/components/ui/PressableScale';
+import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { radii, shadows, spacing, type ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/lib/theme/ThemeContext';
@@ -57,7 +58,7 @@ export default function AlphabetScreen() {
     ARABIC_LETTERS.length > 0 ? Math.round((accessedLetterIds.length / ARABIC_LETTERS.length) * 100) : 0;
 
   // Any letter can be picked; each counts when first opened (src/lib/access).
-  const { decide, open } = useAccess();
+  const { isResolved, decide, open } = useAccess();
   const onLockedPress = useLockedItemAction();
 
   const selectLetter = async (letter: ArabicLetter) => {
@@ -71,6 +72,9 @@ export default function AlphabetScreen() {
     setViewedLetterIds((prev) => [...prev, letter.id]);
     markLetterViewed(activeProfile.id, letter.id);
   };
+
+  // Until access is known, locks could flash on items this learner can open.
+  if (!isResolved) return <LoadingScreen themed />;
 
   return (
     <ScreenContainer themed style={styles.screen}>

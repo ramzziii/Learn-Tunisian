@@ -10,6 +10,7 @@ import { PROVERBS } from '@/constants/proverbs';
 const mockPush = jest.fn();
 let mockTier: 'guest' | 'free' | 'premium' = 'free';
 let mockClaimed: string[] = [];
+let mockResolved = true;
 const mockOpen = jest.fn(async () => true);
 const mockDecide = (feature: string, key: string) =>
   // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -28,7 +29,7 @@ jest.mock('@/lib/supabase/client', () => ({ supabase: { from: jest.fn(), rpc: je
 const mockProfile = { activeProfile: { id: 'p1' } };
 jest.mock('@/lib/account/ActiveProfileContext', () => ({ useActiveProfile: () => mockProfile }));
 jest.mock('@/lib/access/AccessContext', () => ({
-  useAccess: () => ({ tier: mockTier, isResolved: true, loadError: false, open: mockOpen, decide: mockDecide }),
+  useAccess: () => ({ tier: mockTier, isResolved: mockResolved, loadError: false, open: mockOpen, decide: mockDecide }),
 }));
 jest.mock('@/hooks/useLetterSpeech', () => ({ useLetterSpeech: () => ({ speak: jest.fn(), isSpeaking: false }) }));
 jest.mock('@/lib/display/useDisplayPreferences', () => ({
@@ -43,7 +44,20 @@ beforeEach(() => {
   mockPush.mockReset();
   mockTier = 'free';
   mockClaimed = [];
+  mockResolved = true;
   mockOpen.mockReset().mockResolvedValue(true);
+});
+
+it.each([
+  ['Grammar', '../../../app/grammar'],
+  ['Culture', '../../../app/culture'],
+])('while access is still loading, %s shows no locks at all (no 🔒 flash for Premium)', async (_name, path) => {
+  mockResolved = false;
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const Screen = require(path).default;
+  await themed(<Screen />);
+  expect(screen.queryByLabelText('Premium')).toBeNull();
+  expect(screen.queryByLabelText('Sign up to unlock')).toBeNull();
 });
 
 describe('Grammar Notes', () => {

@@ -49,6 +49,31 @@ and nothing is approved, rejected, confirmed, saved, deleted or recorded.
   repository secrets (free, Premium, admin) — test accounts only, never real
   ones.
 
+## Admin content journey on a TEST project (`npm run test:e2e:staging`)
+
+`e2e/staging/admin-content.test.mjs` creates and deletes content, so it runs
+**only** against a separate Supabase test project (never the live one — it
+refuses if the URLs match): create a unit and lesson → add a word and form →
+upload a recording in Audio → change the spelling (recording goes to
+Re-check) → "Still matches" → approve it in Review → one at a time → a
+learner sees the unit and sends feedback → the admin reads it → the unit is
+deleted (clean-up runs even if a step fails; failed steps save a screenshot).
+
+One-time setup: a Supabase project such as `learn-tunisian-test` with every
+migration applied (run 0001 → 0007_phrasebook_content, then the rest, as two
+SQL runs — one transaction can't hold both), "Confirm email" off, and
+`.env.staging.local` (not committed) with `STAGING_SUPABASE_URL`,
+`STAGING_SUPABASE_ANON_KEY` (anon key only) and `STAGING_TEST_PASSWORD`. The
+test signs up `e2e-admin@example.com` and `e2e-learner@example.com` itself;
+make the admin an admin and reviewer once, in the test project's SQL editor.
+Then build the web app against the test project and serve it on port 8091:
+
+```sh
+EXPO_PUBLIC_SUPABASE_URL=<test url> EXPO_PUBLIC_SUPABASE_ANON_KEY=<test anon key> npx expo export --platform web --output-dir dist-staging
+npx serve -s dist-staging -l 8091
+E2E_BROWSER_CHANNEL=msedge npm run test:e2e:staging
+```
+
 `expo-doctor` is advisory because it compares installed versions against the
 latest SDK 57 patch releases fetched from the network, so it turns red when
 Expo publishes a patch rather than when a PR breaks something. It also always

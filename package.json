@@ -57,7 +57,8 @@
     "typecheck": "tsc --noEmit",
     "test:db": "node --test \"supabase/tests/*.test.mjs\"",
     "test:scripts": "node --test \"scripts/tests/*.test.mjs\"",
-    "test:e2e": "node --test --test-concurrency=1 \"e2e/*.test.mjs\""
+    "test:e2e": "node --test --test-concurrency=1 \"e2e/*.test.mjs\"",
+    "test:e2e:staging": "node --test --test-concurrency=1 \"e2e/staging/*.test.mjs\""
   },
   "private": true,
   "jest": {

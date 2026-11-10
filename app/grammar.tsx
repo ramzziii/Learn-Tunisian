@@ -9,6 +9,7 @@ import { lockKind } from '@/lib/access/accessRules';
 import { BackButton } from '@/components/ui/BackButton';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Reveal } from '@/components/ui/Reveal';
+import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { radii, spacing, type ThemeColors } from '@/constants/theme';
 import { GRAMMAR_NOTES, type GrammarNote } from '@/constants/grammarNotes';
@@ -52,7 +53,7 @@ export default function GrammarScreen() {
   const groupedNotes = useMemo(() => groupGrammarNotes(), []);
   // The basics are free; the rest are Premium (FIXED_FREE_ITEMS in
   // src/lib/access/accessRules.ts). Nothing is counted.
-  const { tier, decide, open } = useAccess();
+  const { isResolved, tier, decide, open } = useAccess();
   const onLockedPress = useLockedItemAction();
   const [expandedId, setExpandedId] = useState<string | null>(
     () => GRAMMAR_NOTES.find((note) => decide('grammar_note', note.id) === 'open')?.id ?? null
@@ -81,6 +82,9 @@ export default function GrammarScreen() {
   useEffect(() => {
     if (!isSpeaking) setActiveKey(null);
   }, [isSpeaking]);
+
+  // Until access is known, locks could flash on items this learner can open.
+  if (!isResolved) return <LoadingScreen themed />;
 
   return (
     <ScreenContainer themed>
