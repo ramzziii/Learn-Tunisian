@@ -3,7 +3,9 @@
 # talks to the live site. Guest journeys need nothing; the free / Premium
 # journeys run only if these repository secrets are set (Settings → Secrets
 # and variables → Actions): E2E_FREE_EMAIL, E2E_FREE_PASSWORD,
-# E2E_PREMIUM_EMAIL, E2E_PREMIUM_PASSWORD. Use test accounts only.
+# E2E_PREMIUM_EMAIL, E2E_PREMIUM_PASSWORD, and for the admin journeys
+# E2E_ADMIN_EMAIL, E2E_ADMIN_PASSWORD (a test admin who is not a reviewer).
+# Use test accounts only.
 name: E2E
 
 on:
@@ -40,3 +42,5 @@ jobs:
           E2E_FREE_PASSWORD: ${{ secrets.E2E_FREE_PASSWORD }}
           E2E_PREMIUM_EMAIL: ${{ secrets.E2E_PREMIUM_EMAIL }}
           E2E_PREMIUM_PASSWORD: ${{ secrets.E2E_PREMIUM_PASSWORD }}
+          E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
+          E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
