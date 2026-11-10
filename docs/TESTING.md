@@ -34,15 +34,20 @@ web app like a user: the guest preview (lesson 1 with its new-words intro,
 units, grammar locks, deep links, and that guests read only the
 `guest_preview_*` views, with no console errors or failed requests), then —
 only when `E2E_FREE_*` / `E2E_PREMIUM_*` logins are set — the free and
-Premium accounts (plan, locks, Talk, sign out). They only look: no counted
-item is opened beyond lesson 1, and Talk is never started.
+Premium accounts (plan, locks, Talk, sign out), and — with `E2E_ADMIN_*`, a
+test admin who is not a reviewer — every admin tab and screen, the Audio
+parts, "Edit word", reviewer-only items staying hidden, the "View app as
+Premium" switch (put back afterwards), and dark mode at computer size. They
+only look: no counted item is opened beyond lesson 1, Talk is never started,
+and nothing is approved, rejected, confirmed, saved, deleted or recorded.
 
 - Locally: `E2E_BROWSER_CHANNEL=msedge npm run test:e2e` (or `chrome`; or
   install Chromium with `npx playwright-core install chromium`). `E2E_BASE`
   points them at another URL (default https://learn-tunisian.expo.app).
 - On GitHub: Actions → E2E → Run workflow (also weekly). Not part of CI,
-  since it talks to the live site. Signed-in journeys need the four
-  `E2E_*` repository secrets — test accounts only, never real ones.
+  since it talks to the live site. Signed-in journeys need the `E2E_*`
+  repository secrets (free, Premium, admin) — test accounts only, never real
+  ones.
 
 `expo-doctor` is advisory because it compares installed versions against the
 latest SDK 57 patch releases fetched from the network, so it turns red when
