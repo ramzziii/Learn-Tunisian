@@ -2,6 +2,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { FieldHelp } from '@/components/admin/FieldHelp';
 import { PillSelect } from '@/components/admin/PillSelect';
 import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
@@ -153,11 +154,11 @@ export default function AdminUnitDetail() {
 
         <View style={[styles.card, shadows.card]}>
           {saveError ? <Text style={styles.errorText}>{saveError}</Text> : null}
-          <Text style={styles.fieldLabel}>Name</Text>
+          <FieldHelp label="Name" help="unitName" labelStyle={styles.fieldLabel} />
           <TextInput accessibilityLabel="Name" value={name} onChangeText={setName} style={styles.input} />
-          <Text style={styles.fieldLabel}>Sort order</Text>
+          <FieldHelp label="Sort order" help="unitSortOrder" labelStyle={styles.fieldLabel} />
           <TextInput accessibilityLabel="Sort order" value={sortOrder} onChangeText={setSortOrder} style={styles.input} keyboardType="number-pad" />
-          <PillSelect label="Type" options={CURRICULUM_OPTIONS} value={isCurriculum} onChange={setIsCurriculum} />
+          <PillSelect label="Type" help="unitType" options={CURRICULUM_OPTIONS} value={isCurriculum} onChange={setIsCurriculum} />
           <Button themed label="Save" onPress={handleSave} loading={isSaving} style={{ marginTop: spacing.sm }} />
         </View>
 
@@ -181,16 +182,16 @@ export default function AdminUnitDetail() {
         {isAddingLesson ? (
           <View style={[styles.card, shadows.card]}>
             {lessonError ? <Text style={styles.errorText}>{lessonError}</Text> : null}
-            <Text style={styles.fieldLabel}>Lesson number</Text>
+            <FieldHelp label="Lesson number" help="lessonNumber" labelStyle={styles.fieldLabel} />
             <TextInput accessibilityLabel="Lesson number"
               value={lessonNumber}
               onChangeText={setLessonNumber}
               style={styles.input}
               keyboardType="number-pad"
             />
-            <Text style={styles.fieldLabel}>Title (optional)</Text>
+            <FieldHelp label="Title (optional)" help="lessonTitle" labelStyle={styles.fieldLabel} />
             <TextInput accessibilityLabel="Title (optional)" value={lessonTitle} onChangeText={setLessonTitle} style={styles.input} />
-            <Text style={styles.fieldLabel}>Sort order</Text>
+            <FieldHelp label="Sort order" help="lessonSortOrder" labelStyle={styles.fieldLabel} />
             <TextInput accessibilityLabel="Sort order"
               value={lessonSortOrder}
               onChangeText={setLessonSortOrder}

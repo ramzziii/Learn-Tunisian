@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { FieldHelp } from '@/components/admin/FieldHelp';
 import { Button } from '@/components/ui/Button';
 import { ComputerVoiceNote } from '@/components/ui/ComputerVoiceNote';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
@@ -155,7 +156,7 @@ export default function AdminReviewSession() {
 
           {mode === 'fix' ? (
             <View style={styles.form}>
-              <Text style={styles.label}>Arabic</Text>
+              <FieldHelp label="Arabic" help="arabic" labelStyle={styles.label} />
               <TextInput
                 value={arabic}
                 onChangeText={setArabic}
@@ -163,7 +164,7 @@ export default function AdminReviewSession() {
                 style={[styles.input, styles.inputArabic]}
                 placeholderTextColor={colors.textSecondary}
               />
-              <Text style={styles.label}>Transliteration</Text>
+              <FieldHelp label="Transliteration" help="transliteration" labelStyle={styles.label} />
               <TextInput
                 value={latin}
                 onChangeText={setLatin}
@@ -186,6 +187,7 @@ export default function AdminReviewSession() {
             </View>
           ) : (
             <View style={styles.form}>
+              <FieldHelp label="How to review" help="reviewChoices" labelStyle={styles.label} />
               {error ? <Text style={styles.error}>{error}</Text> : null}
               <Button themed label="✓ Correct" onPress={() => save('ok')} loading={saving} />
               <Button themed label="✎ Fix the spelling" variant="secondary" onPress={() => setMode('fix')} />
@@ -201,7 +203,7 @@ export default function AdminReviewSession() {
 function NoteInput({ value, onChange, styles }: { value: string; onChange: (v: string) => void; styles: ReturnType<typeof makeStyles> }) {
   return (
     <>
-      <Text style={styles.label}>Note (optional)</Text>
+      <FieldHelp label="Note (optional)" help="reviewNote" labelStyle={styles.label} />
       <TextInput value={value} onChangeText={onChange} multiline accessibilityLabel="Review note" style={[styles.input, styles.note]} />
     </>
   );

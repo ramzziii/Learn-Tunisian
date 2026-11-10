@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { FieldHelp } from '@/components/admin/FieldHelp';
 import { PillSelect } from '@/components/admin/PillSelect';
 import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
@@ -111,16 +112,16 @@ export default function AdminUnitsList() {
         {isCreating ? (
           <View style={[styles.card, shadows.card]}>
             {createError ? <Text style={styles.errorText}>{createError}</Text> : null}
-            <Text style={styles.fieldLabel}>Name</Text>
+            <FieldHelp label="Name" help="unitName" labelStyle={styles.fieldLabel} />
             <TextInput accessibilityLabel="Name" value={name} onChangeText={setName} style={styles.input} placeholder="e.g. Greetings" />
-            <Text style={styles.fieldLabel}>Sort order</Text>
+            <FieldHelp label="Sort order" help="unitSortOrder" labelStyle={styles.fieldLabel} />
             <TextInput accessibilityLabel="Sort order"
               value={sortOrder}
               onChangeText={setSortOrder}
               style={styles.input}
               keyboardType="number-pad"
             />
-            <PillSelect label="Type" options={CURRICULUM_OPTIONS} value={isCurriculum} onChange={setIsCurriculum} />
+            <PillSelect label="Type" help="unitType" options={CURRICULUM_OPTIONS} value={isCurriculum} onChange={setIsCurriculum} />
             <View style={styles.actionsRow}>
               <Button themed label="Cancel" variant="secondary" onPress={() => setIsCreating(false)} style={{ flex: 1 }} />
               <Button themed label="Create" onPress={handleCreate} loading={isSaving} style={{ flex: 1 }} />

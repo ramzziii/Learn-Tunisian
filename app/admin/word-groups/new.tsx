@@ -2,6 +2,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { FieldHelp } from '@/components/admin/FieldHelp';
 import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
@@ -66,7 +67,7 @@ export default function AdminNewWordGroup() {
 
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-        <Text style={styles.fieldLabel}>ID (slug)</Text>
+        <FieldHelp label="ID (slug)" help="wordId" labelStyle={styles.fieldLabel} />
         <TextInput accessibilityLabel="ID (slug)"
           value={id}
           onChangeText={setId}
@@ -74,11 +75,11 @@ export default function AdminNewWordGroup() {
           placeholder="e.g. pb_greet_hello"
           autoCapitalize="none"
         />
-        <Text style={styles.fieldLabel}>English meaning</Text>
+        <FieldHelp label="English meaning" help="englishMeaning" labelStyle={styles.fieldLabel} />
         <TextInput accessibilityLabel="English meaning" value={englishMeaning} onChangeText={setEnglishMeaning} style={styles.input} placeholder="e.g. hello" />
-        <Text style={styles.fieldLabel}>Image keyword (optional)</Text>
+        <FieldHelp label="Image keyword (optional)" help="imageKeyword" labelStyle={styles.fieldLabel} />
         <TextInput accessibilityLabel="Image keyword (optional)" value={imageKeyword} onChangeText={setImageKeyword} style={styles.input} />
-        <Text style={styles.fieldLabel}>Sort order</Text>
+        <FieldHelp label="Sort order" help="wordSortOrder" labelStyle={styles.fieldLabel} />
         <TextInput accessibilityLabel="Sort order" value={sortOrder} onChangeText={setSortOrder} style={styles.input} keyboardType="number-pad" />
 
         <Button themed label="Create" onPress={handleCreate} loading={isSaving} style={{ marginTop: spacing.lg }} />
