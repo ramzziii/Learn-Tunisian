@@ -2,6 +2,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { FieldHelp } from '@/components/admin/FieldHelp';
 import { StatusBadge } from '@/components/admin/StatusBadge';
 import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
@@ -120,11 +121,11 @@ export default function AdminLessonDetail() {
 
         <View style={[styles.card, shadows.card]}>
           {saveError ? <Text style={styles.errorText}>{saveError}</Text> : null}
-          <Text style={styles.fieldLabel}>Lesson number</Text>
+          <FieldHelp label="Lesson number" help="lessonNumber" labelStyle={styles.fieldLabel} />
           <TextInput accessibilityLabel="Lesson number" value={lessonNumber} onChangeText={setLessonNumber} style={styles.input} keyboardType="number-pad" />
-          <Text style={styles.fieldLabel}>Title</Text>
+          <FieldHelp label="Title" help="lessonTitle" labelStyle={styles.fieldLabel} />
           <TextInput accessibilityLabel="Title" value={title} onChangeText={setTitle} style={styles.input} />
-          <Text style={styles.fieldLabel}>Sort order</Text>
+          <FieldHelp label="Sort order" help="lessonSortOrder" labelStyle={styles.fieldLabel} />
           <TextInput accessibilityLabel="Sort order" value={sortOrder} onChangeText={setSortOrder} style={styles.input} keyboardType="number-pad" />
           <Button themed label="Save" onPress={handleSave} loading={isSaving} style={{ marginTop: spacing.sm }} />
         </View>

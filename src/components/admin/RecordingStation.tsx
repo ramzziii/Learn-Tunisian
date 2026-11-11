@@ -2,6 +2,7 @@ import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { FieldHelp } from '@/components/admin/FieldHelp';
 import { Button } from '@/components/ui/Button';
 import { radii, shadows, spacing, type ThemeColors } from '@/constants/theme';
 import {
@@ -302,7 +303,7 @@ export function RecordingStation(props: StationProps) {
             variant="ghost"
             onPress={() => playUri(getAudioUrl(variant.audioPath, variant.updatedAt), "Couldn't play the pronunciation.")}
           />
-          <Text style={styles.sectionLabel}>Explanation recording</Text>
+          <FieldHelp label="Explanation recording" help="explanationRecording" labelStyle={styles.sectionLabel} />
           <Text style={styles.context}>A native speaker explaining it — in English, Arabic, or both.</Text>
           {explanationControls}
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
@@ -310,7 +311,7 @@ export function RecordingStation(props: StationProps) {
         </>
       ) : recordedUri && !recordingPronunciation ? (
         <>
-          <Text style={styles.sectionLabel}>Pronunciation recording</Text>
+          <FieldHelp label="Pronunciation recording" help="pronunciationRecording" labelStyle={styles.sectionLabel} />
           {pickedFile ? <Text style={styles.context}>Selected file: {pickedFile.name}</Text> : null}
           <View style={styles.row}>
             <View style={styles.cell}>
@@ -332,36 +333,40 @@ export function RecordingStation(props: StationProps) {
             </View>
           </View>
 
-          <Pressable
-            accessibilityRole="checkbox"
-            accessibilityLabel="Add to Repeat After Me"
-            accessibilityState={{ checked: addToRepeatAfterMe }}
-            onPress={() => setAddToRepeatAfterMe((v) => !v)}
-            style={styles.checkboxRow}
-            hitSlop={8}
-          >
-            <View style={[styles.checkbox, addToRepeatAfterMe && styles.checkboxChecked]}>
-              {addToRepeatAfterMe ? <Text style={styles.checkmark}>✓</Text> : null}
-            </View>
-            <Text style={styles.checkboxLabel}>Add to Repeat After Me</Text>
-          </Pressable>
+          <FieldHelp label="Add to Repeat After Me" help="repeatAfterMe">
+            <Pressable
+              accessibilityRole="checkbox"
+              accessibilityLabel="Add to Repeat After Me"
+              accessibilityState={{ checked: addToRepeatAfterMe }}
+              onPress={() => setAddToRepeatAfterMe((v) => !v)}
+              style={styles.checkboxRow}
+              hitSlop={8}
+            >
+              <View style={[styles.checkbox, addToRepeatAfterMe && styles.checkboxChecked]}>
+                {addToRepeatAfterMe ? <Text style={styles.checkmark}>✓</Text> : null}
+              </View>
+              <Text style={styles.checkboxLabel}>Add to Repeat After Me</Text>
+            </Pressable>
+          </FieldHelp>
 
           {hasExistingExplanation ? <Text style={styles.context}>This word already has an explanation recording.</Text> : null}
-          <Pressable
-            accessibilityRole="checkbox"
-            accessibilityLabel={hasExistingExplanation ? 'Replace explanation recording' : 'Add explanation recording'}
-            accessibilityState={{ checked: includeExplanation }}
-            onPress={() => setIncludeExplanation((v) => !v)}
-            style={styles.checkboxRow}
-            hitSlop={8}
-          >
-            <View style={[styles.checkbox, includeExplanation && styles.checkboxChecked]}>
-              {includeExplanation ? <Text style={styles.checkmark}>✓</Text> : null}
-            </View>
-            <Text style={styles.checkboxLabel}>
-              {hasExistingExplanation ? 'Replace explanation recording' : 'Add explanation recording'}
-            </Text>
-          </Pressable>
+          <FieldHelp label="Add explanation recording" help="addExplanation">
+            <Pressable
+              accessibilityRole="checkbox"
+              accessibilityLabel={hasExistingExplanation ? 'Replace explanation recording' : 'Add explanation recording'}
+              accessibilityState={{ checked: includeExplanation }}
+              onPress={() => setIncludeExplanation((v) => !v)}
+              style={styles.checkboxRow}
+              hitSlop={8}
+            >
+              <View style={[styles.checkbox, includeExplanation && styles.checkboxChecked]}>
+                {includeExplanation ? <Text style={styles.checkmark}>✓</Text> : null}
+              </View>
+              <Text style={styles.checkboxLabel}>
+                {hasExistingExplanation ? 'Replace explanation recording' : 'Add explanation recording'}
+              </Text>
+            </Pressable>
+          </FieldHelp>
           {includeExplanation ? (
             <>
               <Text style={styles.context}>A native speaker explaining it — in English, Arabic, or both. Not used in Repeat After Me.</Text>

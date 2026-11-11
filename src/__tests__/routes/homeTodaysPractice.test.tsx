@@ -1,7 +1,8 @@
 // Home answers "what should I do now?" with one primary action — Start
-// today's practice — plus a quiet "N words due" link to Review only when
-// something is due. The greeting and today's minutes toward the goal stay.
-// No challenges checklist, no quick-action row, no 🔥 day count.
+// today's practice — plus a "N words due" link to Review only when
+// something is due, then the learner's path (Continue card, units). The
+// greeting and today's minutes toward the goal stay. No challenges
+// checklist, no quick-action row, no 🔥 day count.
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 const mockRouter = { push: jest.fn(), replace: jest.fn(), back: jest.fn(), canGoBack: () => true };
@@ -13,9 +14,13 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,
   default: { getItem: jest.fn(async () => null), setItem: jest.fn(async () => undefined) },
 }));
-jest.mock('expo-router', () => ({ router: mockRouter }));
+jest.mock('expo-router', () => ({
+  router: mockRouter,
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  useFocusEffect: (effect: () => void) => require('react').useEffect(effect, [effect]),
+}));
 let mockTier: 'guest' | 'free' = 'free';
-jest.mock('@/lib/access/AccessContext', () => ({ useAccess: () => ({ tier: mockTier, isResolved: true }) }));
+jest.mock('@/lib/access/AccessContext', () => ({ useAccess: () => ({ tier: mockTier, isResolved: true, decide: () => 'open' }) }));
 jest.mock('@/lib/account/ActiveProfileContext', () => ({ useActiveProfile: () => ({ activeProfile: mockProfile }) }));
 jest.mock('@/data/content', () => ({
   fetchLessonMap: jest.fn(async () => [
@@ -57,8 +62,7 @@ describe('a returning learner', () => {
     await renderHome();
     expect(await screen.findByText('Start today’s practice')).toBeOnTheScreen();
     expect(screen.getByText('Ahla, Ramzi!')).toBeOnTheScreen();
-    expect(screen.getByText('4 / 10 min')).toBeOnTheScreen();
-    expect(screen.getAllByRole('button')).toHaveLength(1);
+    expect(screen.getByText("Today's goal: 4 / 10 min")).toBeOnTheScreen();
 
     await fireEvent.press(screen.getByRole('button', { name: 'Start today’s practice' }));
     expect(mockRouter.push).toHaveBeenCalledWith('/todays-practice');
@@ -93,7 +97,15 @@ describe('a returning learner', () => {
     expect(screen.queryByText(/Today's challenges/)).toBeNull();
     expect(screen.queryByText(/🔥/)).toBeNull();
     expect(screen.queryByText('Recommended next')).toBeNull();
-    for (const quick of ['Learn', 'Practice', 'Talk', 'Review']) expect(screen.queryByText(quick)).toBeNull();
+    for (const quick of ['Practice', 'Talk', 'Review']) expect(screen.queryByText(quick)).toBeNull();
+  });
+
+  it('under Today’s Practice and Review: the path, with a Continue card for the next lesson', async () => {
+    await renderHome();
+    expect(await screen.findByText('Your units')).toBeOnTheScreen();
+    expect(screen.getByText('Your path')).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole('button', { name: /^Start your first lesson: Hello/ }));
+    expect(mockRouter.push).toHaveBeenCalledWith('/lesson/l1');
   });
 });
 
@@ -103,7 +115,6 @@ describe('a brand-new learner', () => {
     mockDue = 0;
     await renderHome();
     expect(await screen.findByText('Start today’s practice')).toBeOnTheScreen();
-    expect(screen.getAllByRole('button')).toHaveLength(1);
     expect(screen.queryByRole('link')).toBeNull();
     await fireEvent.press(screen.getByRole('button', { name: 'Start today’s practice' }));
     expect(mockRouter.push).toHaveBeenCalledWith('/todays-practice');
@@ -115,22 +126,22 @@ describe('a guest (device-only preview)', () => {
     mockTier = 'free';
   });
 
-  it('no goal card; the one action is “Try lesson 1”, which opens the first preview lesson', async () => {
+  it('no goal; the path’s “Start your first lesson” card opens the first preview lesson', async () => {
     mockTier = 'guest';
     await renderHome();
-    await fireEvent.press(await screen.findByRole('button', { name: 'Try lesson 1' }));
+    await fireEvent.press(await screen.findByRole('button', { name: /^Start your first lesson: Hello/ }));
     expect(mockRouter.push).toHaveBeenCalledWith('/lesson/l1');
     expect(screen.queryByText(/Today.s goal/)).toBeNull();
     expect(screen.queryByText('Start today’s practice')).toBeNull();
   });
 
-  it('while lesson 1 is still being found, the button waits (a quick tap never lands on Learn instead)', async () => {
+  it('while the lessons are still loading, there is no lesson card to tap yet', async () => {
     mockTier = 'guest';
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     require('@/data/content').fetchLessonMap.mockReturnValueOnce(new Promise(() => undefined));
     await renderHome();
-    expect(screen.queryByRole('button', { name: 'Try lesson 1' })).toBeNull();
-    expect(mockRouter.push).not.toHaveBeenCalledWith('/learn');
+    expect(screen.queryByRole('button', { name: /^Start your first lesson/ })).toBeNull();
+    expect(mockRouter.push).not.toHaveBeenCalled();
   });
 
   it('offers a free account without pressure', async () => {

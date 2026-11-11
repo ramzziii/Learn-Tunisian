@@ -14,17 +14,17 @@ describe('guest', () => {
 
   it('Home offers lesson 1; the lesson starts with the new words, then the quiz', async () => {
     const { page } = ctx;
-    // The button only appears (named) once lesson 1 is known, so this waits for it.
-    await page.getByRole('button', { name: 'Try lesson 1' }).click({ timeout: 20000 });
+    // The path's card only appears once the lessons are loaded, so this waits for it.
+    await page.getByRole('button', { name: /^Start your first lesson/ }).click({ timeout: 20000 });
     await page.waitForURL('**/lesson/**', { timeout: 15000 });
     await page.getByText(/New words · 1 of \d+/).waitFor({ timeout: 20000 });
     await page.getByRole('button', { name: 'Skip to practice' }).click();
     await page.getByText(/Tap the|Type the Tunisian|Listen/).first().waitFor({ timeout: 15000 });
   });
 
-  it('Learn lists the preview units', async () => {
+  it('Home lists the preview units', async () => {
     const { page } = ctx;
-    await page.goto(`${BASE}/learn`);
+    await page.goto(`${BASE}/home`);
     await page.getByText(/\d+ units?/).first().waitFor({ timeout: 15000 });
     assert.doesNotMatch(await bodyText(page), /No lessons yet/);
   });

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocalSearchParams } from 'expo-router';
 import { ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
+import { FieldHelp } from '@/components/admin/FieldHelp';
 import { AudioRecorderField } from '@/components/admin/AudioRecorderField';
 import { PhraseWordsEditor } from '@/components/admin/PhraseWordsEditor';
 import { PillSelect } from '@/components/admin/PillSelect';
@@ -157,14 +158,15 @@ export default function AdminWordGroupDetail() {
 
         <View style={[styles.card, shadows.card]}>
           {groupError ? <Text style={styles.errorText}>{groupError}</Text> : null}
-          <Text style={styles.fieldLabel}>English meaning</Text>
+          <FieldHelp label="English meaning" help="englishMeaning" labelStyle={styles.fieldLabel} />
           <TextInput accessibilityLabel="English meaning" value={englishMeaning} onChangeText={setEnglishMeaning} style={styles.input} />
-          <Text style={styles.fieldLabel}>Image keyword</Text>
+          <FieldHelp label="Image keyword" help="imageKeyword" labelStyle={styles.fieldLabel} />
           <TextInput accessibilityLabel="Image keyword" value={imageKeyword} onChangeText={setImageKeyword} style={styles.input} />
-          <Text style={styles.fieldLabel}>Sort order</Text>
+          <FieldHelp label="Sort order" help="wordSortOrder" labelStyle={styles.fieldLabel} />
           <TextInput accessibilityLabel="Sort order" value={sortOrder} onChangeText={setSortOrder} style={styles.input} keyboardType="number-pad" />
           <PillSelect
             label="Status"
+            help="wordStatus"
             options={statusOptionsFor(isReviewer, group.contentStatus)}
             value={contentStatus}
             onChange={(v) => setContentStatus(v as ContentStatus)}
@@ -288,9 +290,9 @@ function VariantRow({
         </Text>
       )}
       <View style={styles.variantHeaderRow}>
-        <PillSelect label="Label" options={VARIANT_LABEL_OPTIONS} value={variantLabel} onChange={(v) => setVariantLabel(v as VariantLabel)} />
+        <PillSelect label="Label" help="formLabel" options={VARIANT_LABEL_OPTIONS} value={variantLabel} onChange={(v) => setVariantLabel(v as VariantLabel)} />
         <View style={styles.verifiedBox}>
-          <Text style={styles.fieldLabel}>Text checked by a native speaker</Text>
+          <FieldHelp label="Text checked by a native speaker" help="textChecked" labelStyle={styles.fieldLabel} />
           <Switch
             value={nativeVerified}
             onValueChange={setNativeVerified}
@@ -304,20 +306,20 @@ function VariantRow({
       {variant.audioNeedsRecheck ? (
         <Text style={styles.recheckBadge}>🔁 Recording waiting for re-check (Audio → Re-check)</Text>
       ) : null}
-      <Text style={styles.fieldLabel}>Arabic</Text>
+      <FieldHelp label="Arabic" help="arabic" labelStyle={styles.fieldLabel} />
       <TextInput value={wordArabic} onChangeText={setWordArabic} style={styles.input} accessibilityLabel="Arabic" />
-      <Text style={styles.fieldLabel}>Transliteration</Text>
+      <FieldHelp label="Transliteration" help="transliteration" labelStyle={styles.fieldLabel} />
       <TextInput value={transliteration} onChangeText={setTransliteration} style={styles.input} accessibilityLabel="Transliteration" />
       {variant.audioPath && (wordArabic.trim() !== variant.wordArabic || transliteration.trim() !== variant.transliteration) ? (
         <Text style={styles.hint}>Saving keeps the recording and marks it for re-check, so learners won&apos;t hear it until someone confirms it.</Text>
       ) : null}
-      <Text style={styles.fieldLabel}>Notes</Text>
+      <FieldHelp label="Notes" help="notes" labelStyle={styles.fieldLabel} />
       <TextInput accessibilityLabel="Notes" value={notes} onChangeText={setNotes} style={styles.input} />
-      <Text style={styles.fieldLabel}>Sort order</Text>
+      <FieldHelp label="Sort order" help="formSortOrder" labelStyle={styles.fieldLabel} />
       <TextInput accessibilityLabel="Sort order" value={sortOrder} onChangeText={setSortOrder} style={styles.input} keyboardType="number-pad" />
-      <PillSelect label="Status" options={statusOptionsFor(isReviewer, variant.contentStatus)} value={status} onChange={(v) => setStatus(v as ContentStatus)} />
+      <PillSelect label="Status" help="formStatus" options={statusOptionsFor(isReviewer, variant.contentStatus)} value={status} onChange={(v) => setStatus(v as ContentStatus)} />
 
-      <Text style={styles.fieldLabel}>Pronunciation recording</Text>
+      <FieldHelp label="Pronunciation recording" help="pronunciationRecording" labelStyle={styles.fieldLabel} />
       <AudioRecorderField
         wordGroupId={variant.wordGroupId}
         variantId={variant.id}
@@ -336,7 +338,7 @@ function VariantRow({
 
       {/* A separate file and column from the pronunciation above, and never
           part of Repeat After Me (so no repeatAfterMe prop here). */}
-      <Text style={styles.fieldLabel}>Explanation recording (optional)</Text>
+      <FieldHelp label="Explanation recording (optional)" help="explanationRecording" labelStyle={styles.fieldLabel} />
       <Text style={styles.helperText}>
         A native speaker explaining it — in English, Arabic, or both.
         {variant.explanationAudioPath ? '' : ' No explanation yet.'}
@@ -356,15 +358,15 @@ function VariantRow({
 
       <View style={styles.variantHeaderRow}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.fieldLabel}>Speaker name</Text>
+          <FieldHelp label="Speaker name" help="speakerName" labelStyle={styles.fieldLabel} />
           <TextInput accessibilityLabel="Speaker name" value={speakerName} onChangeText={setSpeakerName} style={styles.input} />
         </View>
         <View style={styles.verifiedBox}>
-          <Text style={styles.fieldLabel}>Native recording</Text>
+          <FieldHelp label="Native recording" help="nativeRecording" labelStyle={styles.fieldLabel} />
           <Switch value={isNativeVoice} onValueChange={setIsNativeVoice} trackColor={{ true: colors.success }} />
         </View>
       </View>
-      <Text style={styles.fieldLabel}>Dialect / regional notes</Text>
+      <FieldHelp label="Dialect / regional notes" help="dialectNotes" labelStyle={styles.fieldLabel} />
       <TextInput accessibilityLabel="Dialect / regional notes" value={dialectNotes} onChangeText={setDialectNotes} style={styles.input} />
 
       <View style={styles.actionsRow}>
@@ -458,14 +460,14 @@ function NewVariantForm({
     <View style={[styles.card, shadows.card]}>
       <Text style={styles.sectionTitle}>Add variant</Text>
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
-      <PillSelect label="Label" options={VARIANT_LABEL_OPTIONS} value={variantLabel} onChange={(v) => setVariantLabel(v as VariantLabel)} />
-      <Text style={styles.fieldLabel}>Arabic</Text>
+      <PillSelect label="Label" help="formLabel" options={VARIANT_LABEL_OPTIONS} value={variantLabel} onChange={(v) => setVariantLabel(v as VariantLabel)} />
+      <FieldHelp label="Arabic" help="arabic" labelStyle={styles.fieldLabel} />
       <TextInput accessibilityLabel="New form: Arabic" value={wordArabic} onChangeText={setWordArabic} style={styles.input} placeholder="Arabic" />
-      <Text style={styles.fieldLabel}>Transliteration</Text>
+      <FieldHelp label="Transliteration" help="transliteration" labelStyle={styles.fieldLabel} />
       <TextInput accessibilityLabel="New form: Transliteration" value={transliteration} onChangeText={setTransliteration} style={styles.input} placeholder="Transliteration" />
-      <Text style={styles.fieldLabel}>Notes</Text>
+      <FieldHelp label="Notes" help="notes" labelStyle={styles.fieldLabel} />
       <TextInput accessibilityLabel="New form: Notes" value={notes} onChangeText={setNotes} style={styles.input} />
-      <Text style={styles.fieldLabel}>Sort order</Text>
+      <FieldHelp label="Sort order" help="formSortOrder" labelStyle={styles.fieldLabel} />
       <TextInput accessibilityLabel="New form: Sort order" value={sortOrder} onChangeText={setSortOrder} style={styles.input} keyboardType="number-pad" />
       <Button themed label="+ Add Variant" variant="secondary" onPress={handleCreate} loading={isSaving} style={{ marginTop: spacing.sm }} />
 

@@ -1,7 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { useMemo } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useMemo, type ReactNode } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { GrowingBar } from '@/components/lesson-map/GrowingBar';
 import { PulseRing } from '@/components/lesson-map/PulseRing';
@@ -9,7 +9,6 @@ import { UnitSection } from '@/components/lesson-map/UnitSection';
 import { PremiumBadge } from '@/components/premium/Premium';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Reveal } from '@/components/ui/Reveal';
-import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { radii, shadows, spacing, type ThemeColors } from '@/constants/theme';
 import type { UnitWithLessons } from '@/data/content';
 import type { ProfileProgressSummary } from '@/data/progress';
@@ -18,9 +17,20 @@ import type { ProgressInsights } from '@/lib/progressInsights';
 import { useTheme } from '@/lib/theme/ThemeContext';
 import type { LessonWithState } from '@/types/models';
 
-/** Reference features to explore alongside the curriculum. Same routes and
- * behaviour as before — only the entry points moved here (from Practice and
- * Profile). */
+/**
+ * The pieces of the Home and Learn tabs, in one visual style:
+ * - PageHeader: small coloured eyebrow, big bold title, optional badge.
+ * - LearnPath (Home, under Review): overall progress, the gradient Continue
+ *   card for the lesson that's up next, "Start here" before any lesson is
+ *   done, and the units with each lesson on a path (UnitSection).
+ * - SearchBar + ExploreSection (Learn): the dictionary and the reference
+ *   features (Alphabet, Phrasebook, Grammar, Culture, translations).
+ * Lesson order and unlock rules come from the data; the allowance lock from
+ * the caller (src/lib/access). Entrances are staggered, bars fill in and the
+ * next lesson ripples; loops stop when the OS asks to reduce motion.
+ */
+
+/** Reference features to explore alongside the curriculum. */
 const EXPLORE_LINKS: {
   emoji: string;
   /** Fixed identity accent, same approach as the Practice and Phrasebook tiles. */
@@ -36,32 +46,91 @@ const EXPLORE_LINKS: {
   { emoji: '💬', color: '#4CA771', title: 'Ask for a translation', description: 'Send a phrase you want to say in Tunisian', href: '/translation-requests' },
 ];
 
-export interface LearnViewData {
+export interface LearnPathData {
   unitsWithLessons: UnitWithLessons[];
   progressSummary: ProfileProgressSummary;
   progressInsights: ProgressInsights;
 }
 
-interface LearnViewProps {
-  data: LearnViewData;
+/** Big page title with a small coloured eyebrow above it, as on Learn. */
+export function PageHeader({
+  eyebrow,
+  title,
+  subtitle,
+  right,
+  children,
+}: {
+  eyebrow: string;
+  title: string;
+  subtitle?: string;
+  right?: ReactNode;
+  children?: ReactNode;
+}) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  return (
+    <View style={styles.header}>
+      <View style={styles.headerTop}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.eyebrow}>{eyebrow}</Text>
+          <Text style={styles.title} accessibilityRole="header">
+            {title}
+          </Text>
+          {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+        </View>
+        {right}
+      </View>
+      {children}
+    </View>
+  );
+}
+
+/** The round gold badge next to a page title ("40% done", "3/5 min"). */
+export function HeaderBadge({ value, label, success = false }: { value: string; label: string; success?: boolean }) {
+  const { colors, gradients } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  return (
+    <LinearGradient
+      colors={success ? gradients.success : gradients.celebration}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.percentBadge}
+    >
+      <Text style={[styles.percentValue, success && { color: colors.textOnPrimary }]}>{value}</Text>
+      <Text style={[styles.percentLabel, success && { color: colors.textOnPrimary }]}>{label}</Text>
+    </LinearGradient>
+  );
+}
+
+/** Dictionary / Search: words the learner can open (app/search.tsx). */
+export function SearchBar() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  return (
+    <PressableScale
+      accessibilityRole="button"
+      accessibilityLabel="Search words"
+      onPress={() => router.push('/search')}
+      style={styles.searchBar}
+    >
+      <Text style={styles.searchIcon}>🔍</Text>
+      <Text style={styles.searchPlaceholder}>Search words — English, عربي or 3/7/9</Text>
+    </PressableScale>
+  );
+}
+
+interface LearnPathProps {
+  data: LearnPathData;
   /** True once the lesson is past the learner's allowance (guest / free). */
   isLessonLocked: (lesson: LessonWithState) => boolean;
   /** Tapping a locked lesson: create-account prompt (guest) or upgrade flow (free). */
   onLockedPress: () => void;
-  /** "🔔 Your translation is ready", or null. */
-  translationNotice: string | null;
+  /** Delay before the first entrance, so it follows what's above it. */
+  baseDelay?: number;
 }
 
-/**
- * The Learn tab's content, given its loaded data (app/(tabs)/learn.tsx loads
- * it): a clean header with overall progress, one bold gradient "Continue"
- * card for the lesson that's up next (the page's focal point), the units as
- * cards with each lesson on a path (UnitSection), and Explore Tunisian.
- * Lesson order and unlock rules come from the data; the allowance lock from
- * the caller (src/lib/access). Entrances are staggered, bars fill in and the
- * next lesson ripples; loops stop when the OS asks to reduce motion.
- */
-export function LearnView({ data, isLessonLocked, onLockedPress, translationNotice }: LearnViewProps) {
+/** "Your path": progress, the Continue card, Start here, and Your units. */
+export function LearnPath({ data, isLessonLocked, onLockedPress, baseDelay = 0 }: LearnPathProps) {
   const { colors, gradients } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
@@ -78,188 +147,168 @@ export function LearnView({ data, isLessonLocked, onLockedPress, translationNoti
   const { wordsLearning, wordsMastered } = data.progressSummary;
 
   return (
-    <ScreenContainer themed style={{ padding: 0 }}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Header: title, overall progress, word stats. */}
-        <Reveal delay={0}>
-          <View style={styles.header}>
-            <View style={styles.headerTop}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.eyebrow}>Your path</Text>
-                <Text style={styles.title} accessibilityRole="header">
-                  Learn
-                </Text>
-              </View>
-              <LinearGradient colors={gradients.celebration} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.percentBadge}>
-                <Text style={styles.percentValue}>{percent}%</Text>
-                <Text style={styles.percentLabel}>done</Text>
-              </LinearGradient>
-            </View>
-            {/* Dictionary / Search: words the learner can open (app/search.tsx). */}
-            <PressableScale
-              accessibilityRole="button"
-              accessibilityLabel="Search words"
-              onPress={() => router.push('/search')}
-              style={styles.searchBar}
-            >
-              <Text style={styles.searchIcon}>🔍</Text>
-              <Text style={styles.searchPlaceholder}>Search words — English, عربي or 3/7/9</Text>
-            </PressableScale>
-            <Text style={styles.progressText}>
-              {completedCount} of {allLessons.length} {allLessons.length === 1 ? 'lesson' : 'lessons'} complete
-            </Text>
-            <GrowingBar
-              progress={allLessons.length > 0 ? completedCount / allLessons.length : 0}
-              colors={gradients.celebration}
-              trackColor={colors.border}
-              height={8}
-              delay={200}
-              style={{ marginTop: spacing.sm }}
-            />
-            <View style={styles.statRow}>
-              <View style={[styles.statPill, { backgroundColor: `${colors.success}1F` }]}>
-                <Text style={styles.statText}>
-                  🌱 <Text style={styles.statValue}>{wordsLearning}</Text> learning
-                </Text>
-              </View>
-              <View style={[styles.statPill, { backgroundColor: `${colors.accent}24` }]}>
-                <Text style={styles.statText}>
-                  ⭐ <Text style={styles.statValue}>{wordsMastered}</Text> mastered
-                </Text>
-              </View>
-              {data.progressInsights.strongArea ? (
-                <View style={[styles.statPill, { backgroundColor: `${colors.primary}1A` }]}>
-                  <Text style={styles.statText}>
-                    💪 Strong: <Text style={styles.statValue}>{data.progressInsights.strongArea.unitName}</Text>
-                  </Text>
-                </View>
-              ) : null}
-              {data.progressInsights.focusArea ? (
-                <View style={[styles.statPill, { backgroundColor: `${colors.error}1A` }]}>
-                  <Text style={styles.statText}>
-                    🎯 Practise: <Text style={styles.statValue}>{data.progressInsights.focusArea.unitName}</Text>
-                  </Text>
-                </View>
-              ) : null}
-            </View>
-          </View>
-        </Reveal>
-
-        <View style={styles.body}>
-          {nextLesson ? (
-            <Reveal delay={90}>
-              <ContinueCard
-                heading={hasCompletedALesson ? 'Continue' : 'Start your first lesson'}
-                // A lesson titled after its unit shows the unit name once.
-                lessonTitle={hasOwnLessonTitle(nextLesson) ? lessonDisplayTitle(nextLesson, nextPosition) : nextLesson.unitName}
-                meta={
-                  hasOwnLessonTitle(nextLesson)
-                    ? `${nextLesson.unitName} · Lesson ${nextPosition}`
-                    : `Lesson ${nextPosition}`
-                }
-                masteredCount={nextLesson.masteredCount}
-                wordCount={nextLesson.wordCount}
-                premiumLocked={isLessonLocked(nextLesson)}
-                onPress={() => (isLessonLocked(nextLesson) ? onLockedPress() : router.push(`/lesson/${nextLesson.id}`))}
-              />
-            </Reveal>
-          ) : allDone ? (
-            <Reveal delay={90}>
-              <LinearGradient colors={gradients.success} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.doneCard}>
-                <Text style={styles.doneTitle}>Every lesson complete 🎉</Text>
-                <Text style={styles.doneBody}>Keep it fresh with Review and Flashcards on the Practice tab.</Text>
-              </LinearGradient>
-            </Reveal>
-          ) : null}
-
-          {/* Before any lesson is completed, the letters are a gentle first step. */}
-          {!hasCompletedALesson ? (
-            <Reveal delay={150}>
-              <PressableScale
-                haptic
-                accessibilityRole="button"
-                accessibilityLabel="Start here: Alphabet. Get to know the Arabic letters and their sounds"
-                onPress={() => router.push('/alphabet')}
-                style={[styles.startHere, shadows.card]}
-              >
-                <View style={[styles.tileIcon, { backgroundColor: `${colors.accent}2E` }]}>
-                  <Text style={styles.tileEmoji}>🅰️</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.startHereEyebrow}>Start here</Text>
-                  <Text style={styles.cardTitle}>Alphabet</Text>
-                  <Text style={styles.cardBody}>Get to know the Arabic letters and their sounds.</Text>
-                </View>
-                <Text style={styles.chevron}>›</Text>
-              </PressableScale>
-            </Reveal>
-          ) : null}
-
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionHeading} accessibilityRole="header">
-              Your units
-            </Text>
-            <Text style={styles.sectionCount}>
-              {data.unitsWithLessons.length} {data.unitsWithLessons.length === 1 ? 'unit' : 'units'}
-            </Text>
-          </View>
-          {data.unitsWithLessons.length === 0 ? (
-            <Text style={styles.emptyText}>No lessons yet — check back soon!</Text>
-          ) : (
-            data.unitsWithLessons.map((unitWithLessons, index) => (
-              <Reveal key={unitWithLessons.unit.id} delay={Math.min(220 + index * 80, 700)}>
-                <UnitSection
-                  unitWithLessons={unitWithLessons}
-                  unitNumber={index + 1}
-                  onSelectLesson={(lessonId) => router.push(`/lesson/${lessonId}`)}
-                  onBrowseWords={(lessonId) => router.push(`/words/${lessonId}`)}
-                  isPremiumLocked={(lessonId) => {
-                    const lesson = lessonById.get(lessonId);
-                    return lesson ? isLessonLocked(lesson) : false;
-                  }}
-                  onPremiumLockedPress={onLockedPress}
-                />
-              </Reveal>
-            ))
-          )}
-
-          <View style={styles.exploreSection}>
-            <Text style={styles.sectionHeading} accessibilityRole="header">
-              Explore Tunisian
-            </Text>
-            <Text style={styles.exploreIntro}>Learn more about the language, at your own pace.</Text>
-            <View style={styles.tileGrid}>
-              {EXPLORE_LINKS.map((link, index) => (
-                <Reveal key={link.title} delay={Math.min(index * 60, 400)} style={styles.tileCell}>
-                  <PressableScale
-                    haptic
-                    accessibilityRole="button"
-                    accessibilityLabel={`${link.title}. ${link.description}`}
-                    onPress={() => router.push(link.href)}
-                    style={[styles.tile, shadows.card]}
-                  >
-                    <View style={[styles.tileIcon, { backgroundColor: `${link.color}26` }]}>
-                      <Text style={styles.tileEmoji}>{link.emoji}</Text>
-                    </View>
-                    <Text style={styles.cardTitle}>{link.title}</Text>
-                    <Text style={styles.cardBody}>{link.description}</Text>
-                    {link.href === '/translation-requests' && translationNotice ? (
-                      <Text style={styles.exploreNotice}>{translationNotice}</Text>
-                    ) : null}
-                  </PressableScale>
-                </Reveal>
-              ))}
-            </View>
-          </View>
+    <View>
+      <Reveal delay={baseDelay}>
+        <View style={styles.pathHeader}>
+          <Text style={[styles.sectionHeading, { flex: 1 }]} accessibilityRole="header">
+            Your path
+          </Text>
+          <HeaderBadge value={`${percent}%`} label="done" />
         </View>
-      </ScrollView>
-    </ScreenContainer>
+        <Text style={styles.progressText}>
+          {completedCount} of {allLessons.length} {allLessons.length === 1 ? 'lesson' : 'lessons'} complete
+        </Text>
+        <GrowingBar
+          progress={allLessons.length > 0 ? completedCount / allLessons.length : 0}
+          colors={gradients.celebration}
+          trackColor={colors.border}
+          height={8}
+          delay={baseDelay + 200}
+          style={{ marginTop: spacing.sm }}
+        />
+        <View style={styles.statRow}>
+          <View style={[styles.statPill, { backgroundColor: `${colors.success}1F` }]}>
+            <Text style={styles.statText}>
+              🌱 <Text style={styles.statValue}>{wordsLearning}</Text> learning
+            </Text>
+          </View>
+          <View style={[styles.statPill, { backgroundColor: `${colors.accent}24` }]}>
+            <Text style={styles.statText}>
+              ⭐ <Text style={styles.statValue}>{wordsMastered}</Text> mastered
+            </Text>
+          </View>
+          {data.progressInsights.strongArea ? (
+            <View style={[styles.statPill, { backgroundColor: `${colors.primary}1A` }]}>
+              <Text style={styles.statText}>
+                💪 Strong: <Text style={styles.statValue}>{data.progressInsights.strongArea.unitName}</Text>
+              </Text>
+            </View>
+          ) : null}
+          {data.progressInsights.focusArea ? (
+            <View style={[styles.statPill, { backgroundColor: `${colors.error}1A` }]}>
+              <Text style={styles.statText}>
+                🎯 Practise: <Text style={styles.statValue}>{data.progressInsights.focusArea.unitName}</Text>
+              </Text>
+            </View>
+          ) : null}
+        </View>
+      </Reveal>
+
+      {nextLesson ? (
+        <Reveal delay={baseDelay + 90}>
+          <ContinueCard
+            heading={hasCompletedALesson ? 'Continue' : 'Start your first lesson'}
+            // A lesson titled after its unit shows the unit name once.
+            lessonTitle={hasOwnLessonTitle(nextLesson) ? lessonDisplayTitle(nextLesson, nextPosition) : nextLesson.unitName}
+            meta={hasOwnLessonTitle(nextLesson) ? `${nextLesson.unitName} · Lesson ${nextPosition}` : `Lesson ${nextPosition}`}
+            masteredCount={nextLesson.masteredCount}
+            wordCount={nextLesson.wordCount}
+            premiumLocked={isLessonLocked(nextLesson)}
+            onPress={() => (isLessonLocked(nextLesson) ? onLockedPress() : router.push(`/lesson/${nextLesson.id}`))}
+          />
+        </Reveal>
+      ) : allDone ? (
+        <Reveal delay={baseDelay + 90}>
+          <LinearGradient colors={gradients.success} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.doneCard}>
+            <Text style={styles.doneTitle}>Every lesson complete 🎉</Text>
+            <Text style={styles.doneBody}>Keep it fresh with Review and Flashcards on the Practice tab.</Text>
+          </LinearGradient>
+        </Reveal>
+      ) : null}
+
+      {/* Before any lesson is completed, the letters are a gentle first step. */}
+      {!hasCompletedALesson ? (
+        <Reveal delay={baseDelay + 150}>
+          <PressableScale
+            haptic
+            accessibilityRole="button"
+            accessibilityLabel="Start here: Alphabet. Get to know the Arabic letters and their sounds"
+            onPress={() => router.push('/alphabet')}
+            style={[styles.startHere, shadows.card]}
+          >
+            <View style={[styles.tileIcon, { backgroundColor: `${colors.accent}2E` }]}>
+              <Text style={styles.tileEmoji}>🅰️</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.startHereEyebrow}>Start here</Text>
+              <Text style={styles.cardTitle}>Alphabet</Text>
+              <Text style={styles.cardBody}>Get to know the Arabic letters and their sounds.</Text>
+            </View>
+            <Text style={styles.chevron}>›</Text>
+          </PressableScale>
+        </Reveal>
+      ) : null}
+
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionHeading} accessibilityRole="header">
+          Your units
+        </Text>
+        <Text style={styles.sectionCount}>
+          {data.unitsWithLessons.length} {data.unitsWithLessons.length === 1 ? 'unit' : 'units'}
+        </Text>
+      </View>
+      {data.unitsWithLessons.length === 0 ? (
+        <Text style={styles.emptyText}>No lessons yet — check back soon!</Text>
+      ) : (
+        data.unitsWithLessons.map((unitWithLessons, index) => (
+          <Reveal key={unitWithLessons.unit.id} delay={Math.min(baseDelay + 220 + index * 80, 700)}>
+            <UnitSection
+              unitWithLessons={unitWithLessons}
+              unitNumber={index + 1}
+              onSelectLesson={(lessonId) => router.push(`/lesson/${lessonId}`)}
+              onBrowseWords={(lessonId) => router.push(`/words/${lessonId}`)}
+              isPremiumLocked={(lessonId) => {
+                const lesson = lessonById.get(lessonId);
+                return lesson ? isLessonLocked(lesson) : false;
+              }}
+              onPremiumLockedPress={onLockedPress}
+            />
+          </Reveal>
+        ))
+      )}
+    </View>
+  );
+}
+
+/** Explore Tunisian: the reference features as tiles, two per row. */
+export function ExploreSection({ translationNotice }: { translationNotice: string | null }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  return (
+    <View>
+      <Text style={styles.sectionHeading} accessibilityRole="header">
+        Explore Tunisian
+      </Text>
+      <Text style={styles.exploreIntro}>Learn more about the language, at your own pace.</Text>
+      <View style={styles.tileGrid}>
+        {EXPLORE_LINKS.map((link, index) => (
+          <Reveal key={link.title} delay={Math.min(index * 60, 400)} style={styles.tileCell}>
+            <PressableScale
+              haptic
+              accessibilityRole="button"
+              accessibilityLabel={`${link.title}. ${link.description}`}
+              onPress={() => router.push(link.href)}
+              style={[styles.tile, shadows.card]}
+            >
+              <View style={[styles.tileIcon, { backgroundColor: `${link.color}26` }]}>
+                <Text style={styles.tileEmoji}>{link.emoji}</Text>
+              </View>
+              <Text style={styles.cardTitle}>{link.title}</Text>
+              <Text style={styles.cardBody}>{link.description}</Text>
+              {link.href === '/translation-requests' && translationNotice ? (
+                <Text style={styles.exploreNotice}>{translationNotice}</Text>
+              ) : null}
+            </PressableScale>
+          </Reveal>
+        ))}
+      </View>
+    </View>
   );
 }
 
 const PLAY_SIZE = 60;
 
-/** The page's focal point: the one lesson that's up next, on a bold gradient
+/** The path's focal point: the one lesson that's up next, on a bold gradient
  * card with a white play button that ripples. */
 function ContinueCard({
   heading,
@@ -336,11 +385,11 @@ function ContinueCard({
 
 const makeStyles = (colors: ThemeColors) =>
   StyleSheet.create({
-    scrollContent: { paddingBottom: spacing.xxl },
     header: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.md },
     headerTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
     eyebrow: { fontSize: 12, fontWeight: '800', color: colors.primary, letterSpacing: 1.2, textTransform: 'uppercase' },
     title: { fontSize: 34, fontWeight: '800', color: colors.textPrimary, letterSpacing: -0.5 },
+    subtitle: { fontSize: 15, color: colors.textSecondary, marginTop: 2 },
     percentBadge: {
       width: 64,
       height: 64,
@@ -350,7 +399,8 @@ const makeStyles = (colors: ThemeColors) =>
     },
     percentValue: { fontSize: 18, fontWeight: '900', color: '#3A2A10' },
     percentLabel: { fontSize: 10, fontWeight: '700', color: '#3A2A10', opacity: 0.75, marginTop: -2 },
-    progressText: { fontSize: 14, fontWeight: '600', color: colors.textSecondary, marginTop: spacing.md },
+    pathHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.md },
+    progressText: { fontSize: 14, fontWeight: '600', color: colors.textSecondary, marginTop: spacing.sm },
     searchBar: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -365,11 +415,10 @@ const makeStyles = (colors: ThemeColors) =>
     },
     searchIcon: { fontSize: 16 },
     searchPlaceholder: { fontSize: 15, color: colors.textSecondary },
-    statRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.md },
+    statRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.md, marginBottom: spacing.lg },
     statPill: { borderRadius: radii.pill, paddingVertical: 6, paddingHorizontal: spacing.sm, maxWidth: '100%' },
     statText: { fontSize: 13, color: colors.textPrimary },
     statValue: { fontWeight: '800' },
-    body: { paddingHorizontal: spacing.lg },
     continueShadow: { borderRadius: radii.lg + 4, marginBottom: spacing.lg },
     continueCard: { borderRadius: radii.lg + 4, padding: spacing.lg, overflow: 'hidden' },
     decor: { position: 'absolute', borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.08)' },
@@ -416,7 +465,6 @@ const makeStyles = (colors: ThemeColors) =>
     sectionHeader: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginTop: spacing.sm, marginBottom: spacing.md },
     sectionHeading: { fontSize: 22, fontWeight: '800', color: colors.textPrimary, letterSpacing: -0.3 },
     sectionCount: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
-    exploreSection: { marginTop: spacing.lg },
     exploreIntro: { fontSize: 14, color: colors.textSecondary, marginTop: spacing.xs, marginBottom: spacing.md },
     tileGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
     // Two per row on phones; a single column when large text needs the room.

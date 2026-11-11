@@ -191,7 +191,7 @@ describe('admin content journey (TEST project)', { skip }, () => {
     const note = `E2E feedback ${RUN}`;
     try {
       await signInUi(learner.page, LEARNER_EMAIL);
-      await learner.page.goto(`${STAGING.base}/learn`);
+      await learner.page.goto(`${STAGING.base}/home`);
       await learner.page.getByText(UNIT).first().waitFor({ timeout: 20000 });
       step('learner sees unit');
 

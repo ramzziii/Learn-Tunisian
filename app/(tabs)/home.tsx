@@ -1,18 +1,18 @@
-import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { GrowingBar } from '@/components/lesson-map/GrowingBar';
+import { HeaderBadge, LearnPath, PageHeader } from '@/components/learn/LearnView';
 import { Button } from '@/components/ui/Button';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
-import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Reveal } from '@/components/ui/Reveal';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
-import { radii, spacing, type ThemeColors } from '@/constants/theme';
-import { fetchLessonMap } from '@/data/content';
+import { radii, shadows, spacing, type ThemeColors } from '@/constants/theme';
 import { fetchDailyGoalSettings } from '@/data/profiles';
 import { fetchReviewDueCount } from '@/data/progress';
 import { fetchMinutesLearnedToday } from '@/data/sessionLogs';
+import { useLearnPath } from '@/hooks/useLearnPath';
 import { useAccess } from '@/lib/access/AccessContext';
 import { useActiveProfile } from '@/lib/account/ActiveProfileContext';
 import { useTheme } from '@/lib/theme/ThemeContext';
@@ -25,18 +25,15 @@ interface HomeData {
 }
 
 /**
- * Home answers one question — "what should I do now?" — with one primary
- * action: Start today's practice (app/todays-practice.tsx). Below it, only
- * when words are due, a quiet "N words due" link to Review. Greeting and
- * today's minutes toward the daily goal stay; lessons live on Learn and
- * individual activities on Practice.
+ * Home, in the same style as Learn: a big greeting with today's minutes
+ * toward the goal, one primary action — Start today's practice
+ * (app/todays-practice.tsx) — a "N words due" link to Review only when
+ * words are due, and then the learner's path: progress, the Continue card,
+ * and Your units (LearnPath). Reference features live on Learn.
  *
  * Today's Practice works for a brand-new learner too: it takes new words
- * from the one unlocked lesson (lessons unlock in order, so there is only
- * ever one) — for a new learner the first lesson, which it opens (counted)
- * while the allowance has room. So there is no separate "start your first
- * lesson" fallback here — if that lesson had no words, a lesson session would have
- * none either, and Today's Practice's own empty state points to Practice.
+ * from the one unlocked lesson, so there is no separate "start your first
+ * lesson" button — the path's own "Start your first lesson" card is there.
  *
  * The daily-challenge checklist and the day count are no longer shown here;
  * their stored data and calculations (src/lib/dailyChallenges.ts,
@@ -48,42 +45,51 @@ export default function Home() {
   return <AccountHome />;
 }
 
+/** The learner's path under everything else, with its own loading/error. */
+function PathBlock({ path, baseDelay }: { path: ReturnType<typeof useLearnPath>; baseDelay: number }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  if (path.data) {
+    return <LearnPath data={path.data} isLessonLocked={path.isLessonLocked} onLockedPress={path.onLockedPress} baseDelay={baseDelay} />;
+  }
+  if (path.loadError) {
+    return (
+      <View style={styles.pathError}>
+        <Text style={styles.pathErrorText}>Couldn&apos;t load your lessons</Text>
+        <Button themed label="Try again" variant="secondary" onPress={path.reload} />
+      </View>
+    );
+  }
+  return <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.lg }} />;
+}
+
 /**
- * The guest preview's Home: no goal or streak (nothing is saved to an
- * account), one action — try the first preview lesson — and a quiet way to
- * create a free account.
+ * The guest preview's Home: no goal (nothing is saved to an account), the
+ * path — whose "Start your first lesson" card opens preview lesson 1 — and a
+ * quiet way to create a free account.
  */
 function GuestHome() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  // undefined while loading: the button waits rather than sending a quick tap
-  // to Learn; null (none / couldn't load) falls back to Learn.
-  const [firstLessonId, setFirstLessonId] = useState<string | null | undefined>(undefined);
-
-  useEffect(() => {
-    fetchLessonMap('guest')
-      .then((units) => setFirstLessonId(units.flatMap((u) => u.lessons)[0]?.id ?? null))
-      .catch(() => setFirstLessonId(null));
-  }, []);
+  const path = useLearnPath();
 
   return (
     <ScreenContainer themed style={{ padding: 0 }}>
-      <HomeHeader name="there" subtitle="You’re trying the free preview." />
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <Reveal style={styles.primaryAction}>
-          <Button
-            themed
-            label="Try lesson 1"
-            loading={firstLessonId === undefined}
-            onPress={() => router.push(firstLessonId ? `/lesson/${firstLessonId}` : '/learn')}
-          />
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <Reveal delay={0}>
+          <PageHeader eyebrow="Free preview" title="Ahla!" subtitle="You’re trying the free preview." />
         </Reveal>
-        <Reveal delay={80}>
-          <Text style={styles.guestNote}>
-            A free account keeps your progress and opens a few more lessons, phrases, notes and letters.
-          </Text>
-          <Button themed label="Create a free account" variant="ghost" onPress={() => router.push('/onboarding/age')} />
-        </Reveal>
+        <View style={styles.body}>
+          <Reveal delay={60}>
+            <View style={[styles.card, shadows.card]}>
+              <Text style={styles.guestNote}>
+                A free account keeps your progress and opens a few more lessons, phrases, notes and letters.
+              </Text>
+              <Button themed label="Create a free account" variant="secondary" onPress={() => router.push('/onboarding/age')} />
+            </View>
+          </Reveal>
+          <PathBlock path={path} baseDelay={120} />
+        </View>
       </ScrollView>
     </ScreenContainer>
   );
@@ -95,6 +101,7 @@ function AccountHome() {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [data, setData] = useState<HomeData | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const path = useLearnPath();
 
   const load = useCallback(async () => {
     if (!activeProfile) return;
@@ -108,160 +115,164 @@ function AccountHome() {
     setData({ reviewDueCount, minutesToday, goalMinutes: goalSettings?.dailyGoalMinutes ?? 5 });
   }, [activeProfile]);
 
-  useEffect(() => {
-    setData(null);
-    load();
-  }, [load]);
+  // A different profile starts from a blank screen; coming back to the tab
+  // refreshes in place (minutes and due words change after practice).
+  useEffect(() => setData(null), [activeProfile?.id]);
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load])
+  );
 
   const onRefresh = async () => {
     setIsRefreshing(true);
-    await load();
+    await Promise.all([load(), path.reload()]);
     setIsRefreshing(false);
   };
 
   if (!activeProfile) return <LoadingScreen themed />;
+  if (data === null) {
+    return (
+      <ScreenContainer themed style={{ padding: 0 }}>
+        <PageHeader eyebrow="Today" title={`Ahla, ${activeProfile.name}!`} subtitle="Ready for today’s practice?" />
+        <LoadingScreen themed />
+      </ScreenContainer>
+    );
+  }
 
   return (
     <ScreenContainer themed style={{ padding: 0 }}>
-      <HomeHeader name={activeProfile.name} />
-
-      {data === null ? (
-        <LoadingScreen themed />
-      ) : (
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-        >
-          <HomeContent data={data} />
-        </ScrollView>
-      )}
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+      >
+        <HomeContent name={activeProfile.name} data={data} />
+        <View style={styles.body}>
+          <PathBlock path={path} baseDelay={120} />
+        </View>
+      </ScrollView>
     </ScreenContainer>
   );
 }
 
-function HomeHeader({ name, subtitle = 'Ready for today’s practice?' }: { name: string; subtitle?: string }) {
-  const { colors, gradients } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
-  return (
-    <LinearGradient colors={gradients.primary} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
-      <Text style={styles.greeting}>Ahla, {name}!</Text>
-      <Text style={styles.subGreeting}>{subtitle}</Text>
-    </LinearGradient>
-  );
-}
-
-/** Today's minutes toward the goal, the one primary action, and — only when
- * something is due — a quiet link to Review. */
-function HomeContent({ data }: { data: HomeData }) {
+/** Greeting with today's minutes, the one primary action, and — only when
+ * something is due — a link to Review. */
+function HomeContent({ name, data }: { name: string; data: HomeData }) {
   const { colors, gradients } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { reviewDueCount, minutesToday, goalMinutes } = data;
 
-  const goalProgress = goalMinutes > 0 ? minutesToday / goalMinutes : 0;
+  const goalProgress = goalMinutes > 0 ? Math.min(minutesToday / goalMinutes, 1) : 0;
   const goalReached = minutesToday >= goalMinutes;
   const dueLabel = `${reviewDueCount} ${reviewDueCount === 1 ? 'word' : 'words'} due`;
 
   return (
     <>
       <Reveal delay={0}>
-        <View style={[styles.goalCard, styles.shadowCard]}>
-          <View style={styles.goalHeaderRow}>
-            <Text style={styles.goalLabel}>Today&apos;s goal</Text>
-            <Text style={styles.goalValue}>
-              {minutesToday} / {goalMinutes} min
-            </Text>
-          </View>
-          <ProgressBar themed progress={goalProgress} gradientColors={goalReached ? gradients.success : gradients.primary} />
+        <PageHeader
+          eyebrow="Today"
+          title={`Ahla, ${name}!`}
+          subtitle="Ready for today’s practice?"
+          right={<HeaderBadge value={`${minutesToday}/${goalMinutes}`} label="min" success={goalReached} />}
+        >
+          <Text style={styles.goalText}>
+            Today&apos;s goal: {minutesToday} / {goalMinutes} min
+          </Text>
+          <GrowingBar
+            progress={goalProgress}
+            colors={goalReached ? gradients.success : gradients.celebration}
+            trackColor={colors.border}
+            height={8}
+            delay={200}
+            style={{ marginTop: spacing.sm }}
+          />
           {goalReached ? (
-            <View style={styles.goalReachedBanner}>
+            <View style={styles.goalReachedPill}>
               <Text style={styles.goalReachedText}>🎉 Goal reached — nice work today!</Text>
             </View>
           ) : null}
-        </View>
+        </PageHeader>
       </Reveal>
 
-      <Reveal delay={15}>
-        <View style={[styles.todaysPracticeCard, styles.shadowCard]}>
-          <Text style={styles.todaysPracticeTitle}>Today’s Practice</Text>
-          <Text style={styles.todaysPracticeBody}>
-            A few minutes picked for you: words to review, a little new vocabulary and Repeat After Me.
-          </Text>
-          <Button themed label="Start today’s practice" onPress={() => router.push('/todays-practice')} />
-        </View>
-      </Reveal>
-
-      {reviewDueCount > 0 ? (
-        <Reveal delay={30}>
-          <Pressable
-            accessibilityRole="link"
-            accessibilityLabel={`${dueLabel}. Open Review`}
-            onPress={() => router.push('/review')}
-            hitSlop={8}
-            style={({ pressed }) => [styles.dueLink, pressed && { opacity: 0.6 }]}
-          >
-            <Text style={styles.dueLinkText}>{dueLabel}</Text>
-            <Text style={styles.dueLinkAction}>Review ›</Text>
-          </Pressable>
+      <View style={styles.body}>
+        <Reveal delay={40}>
+          <View style={[styles.card, shadows.card]}>
+            <View style={styles.cardTop}>
+              <View style={[styles.tileIcon, { backgroundColor: `${colors.primary}1F` }]}>
+                <Text style={styles.tileEmoji}>✨</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.cardTitle}>Today’s Practice</Text>
+                <Text style={styles.cardBody}>
+                  A few minutes picked for you: words to review, a little new vocabulary and Repeat After Me.
+                </Text>
+              </View>
+            </View>
+            <Button themed label="Start today’s practice" onPress={() => router.push('/todays-practice')} />
+          </View>
         </Reveal>
-      ) : null}
+
+        {reviewDueCount > 0 ? (
+          <Reveal delay={80}>
+            <Pressable
+              accessibilityRole="link"
+              accessibilityLabel={`${dueLabel}. Open Review`}
+              onPress={() => router.push('/review')}
+              hitSlop={8}
+              style={({ pressed }) => [styles.dueRow, shadows.card, pressed && { opacity: 0.7 }]}
+            >
+              <View style={[styles.tileIcon, { backgroundColor: `${colors.accent}2E` }]}>
+                <Text style={styles.tileEmoji}>🔁</Text>
+              </View>
+              <Text style={styles.dueText}>{dueLabel}</Text>
+              <Text style={styles.dueAction}>Review ›</Text>
+            </Pressable>
+          </Reveal>
+        ) : null}
+      </View>
     </>
   );
 }
 
-const makeStyles = (colors: ThemeColors) => {
-  // Elevation shadows kept theme-independent in shape, since RN shadows
-  // read fine on dark surfaces at low opacity too — see the redesign plan.
-  const shadowCard = { shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 3 };
-
-  return StyleSheet.create({
-    shadowCard,
-    header: {
-      padding: spacing.lg,
-      paddingBottom: spacing.xl,
-      borderBottomLeftRadius: radii.lg,
-      borderBottomRightRadius: radii.lg,
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    scrollContent: { paddingBottom: spacing.xxl },
+    body: { paddingHorizontal: spacing.lg },
+    goalText: { fontSize: 14, fontWeight: '600', color: colors.textSecondary, marginTop: spacing.md },
+    goalReachedPill: {
+      alignSelf: 'flex-start',
+      backgroundColor: `${colors.success}1F`,
+      borderRadius: radii.pill,
+      paddingVertical: 6,
+      paddingHorizontal: spacing.sm,
+      marginTop: spacing.sm,
     },
-    greeting: { fontSize: 24, fontWeight: '700', color: colors.textOnPrimary },
-    subGreeting: { fontSize: 14, color: colors.textOnPrimary, opacity: 0.85, marginTop: 2 },
-    scrollContent: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.xxl },
-    primaryAction: { marginBottom: spacing.lg },
-    guestNote: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', lineHeight: 20, marginBottom: spacing.xs },
-    todaysPracticeCard: {
+    goalReachedText: { fontSize: 13, fontWeight: '700', color: colors.success },
+    card: {
       backgroundColor: colors.surface,
       borderRadius: radii.lg,
       padding: spacing.md,
-      marginBottom: spacing.lg,
-      gap: spacing.sm,
+      marginBottom: spacing.md,
+      gap: spacing.md,
     },
-    todaysPracticeTitle: { fontSize: 17, fontWeight: '800', color: colors.textPrimary },
-    todaysPracticeBody: { fontSize: 14, color: colors.textSecondary, lineHeight: 20 },
-    goalCard: { backgroundColor: colors.surface, borderRadius: radii.lg, padding: spacing.md, marginBottom: spacing.lg },
-    goalHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
-    goalLabel: { fontSize: 14, fontWeight: '700', color: colors.textSecondary },
-    goalValue: { fontSize: 14, fontWeight: '700', color: colors.primary },
-    goalReachedBanner: {
-      backgroundColor: `${colors.success}1F`,
-      borderRadius: radii.md,
-      paddingVertical: spacing.xs,
-      paddingHorizontal: spacing.sm,
-      marginTop: spacing.sm,
-      alignItems: 'center',
-    },
-    goalReachedText: { fontSize: 13, fontWeight: '700', color: colors.success },
-    dueLink: {
+    cardTop: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
+    tileIcon: { width: 44, height: 44, borderRadius: radii.md, alignItems: 'center', justifyContent: 'center' },
+    tileEmoji: { fontSize: 22 },
+    cardTitle: { fontSize: 17, fontWeight: '800', color: colors.textPrimary },
+    cardBody: { fontSize: 14, color: colors.textSecondary, lineHeight: 20, marginTop: 2 },
+    guestNote: { fontSize: 14, color: colors.textSecondary, lineHeight: 20 },
+    dueRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'space-between',
-      flexWrap: 'wrap',
-      gap: spacing.sm,
-      paddingVertical: spacing.sm,
-      paddingHorizontal: spacing.md,
-      borderRadius: radii.md,
-      borderWidth: 1.5,
-      borderColor: colors.border,
-      marginBottom: spacing.lg,
+      gap: spacing.md,
+      padding: spacing.md,
+      borderRadius: radii.lg,
+      backgroundColor: colors.surface,
+      marginBottom: spacing.md,
     },
-    dueLinkText: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
-    dueLinkAction: { fontSize: 15, fontWeight: '700', color: colors.primary },
+    dueText: { flex: 1, fontSize: 16, fontWeight: '700', color: colors.textPrimary },
+    dueAction: { fontSize: 15, fontWeight: '700', color: colors.primary },
+    pathError: { alignItems: 'center', gap: spacing.sm, marginTop: spacing.lg },
+    pathErrorText: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
   });
-};

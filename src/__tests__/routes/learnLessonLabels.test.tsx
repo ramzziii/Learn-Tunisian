@@ -10,7 +10,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 jest.mock('expo-router', () => ({ router: { push: jest.fn(), replace: jest.fn(), back: jest.fn() } }));
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const { LearnView } = require('@/components/learn/LearnView');
+const { LearnPath } = require('@/components/learn/LearnView');
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { ThemeProvider } = require('@/lib/theme/ThemeContext');
 
@@ -42,7 +42,7 @@ const data = {
 it('lesson rows and the Continue card count lessons within their unit', async () => {
   await render(
     <ThemeProvider>
-      <LearnView data={data} isLessonLocked={() => false} onLockedPress={() => undefined} translationNotice={null} />
+      <LearnPath data={data} isLessonLocked={() => false} onLockedPress={() => undefined} />
     </ThemeProvider>
   );
   // Each unit's first lesson is "Lesson 1" (3 rows), plus the Continue card's
