@@ -114,7 +114,7 @@ export function SearchBar() {
       style={styles.searchBar}
     >
       <Text style={styles.searchIcon}>🔍</Text>
-      <Text style={styles.searchPlaceholder}>Search words — English, عربي or 3/7/9</Text>
+      <Text style={styles.searchPlaceholder}>Search words — English, عربي</Text>
     </PressableScale>
   );
 }
