@@ -212,4 +212,128 @@ export const GRAMMAR_NOTES: GrammarNote[] = [
       { term: 'hopefully', form: 'nchallah' },
     ],
   },
+  // Added 2026-11: examples taken from the owner's AI-drafted word and phrase
+  // sheets (content-work/), added at the owner's request without a native
+  // review — same "not verified" status as the notes above.
+  {
+    id: 'future_bech',
+    emoji: '⏭️',
+    title: 'Going To (Future)',
+    explanation: 'To say what you are going to do, put bech before the verb.',
+    examples: [
+      { transliteration: 'Bech nechri 5obz.', english: 'I am going to buy bread.' },
+      { transliteration: 'Bech ne5ou 9ahwa m3aya.', english: 'I will take coffee with me.' },
+      { transliteration: 'Bech nechri 7lib.', english: 'I am going to buy milk.' },
+    ],
+    quickTerms: [
+      { term: 'going to', form: 'bech' },
+      { term: 'I am going to buy', form: 'bech nechri' },
+      { term: 'I will take', form: 'bech ne5ou' },
+    ],
+  },
+  {
+    id: 'there_is',
+    emoji: '📍',
+    title: 'There Is / There Isn’t',
+    explanation: 'Famma means "there is". Ask with it, or wrap it in ma- ... -ch to say "there isn’t".',
+    examples: [
+      { transliteration: 'Famma taxi?', english: 'Is there a taxi?' },
+      { transliteration: 'Famma saydliya?', english: 'Is there a pharmacy?' },
+      { transliteration: 'Ma fammech 7lib.', english: 'There is no milk.' },
+    ],
+    quickTerms: [
+      { term: 'there is / is there?', form: 'famma' },
+      { term: 'there isn’t', form: 'ma fammech' },
+    ],
+  },
+  {
+    id: 'want_and_can',
+    emoji: '💪',
+    title: 'Want To / Can',
+    explanation: 'Put n7eb (I want) or nnajjem (I can) right before another verb.',
+    examples: [
+      { transliteration: 'N7eb nel9a mat3am.', english: 'I want to find a restaurant.' },
+      { transliteration: 'Tnajjem t3awenni?', english: 'Can you help me?' },
+      { transliteration: 'Ma nnajjemch.', english: 'I can’t.' },
+    ],
+    quickTerms: [
+      { term: 'I want to…', form: 'n7eb + verb' },
+      { term: 'I can', form: 'nnajjem' },
+      { term: 'I can’t', form: 'ma nnajjemch' },
+      { term: 'can you…?', form: 'tnajjem…?' },
+    ],
+  },
+  {
+    id: 'commands',
+    emoji: '👉',
+    title: 'Asking Someone To Do Something',
+    explanation: 'Short command words are everyday Tounsi. Many end in -ni, which means "me".',
+    examples: [
+      { transliteration: 'Wa9ef houni.', english: 'Stop here.' },
+      { transliteration: 'Khallini nchouf.', english: 'Let me see.' },
+      { transliteration: 'Dir balek!', english: 'Be careful!' },
+    ],
+    quickTerms: [
+      { term: 'give me', form: '3atini' },
+      { term: 'show me', form: 'warrini' },
+      { term: 'tell me', form: '9olli' },
+      { term: 'wait for me', form: 'stannani' },
+      { term: 'hurry up', form: '3ajjel' },
+    ],
+  },
+  {
+    id: 'masculine_feminine',
+    emoji: '⚖️',
+    title: 'Masculine & Feminine',
+    explanation: 'Many words for people add -a when they describe a woman.',
+    examples: [
+      { transliteration: 'mzawej → mzawja', english: 'Married (man → woman)' },
+      { transliteration: 'momarredh → momarredha', english: 'Nurse (man → woman)' },
+      { transliteration: 'tabbakh → tabbakha', english: 'Cook (man → woman)' },
+    ],
+    quickTerms: [
+      { term: 'married', form: 'mzawej / mzawja' },
+      { term: 'single', form: '3azeb / 3azba' },
+      { term: 'tourist', form: 'saye7 / say7a' },
+    ],
+  },
+  {
+    id: 'where_things_are',
+    emoji: '🧭',
+    title: 'Where Things Are',
+    explanation: 'Place words go before the thing they describe.',
+    examples: [
+      { transliteration: '9rib men saydliya.', english: 'Near the pharmacy.' },
+      { transliteration: 'B3id 3la mostachfa.', english: 'Far from the hospital.' },
+    ],
+    quickTerms: [
+      { term: 'above', form: 'fou9' },
+      { term: 'under', form: 'te7t' },
+      { term: 'in front of', form: '9oddem' },
+      { term: 'behind', form: 'wra' },
+      { term: 'inside', form: 'jwa' },
+      { term: 'outside', form: 'bra' },
+      { term: 'next to', form: 'jnab' },
+      { term: 'between', form: 'bin' },
+    ],
+  },
+  {
+    id: 'joining_words',
+    emoji: '🔗',
+    title: 'Joining Words',
+    explanation: 'These small words link ideas: and, or, but, because, if, also.',
+    examples: [
+      { transliteration: '9ahwa wala 7lib?', english: 'Coffee or milk?' },
+      { transliteration: '5obz w zit.', english: 'Bread and oil.' },
+      { transliteration: 'Ena zeda.', english: 'Me too.' },
+    ],
+    quickTerms: [
+      { term: 'and', form: 'w' },
+      { term: 'or', form: 'wala' },
+      { term: 'but', form: 'ama' },
+      { term: 'because', form: '3la khater' },
+      { term: 'if', form: 'kan' },
+      { term: 'also', form: 'zeda' },
+    ],
+  },
 ];

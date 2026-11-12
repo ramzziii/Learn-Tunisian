@@ -130,7 +130,7 @@ describe('admin (test account, not a reviewer)', { skip: ADMIN ? false : 'set E2
     const startedPremium = await sw.isChecked();
     try {
       await toggle(false);
-      assert.equal(await grammarLocksSettleAt(5), 5, 'free preview: 5 grammar notes locked');
+      assert.equal(await grammarLocksSettleAt(12), 12, 'free preview: 12 grammar notes locked');
       assert.match(await bodyText(page), /Viewing as a free user/);
       await toggle(true);
       assert.equal(await grammarLocksSettleAt(0), 0, 'Premium: nothing locked');

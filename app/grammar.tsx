@@ -26,9 +26,9 @@ const EXPAND_ANIMATION = LayoutAnimation.create(220, 'easeInEaseOut', 'opacity')
 // of the same flat data, so adding/reordering topics never requires
 // touching this list except to slot a new id into the right bucket.
 const GRAMMAR_CATEGORIES: { label: string; noteIds: string[] }[] = [
-  { label: 'Sentence Basics', noteIds: ['sentence_order', 'everyday_pronouns'] },
-  { label: 'Verbs & Tense', noteIds: ['present_verbs', 'past_tense', 'negation'] },
-  { label: 'Everyday Speech', noteIds: ['questions', 'possession', 'small_words'] },
+  { label: 'Sentence Basics', noteIds: ['sentence_order', 'everyday_pronouns', 'masculine_feminine', 'joining_words'] },
+  { label: 'Verbs & Tense', noteIds: ['present_verbs', 'past_tense', 'future_bech', 'negation', 'want_and_can', 'commands'] },
+  { label: 'Everyday Speech', noteIds: ['questions', 'possession', 'there_is', 'where_things_are', 'small_words'] },
 ];
 
 interface GroupedNote {
