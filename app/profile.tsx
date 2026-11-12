@@ -1,9 +1,10 @@
-import { router } from 'expo-router';
+import { router, useCanGoBack } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { RequireAccount } from '@/components/guest/RequireAccount';
 
 import { TimeWheelPicker } from '@/components/onboarding/TimeWheelPicker';
+import { BackButton } from '@/components/ui/BackButton';
 import { DisplaySettings } from '@/components/settings/DisplaySettings';
 import { Button } from '@/components/ui/Button';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
@@ -40,9 +41,9 @@ interface ProgressStats extends ProfileProgressSummary {
 }
 
 /**
- * The Profile tab — moved here from app/settings/index.tsx (was reached via
- * Home's gear icon; that icon is gone now that this is a real tab). Content
- * is unchanged: progress stats, daily goal + reminder, favorites, switch/add
+ * Profile — opened from the account button at the top right of each tab
+ * (src/components/account/AccountButton.tsx) and pushed over the tabs with
+ * a back button; /profile links keep working. Content is unchanged: progress stats, daily goal + reminder, favorites, switch/add
  * profile, plans, sign out — plus the new Appearance section (Light/Dark/
  * Match device), the one place in the app that actually changes the theme.
  *
@@ -171,6 +172,7 @@ function ProfileScreen() {
   if (loadError) {
     return (
       <ScreenContainer themed>
+        <ProfileBackButton />
         <View style={styles.errorContainer}>
           <Text style={styles.errorEmoji}>😕</Text>
           <Text style={styles.errorTitle}>Couldn&apos;t load settings</Text>
@@ -186,6 +188,7 @@ function ProfileScreen() {
   return (
     <ScreenContainer themed>
       <ScrollView showsVerticalScrollIndicator={false}>
+        <ProfileBackButton />
         <Text style={styles.eyebrow}>Profile</Text>
         <Text style={styles.title}>{activeProfile.name}&apos;s settings</Text>
 
@@ -447,8 +450,15 @@ const makeStyles = (colors: ThemeColors) => {
   });
 };
 
+/** Back to where Profile was opened from; opened straight from its link
+ * (no history), it goes to Home instead of leaving the learner stuck. */
+function ProfileBackButton() {
+  const canGoBack = useCanGoBack();
+  return <BackButton themed onPress={() => (canGoBack ? router.back() : router.replace('/home'))} />;
+}
+
 /** Account only: a guest gets the create-account explanation (src/components/guest/RequireAccount.tsx). */
-export default function ProfileTab() {
+export default function ProfileScreenRoute() {
   return (
     <RequireAccount>
       <ProfileScreen />

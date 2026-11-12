@@ -28,7 +28,7 @@ it('matches what the database allows', () => {
 });
 
 it('onboarding and Profile use the shared list instead of their own copy', () => {
-  for (const file of ['app/onboarding/goal.tsx', 'app/(tabs)/profile.tsx']) {
+  for (const file of ['app/onboarding/goal.tsx', 'app/profile.tsx']) {
     const source = readFileSync(join(root, file), 'utf8');
     expect(source).toMatch(/DAILY_GOAL_OPTIONS/);
     expect(source).not.toMatch(/\[5, 10, 15\]/);

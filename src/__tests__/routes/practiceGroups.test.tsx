@@ -10,6 +10,9 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,
   default: { getItem: jest.fn(async () => null), setItem: jest.fn(async () => undefined) },
 }));
+// The account button (top right of each tab) reads these.
+jest.mock('@/lib/access/AccessContext', () => ({ useAccess: () => ({ tier: 'free', isResolved: true }) }));
+jest.mock('@/lib/account/ActiveProfileContext', () => ({ useActiveProfile: () => ({ activeProfile: { id: 'p1', name: 'Sam' } }) }));
 jest.mock('expo-router', () => ({
   router: { push: (...a: unknown[]) => mockPush(...a), replace: jest.fn(), back: jest.fn(), canGoBack: () => true },
 }));
@@ -58,5 +61,7 @@ it('no Alphabet, Phrasebook, Grammar Notes or Culture Corner here (they’re on 
   for (const moved of [/Alphabet/, /Phrasebook/, /Grammar Notes/, /Culture Corner/]) {
     expect(screen.queryByText(moved)).toBeNull();
   }
-  expect(screen.getAllByRole('button')).toHaveLength(4);
+  // The 4 activities, plus the account button at the top right.
+  const activities = screen.getAllByRole('button').filter((b) => b.props.accessibilityLabel !== 'Profile and settings');
+  expect(activities).toHaveLength(4);
 });

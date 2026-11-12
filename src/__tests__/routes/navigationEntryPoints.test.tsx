@@ -2,7 +2,7 @@
 // - Phrasebook links to its browse-and-listen phrase cards;
 // - Review loads the due words (practice isn't counted — no daily allowance;
 //   which words it may use is tested in practiceAccess.test.tsx);
-// - the five tabs are unchanged.
+// - four tabs (Home, Learn, Practice, Talk); Profile is a pushed screen.
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 declare const __dirname: string;
@@ -78,12 +78,17 @@ describe('Review', () => {
   });
 });
 
-it('the five tabs are unchanged: Home, Learn, Practice, Talk, Profile', () => {
+it('four tabs: Home, Learn, Practice, Talk — Profile is one pushed screen, not a tab', () => {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { readFileSync } = require('fs');
+  const { existsSync, readFileSync } = require('fs');
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const { join } = require('path');
-  const layout = readFileSync(join(__dirname, '..', '..', '..', 'app', '(tabs)', '_layout.tsx'), 'utf8');
+  const app = join(__dirname, '..', '..', '..', 'app');
+  const layout = readFileSync(join(app, '(tabs)', '_layout.tsx'), 'utf8');
   const titles = [...layout.matchAll(/title: '([^']+)'/g)].map((m) => m[1]);
-  expect(titles).toEqual(['Home', 'Learn', 'Practice', 'Talk', 'Profile']);
+  expect(titles).toEqual(['Home', 'Learn', 'Practice', 'Talk']);
+  expect(layout).not.toMatch(/name="profile"/);
+  // One /profile route only: at the root (pushed over the tabs), none in the tabs group.
+  expect(existsSync(join(app, 'profile.tsx'))).toBe(true);
+  expect(existsSync(join(app, '(tabs)', 'profile.tsx'))).toBe(false);
 });

@@ -27,7 +27,7 @@ const mockProfile = { id: 'p1', name: 'Ramzi', isPremium: false };
 const mockFetchClaims = jest.fn(async () => ({}));
 const mockClaimItem = jest.fn(async () => true);
 
-jest.mock('expo-router', () => ({ router: { push: jest.fn(), replace: jest.fn(), back: jest.fn() } }));
+jest.mock('expo-router', () => ({ router: { push: jest.fn(), replace: jest.fn(), back: jest.fn() }, useCanGoBack: () => true }));
 jest.mock('@/lib/admin/AdminContext', () => ({ useIsAdmin: () => ({ isAdmin: mockIsAdmin, isLoading: false }) }));
 jest.mock('@/lib/account/ActiveProfileContext', () => ({
   useActiveProfile: () => ({ activeProfile: mockProfile, profiles: [mockProfile] }),
@@ -55,7 +55,7 @@ jest.mock('@/data/content', () => ({ countCompletedLessons: jest.fn(async () => 
 jest.mock('@/components/translation/TranslationRequestsEntry', () => ({ TranslationRequestsEntry: () => null }));
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const ProfileScreen = require('../../../app/(tabs)/profile').default;
+const ProfileScreen = require('../../../app/profile').default;
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { ThemeProvider } = require('@/lib/theme/ThemeContext');
 // eslint-disable-next-line @typescript-eslint/no-var-requires
