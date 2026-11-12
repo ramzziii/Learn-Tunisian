@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { TabTopRow } from '@/components/account/AccountButton';
 import { openUpgradeFlow, PremiumBadge } from '@/components/premium/Premium';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Reveal } from '@/components/ui/Reveal';
@@ -36,7 +37,7 @@ export default function TalkScenarioPicker() {
   return (
     <ScreenContainer themed>
       <ScrollView showsVerticalScrollIndicator={false}>
-        <Text style={styles.eyebrow}>Conversation practice</Text>
+        <TabTopRow eyebrow="Conversation practice" eyebrowStyle={styles.eyebrow} />
         <Text style={styles.title}>Talk to a Tunisian 🇹🇳</Text>
         <Text style={styles.subtitle}>Choose a situation to practice a real conversation.</Text>
         {!unlocked ? (

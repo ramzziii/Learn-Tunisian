@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { useMemo, type ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { TabTopRow } from '@/components/account/AccountButton';
 import { GrowingBar } from '@/components/lesson-map/GrowingBar';
 import { PulseRing } from '@/components/lesson-map/PulseRing';
 import { UnitSection } from '@/components/lesson-map/UnitSection';
@@ -52,7 +53,8 @@ export interface LearnPathData {
   progressInsights: ProgressInsights;
 }
 
-/** Big page title with a small coloured eyebrow above it, as on Learn. */
+/** A tab's header: small coloured eyebrow with the account button beside
+ * it (top right), then the big page title. */
 export function PageHeader({
   eyebrow,
   title,
@@ -70,9 +72,9 @@ export function PageHeader({
   const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <View style={styles.header}>
+      <TabTopRow eyebrow={eyebrow} eyebrowStyle={styles.eyebrow} />
       <View style={styles.headerTop}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.eyebrow}>{eyebrow}</Text>
           <Text style={styles.title} accessibilityRole="header">
             {title}
           </Text>
@@ -114,7 +116,7 @@ export function SearchBar() {
       style={styles.searchBar}
     >
       <Text style={styles.searchIcon}>🔍</Text>
-      <Text style={styles.searchPlaceholder}>Search words — English, عربي or 3/7/9</Text>
+      <Text style={styles.searchPlaceholder}>Search words — English, عربي</Text>
     </PressableScale>
   );
 }

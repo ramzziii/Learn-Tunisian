@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { TabTopRow } from '@/components/account/AccountButton';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Reveal } from '@/components/ui/Reveal';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
@@ -54,7 +55,7 @@ export default function PracticeHubScreen() {
 
   return (
     <ScreenContainer themed>
-      <Text style={styles.eyebrow}>Sharpen your skills</Text>
+      <TabTopRow eyebrow="Sharpen your skills" eyebrowStyle={styles.eyebrow} />
       <Text style={styles.title}>Practice</Text>
       <Text style={styles.subtitle}>Keep what you’ve learned fresh — review it, hear it, say it.</Text>
 

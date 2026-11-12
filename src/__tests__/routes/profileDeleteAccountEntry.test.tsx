@@ -16,7 +16,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   default: { getItem: jest.fn(async () => null), setItem: jest.fn(async () => undefined) },
 }));
 const mockPush = jest.fn();
-jest.mock('expo-router', () => ({ router: { push: (...a: unknown[]) => mockPush(...a), replace: jest.fn(), back: jest.fn() } }));
+jest.mock('expo-router', () => ({ router: { push: (...a: unknown[]) => mockPush(...a), replace: jest.fn(), back: jest.fn() }, useCanGoBack: () => true }));
 jest.mock('@/lib/account/ActiveProfileContext', () => ({
   useActiveProfile: () => ({ activeProfile: mockProfile, profiles: [mockProfile] }),
 }));
@@ -53,7 +53,7 @@ jest.mock('@/components/translation/TranslationRequestsEntry', () => ({
 jest.mock('@/data/content', () => ({ countCompletedLessons: jest.fn(async () => 1) }));
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const ProfileScreen = require('../../../app/(tabs)/profile').default;
+const ProfileScreen = require('../../../app/profile').default;
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { ThemeProvider } = require('@/lib/theme/ThemeContext');
 

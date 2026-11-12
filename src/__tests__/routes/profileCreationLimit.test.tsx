@@ -192,7 +192,7 @@ describe('no profile switching', () => {
     );
     expect(offenders).toEqual([]);
 
-    const profileTab = readFileSync(join(__dirname, '../../../app/(tabs)/profile.tsx'), 'utf8');
+    const profileTab = readFileSync(join(__dirname, '../../../app/profile.tsx'), 'utf8');
     expect(profileTab).not.toMatch(/['"]\/profiles['"]/);
   });
 });

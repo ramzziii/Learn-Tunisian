@@ -1,4 +1,4 @@
-// Profile tab: admins get a clear "Admin dashboard" entry near the top;
+// Profile: admins get a clear "Admin dashboard" entry near the top;
 // everyone else never sees it.
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
@@ -12,7 +12,17 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,
   default: { getItem: jest.fn(async () => null), setItem: jest.fn(async () => undefined) },
 }));
-jest.mock('expo-router', () => ({ router: { push: (...a: unknown[]) => mockPush(...a), replace: jest.fn(), back: jest.fn() } }));
+const mockBack = jest.fn();
+const mockReplace = jest.fn();
+let mockCanGoBack = true;
+jest.mock('expo-router', () => ({
+  router: {
+    push: (...a: unknown[]) => mockPush(...a),
+    replace: (...a: unknown[]) => mockReplace(...a),
+    back: (...a: unknown[]) => mockBack(...a),
+  },
+  useCanGoBack: () => mockCanGoBack,
+}));
 jest.mock('@/lib/account/ActiveProfileContext', () => ({
   useActiveProfile: () => ({ activeProfile: mockProfile, profiles: [mockProfile] }),
 }));
@@ -43,7 +53,7 @@ jest.mock('@/components/translation/TranslationRequestsEntry', () => ({
 jest.mock('@/data/content', () => ({ countCompletedLessons: jest.fn(async () => 1) }));
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const ProfileScreen = require('../../../app/(tabs)/profile').default;
+const ProfileScreen = require('../../../app/profile').default;
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { ThemeProvider } = require('@/lib/theme/ThemeContext');
 
@@ -56,7 +66,28 @@ const renderProfile = () =>
 
 beforeEach(() => {
   mockPush.mockReset();
+  mockBack.mockReset();
+  mockReplace.mockReset();
+  mockCanGoBack = true;
   mockIsAdmin = true;
+});
+
+// Profile is a pushed screen (not a tab), opened from the account button.
+describe('Profile’s back button', () => {
+  it('goes back to the tab it was opened from', async () => {
+    await renderProfile();
+    await fireEvent.press(await screen.findByRole('button', { name: 'Go back' }));
+    expect(mockBack).toHaveBeenCalled();
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('opened straight from its /profile link (no history): goes Home', async () => {
+    mockCanGoBack = false;
+    await renderProfile();
+    await fireEvent.press(await screen.findByRole('button', { name: 'Go back' }));
+    expect(mockReplace).toHaveBeenCalledWith('/home');
+    expect(mockBack).not.toHaveBeenCalled();
+  });
 });
 
 it('admin: an "Admin dashboard" entry near the top opens the dashboard', async () => {

@@ -28,7 +28,7 @@ const { ThemeProvider } = require('@/lib/theme/ThemeContext');
 const themed = (el: React.ReactElement) => render(<ThemeProvider>{el}</ThemeProvider>);
 
 const GUARDED: [string, string][] = [
-  ['Profile tab', '../../../app/(tabs)/profile'],
+  ['Profile', '../../../app/profile'],
   ['translation requests', '../../../app/translation-requests'],
   ['account deletion', '../../../app/account/delete'],
   ['profile chooser', '../../../app/profiles/index'],

@@ -4,8 +4,10 @@ import { Platform, Text } from 'react-native';
 import { useTheme } from '@/lib/theme/ThemeContext';
 
 /**
- * The app's real navigation spine — Home / Learn / Practice / Talk /
- * Profile. Being a route GROUP ("(tabs)"), this folder name never appears
+ * The app's real navigation spine — four tabs: Home / Learn / Practice /
+ * Talk. Profile is not a tab: it's app/profile.tsx, pushed over the tabs
+ * from the account button at the top right of each tab
+ * (src/components/account/AccountButton.tsx). Being a route GROUP ("(tabs)"), this folder name never appears
  * in the URL: app/(tabs)/home.tsx is still reached at exactly "/home", so
  * every existing router.push('/home')-style call elsewhere in the app kept
  * working unchanged when these screens moved here.
@@ -13,8 +15,8 @@ import { useTheme } from '@/lib/theme/ThemeContext';
  * Everything else (lesson sessions, review, phrasebook, alphabet, culture,
  * settings sub-screens, onboarding, auth) stays outside this group as
  * ordinary full-screen routes, pushed on top of the tab bar exactly the way
- * Home already pushed to /lesson/[lessonId] before this change — only the
- * five section landing pages themselves are tabs.
+ * Home pushes to /lesson/[lessonId] — only the four section landing pages
+ * themselves are tabs.
  *
  * Tab switching stays instant (no added transition) — motion in this app
  * lives in screen pushes and taps, not tab switches; see app/_layout.tsx
@@ -51,10 +53,6 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="talk"
         options={{ title: 'Talk', tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>💬</Text> }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{ title: 'Profile', tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>👤</Text> }}
       />
     </Tabs>
   );
